@@ -254,7 +254,7 @@ fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16, com
 /// Interception strategy (tries in order):
 /// 1. LD_PRELOAD (if layer built) — hooks connect() at libc level
 /// 2. HTTP_PROXY + ANTHROPIC_BASE_URL — env var based redirection
-pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, transparent: bool, session_name: Option<String>, command: Vec<String>) -> Result<()> {
+pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, transparent: bool, session_name: Option<String>, max_cost: Option<f64>, command: Vec<String>) -> Result<()> {
     use std::os::unix::io::{AsRawFd, FromRawFd};
     use crate::logging::session_registry::{self, SessionEntry};
 
@@ -356,7 +356,8 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
 
     let yaml_path = crate::cli::find_rigor_yaml(path)?;
     let (event_tx, _event_rx) = daemon::ws::create_event_channel();
-    let state = daemon::DaemonState::load(yaml_path.clone(), event_tx)?;
+    let mut state = daemon::DaemonState::load(yaml_path.clone(), event_tx)?;
+    state.max_cost_usd = max_cost;
 
     let constraint_count = state.config.all_constraints().len();
     info_println!(

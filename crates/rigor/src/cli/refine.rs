@@ -3,12 +3,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::logging::{ViolationLogEntry, ViolationLogger};
 
 const FP_RATE_THRESHOLD: f64 = 0.30;
 const MIN_ANNOTATED_HITS: usize = 3;
+/// Threshold for auto-refinement: higher bar than suggestions.
+const AUTO_FP_RATE_THRESHOLD: f64 = 0.30;
+/// Minimum annotations required before auto-refinement triggers.
+const AUTO_MIN_ANNOTATED_HITS: usize = 5;
 
 /// A suggested refinement to a constraint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -306,6 +310,170 @@ pub fn run_refine(apply: bool, dry_run: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Closed-loop auto-refinement: reads violations.jsonl, identifies constraints
+/// with FP rate > 30% and >= 5 annotations, generates a regex exclusion line,
+/// updates rigor.yaml in place, and records the refinement to ~/.rigor/refinements.jsonl.
+///
+/// Returns the list of refined constraint IDs.
+pub fn auto_refine_if_needed(yaml_path: &Path) -> Result<Vec<String>> {
+    let logger = ViolationLogger::new()?;
+    let entries = logger.read_all()?;
+
+    // Group entries by constraint and compute per-constraint FP stats
+    #[derive(Default)]
+    struct Bucket {
+        name: String,
+        fp: usize,
+        tp: usize,
+        fp_texts: Vec<String>,
+    }
+    let mut map: HashMap<String, Bucket> = HashMap::new();
+
+    for e in &entries {
+        let b = map.entry(e.constraint_id.clone()).or_default();
+        b.name = e.constraint_name.clone();
+        match e.false_positive {
+            Some(true) => {
+                b.fp += 1;
+                // Collect claim texts from false positives for pattern analysis
+                for t in &e.claim_text {
+                    if b.fp_texts.len() < 10 {
+                        b.fp_texts.push(t.clone());
+                    }
+                }
+            }
+            Some(false) => b.tp += 1,
+            None => {}
+        }
+    }
+
+    let mut refined_ids = Vec::new();
+    let mut refinements = Vec::new();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for (cid, b) in &map {
+        let annotated = b.fp + b.tp;
+        if annotated < AUTO_MIN_ANNOTATED_HITS {
+            continue;
+        }
+        let fp_rate = b.fp as f64 / annotated as f64;
+        if fp_rate <= AUTO_FP_RATE_THRESHOLD {
+            continue;
+        }
+
+        // Analyze false-positive claim texts to find common patterns
+        let exclusion_pattern = build_regex_hint(&b.fp_texts);
+
+        let yaml_note = format!(
+            "# rigor-refine: constraint `{}` has FP rate {:.1}% ({} FP / {} annotated). Consider tightening regex, e.g. add negative lookahead: {}",
+            cid,
+            fp_rate * 100.0,
+            b.fp,
+            annotated,
+            exclusion_pattern
+        );
+
+        refinements.push(Refinement {
+            constraint_id: cid.clone(),
+            constraint_name: b.name.clone(),
+            false_positive_rate: fp_rate,
+            annotated_hits: annotated,
+            false_positive_count: b.fp,
+            false_positive_examples: b.fp_texts.clone(),
+            suggested_hint: exclusion_pattern.clone(),
+            yaml_note,
+            generated_at: now.clone(),
+        });
+
+        refined_ids.push(cid.clone());
+    }
+
+    if refinements.is_empty() {
+        return Ok(refined_ids);
+    }
+
+    // Apply refinements to rigor.yaml
+    let yaml_pb = yaml_path.to_path_buf();
+    let (new_content, _diff) = apply_to_yaml(&yaml_pb, &refinements)?;
+    fs::write(yaml_path, &new_content).context("Failed to write updated rigor.yaml during auto-refine")?;
+
+    // Also update the rego blocks: add a `not regex.match(...)` exclusion line
+    // for each refined constraint directly into the rego block in rigor.yaml.
+    let mut content = fs::read_to_string(yaml_path)?;
+    for r in &refinements {
+        content = inject_rego_exclusion(&content, &r.constraint_id, &r.suggested_hint);
+    }
+    fs::write(yaml_path, &content)?;
+
+    // Record to ~/.rigor/refinements.jsonl
+    append_history("auto", &refinements).ok();
+
+    Ok(refined_ids)
+}
+
+/// Inject a `not regex.match(...)` exclusion line into a constraint's rego block
+/// in the raw YAML content. Finds the constraint's rego block by looking for the
+/// `- id: <constraint_id>` line, then locating the first `not regex.match` line
+/// or the line before `v := {`, and inserts a new exclusion.
+fn inject_rego_exclusion(content: &str, constraint_id: &str, pattern: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut result = Vec::new();
+    let mut in_target_constraint = false;
+    let mut in_rego_block = false;
+    let mut exclusion_injected = false;
+
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+
+        // Detect the target constraint block
+        if trimmed.starts_with("- id:") {
+            let id = trimmed
+                .strip_prefix("- id:")
+                .unwrap_or("")
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'');
+            in_target_constraint = id == constraint_id;
+            in_rego_block = false;
+            exclusion_injected = false;
+        }
+
+        // Detect rego block start
+        if in_target_constraint && (trimmed == "rego: |" || trimmed == "rego: >") {
+            in_rego_block = true;
+        }
+
+        // Within rego block of target constraint, find insertion point
+        if in_target_constraint && in_rego_block && !exclusion_injected {
+            // Insert before the `v := {` line
+            if trimmed.starts_with("v := {") {
+                // Determine indentation of the v := line
+                let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+                let exclusion_line = format!(
+                    "{}not regex.match(`{}`, c.text)",
+                    indent, pattern
+                );
+                // Check we haven't already added this exact exclusion
+                let already_present = lines.iter().any(|l| l.trim() == exclusion_line.trim());
+                if !already_present {
+                    result.push(exclusion_line);
+                }
+                exclusion_injected = true;
+            }
+        }
+
+        result.push(line.to_string());
+    }
+
+    // Ensure trailing newline
+    let joined = result.join("\n");
+    if content.ends_with('\n') && !joined.ends_with('\n') {
+        format!("{}\n", joined)
+    } else {
+        joined
+    }
 }
 
 #[cfg(test)]

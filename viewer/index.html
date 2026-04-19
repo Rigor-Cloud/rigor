@@ -181,6 +181,14 @@
       </div>
       <div id="eval-summary"></div>
       <div id="eval-constraints"><div class="empty-hint">Loading eval data...</div></div>
+
+      <!-- COST section -->
+      <div class="obs-header" style="margin-top:24px;">
+        <span class="obs-title">Cost Tracking</span>
+        <button id="cost-refresh" class="obs-btn">Refresh</button>
+      </div>
+      <div id="cost-summary"></div>
+      <div id="cost-models"><div class="empty-hint">Loading cost data...</div></div>
     </div>
   </div>
 
@@ -219,7 +227,7 @@
         // Auto-load data for observability pages
         var pg = btn.getAttribute('data-page');
         if (pg === 'sessions') loadSessions();
-        if (pg === 'eval') loadEval();
+        if (pg === 'eval') { loadEval(); loadCost(); }
       });
     });
 
@@ -1110,6 +1118,13 @@
           timelineEvents.push({ ts: Date.now(), type: 'tokens', input: data.input_tokens||0, output: data.output_tokens||0, model: data.model||'' });
           renderTimeline();
           break;
+        case 'session_cost':
+          // Update the cost display in the header
+          if (data.total_cost_usd !== undefined) {
+            var costEl = el('stat-tokens');
+            if (costEl) costEl.textContent = formatTokens(stats.totalInput + stats.totalOutput) + ' tokens ($' + data.total_cost_usd.toFixed(4) + ')';
+          }
+          break;
         case 'judge_activity':
           // Show judge activity on timeline as a purple marker
           if (data.action.indexOf('start') !== -1) {
@@ -1698,6 +1713,33 @@
       }).catch(function(){ document.getElementById('eval-constraints').innerHTML = '<div class="empty-hint">Failed to load</div>'; });
     }
     document.getElementById('eval-refresh').addEventListener('click', loadEval);
+
+    // Cost tab
+    function loadCost() {
+      fetch('/api/cost').then(function(r){return r.json();}).then(function(data){
+        var sum = document.getElementById('cost-summary');
+        var budgetStr = data.max_cost_usd ? '$' + data.max_cost_usd.toFixed(2) : 'unlimited';
+        var budgetClass = data.budget_exceeded ? 'obs-sev-block' : '';
+        var pausedStr = data.proxy_paused ? ' (PAUSED)' : '';
+        sum.innerHTML = '<div class="obs-eval-grid">' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">$' + data.total_cost_usd.toFixed(4) + '</div><div class="obs-eval-label">total cost</div></div>' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">' + formatTokens(data.total_input_tokens) + '</div><div class="obs-eval-label">input tokens</div></div>' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">' + formatTokens(data.total_output_tokens) + '</div><div class="obs-eval-label">output tokens</div></div>' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">$' + data.cost_per_violation.toFixed(4) + '</div><div class="obs-eval-label">cost/violation</div></div>' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num ' + budgetClass + '">' + budgetStr + pausedStr + '</div><div class="obs-eval-label">budget</div></div>' +
+          '</div>';
+        var modelsEl = document.getElementById('cost-models');
+        if (!data.models || !data.models.length) { modelsEl.innerHTML = '<div class="empty-hint">No model cost data yet</div>'; return; }
+        var html = '<table class="obs-table"><thead><tr><th>Model</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost (USD)</th></tr></thead><tbody>';
+        data.models.sort(function(a,b){ return b.cost_usd - a.cost_usd; });
+        data.models.forEach(function(m){
+          html += '<tr><td class="obs-name">' + m.model + '</td><td>' + formatTokens(m.input_tokens) + '</td><td>' + formatTokens(m.output_tokens) + '</td><td>$' + m.cost_usd.toFixed(4) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        modelsEl.innerHTML = html;
+      }).catch(function(){ document.getElementById('cost-models').innerHTML = '<div class="empty-hint">Failed to load cost data</div>'; });
+    }
+    document.getElementById('cost-refresh').addEventListener('click', loadCost);
 
     initGraph();
     loadInitialGraph();

@@ -1489,6 +1489,14 @@ async fn proxy_request(
                                             let _ = crate::alerting::fire_for_violations(&persisted).await;
                                         });
                                     }
+                                    // Auto-refine: check if any constraint needs refinement
+                                    let auto_refine_yaml = {
+                                        let st = state_bg.lock().unwrap();
+                                        st.yaml_path.clone()
+                                    };
+                                    tokio::spawn(async move {
+                                        let _ = crate::cli::refine::auto_refine_if_needed(&auto_refine_yaml);
+                                    });
                                 }
 
                                 // Build violation summary
@@ -1698,6 +1706,41 @@ async fn proxy_request(
                     output_tokens,
                     model: model_bg.clone(),
                 });
+
+                // Cost tracking: estimate cost, accumulate, emit SessionCost, check budget
+                let cost = crate::cost::estimate_cost(&model_bg, input_tokens, output_tokens);
+                let (budget_exceeded, cum_cost) = {
+                    let mut st = state_bg.lock().unwrap();
+                    st.cumulative_input_tokens += input_tokens;
+                    st.cumulative_output_tokens += output_tokens;
+                    st.cumulative_cost_usd += cost;
+                    let entry = st.cost_by_model.entry(model_bg.clone()).or_insert((0, 0, 0.0));
+                    entry.0 += input_tokens;
+                    entry.1 += output_tokens;
+                    entry.2 += cost;
+                    let exceeded = st.max_cost_usd.map(|max| st.cumulative_cost_usd > max).unwrap_or(false);
+                    if exceeded && !st.proxy_paused {
+                        st.proxy_paused = true;
+                    }
+                    (exceeded, st.cumulative_cost_usd)
+                };
+
+                let _ = event_tx_bg.send(DaemonEvent::SessionCost {
+                    session_id: session_id_bg.clone(),
+                    input_tokens,
+                    output_tokens,
+                    total_cost_usd: cum_cost,
+                    model: model_bg.clone(),
+                });
+
+                if budget_exceeded {
+                    let _ = event_tx_bg.send(DaemonEvent::GovernanceState {
+                        action: "pause".to_string(),
+                        detail: "Budget exceeded".to_string(),
+                    });
+                    crate::daemon::ws::emit_log(&event_tx_bg, "warn", "cost",
+                        format!("Budget exceeded (${:.4}) — proxy paused", cum_cost));
+                }
             }
 
             // Stream ended — final evaluation with retry capability.
@@ -1983,6 +2026,41 @@ async fn proxy_request(
                 output_tokens,
                 model: model.clone(),
             });
+
+            // Cost tracking: estimate cost, accumulate, emit SessionCost, check budget
+            let cost = crate::cost::estimate_cost(&model, input_tokens, output_tokens);
+            let (budget_exceeded, cum_cost) = {
+                let mut st = state.lock().unwrap();
+                st.cumulative_input_tokens += input_tokens;
+                st.cumulative_output_tokens += output_tokens;
+                st.cumulative_cost_usd += cost;
+                let entry = st.cost_by_model.entry(model.clone()).or_insert((0, 0, 0.0));
+                entry.0 += input_tokens;
+                entry.1 += output_tokens;
+                entry.2 += cost;
+                let exceeded = st.max_cost_usd.map(|max| st.cumulative_cost_usd > max).unwrap_or(false);
+                if exceeded && !st.proxy_paused {
+                    st.proxy_paused = true;
+                }
+                (exceeded, st.cumulative_cost_usd)
+            };
+
+            let _ = event_tx.send(DaemonEvent::SessionCost {
+                session_id: session_id.clone(),
+                input_tokens,
+                output_tokens,
+                total_cost_usd: cum_cost,
+                model: model.clone(),
+            });
+
+            if budget_exceeded {
+                let _ = event_tx.send(DaemonEvent::GovernanceState {
+                    action: "pause".to_string(),
+                    detail: "Budget exceeded".to_string(),
+                });
+                crate::daemon::ws::emit_log(&event_tx, "warn", "cost",
+                    format!("Budget exceeded (${:.4}) — proxy paused", cum_cost));
+            }
         }
     }
 
@@ -2573,6 +2651,14 @@ fn extract_and_evaluate_text(
                 let _ = logger.log(&entry);
             }
         }
+        // Auto-refine: check if any constraint needs refinement after persisting
+        let auto_refine_yaml = {
+            let st = state.lock().unwrap();
+            st.yaml_path.clone()
+        };
+        tokio::spawn(async move {
+            let _ = crate::cli::refine::auto_refine_if_needed(&auto_refine_yaml);
+        });
     }
 
     // Async LLM-as-judge: compute semantic relevance between claims and constraints.
