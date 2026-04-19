@@ -16,6 +16,7 @@ pub mod serve;
 pub mod sessions;
 pub mod setup;
 pub mod show;
+pub mod trust;
 pub mod validate;
 pub mod web;
 
@@ -186,12 +187,23 @@ pub enum Commands {
         #[arg(short = 'n', long, default_value = "50")]
         lines: usize,
     },
-    /// Install the rigor CA certificate into the macOS login keychain.
-    /// After this, ALL apps trust rigor's MITM certificates — no more
-    /// NODE_TLS_REJECT_UNAUTHORIZED=0 needed.
-    Trust,
-    /// Remove the rigor CA certificate from the macOS login keychain.
-    Untrust,
+    /// Install rigor trust for a tool or the system CA.
+    ///
+    /// `rigor trust`            — install CA into macOS keychain
+    /// `rigor trust opencode`   — create wrapper so opencode auto-routes through rigor
+    /// `rigor trust claude`     — create wrapper so claude auto-routes through rigor
+    Trust {
+        /// Tool to trust: opencode, claude. Omit for system CA install.
+        tool: Option<String>,
+    },
+    /// Remove rigor trust for a tool or the system CA.
+    ///
+    /// `rigor untrust`          — remove CA from macOS keychain
+    /// `rigor untrust opencode` — remove opencode wrapper
+    Untrust {
+        /// Tool to untrust. Omit for system CA removal.
+        tool: Option<String>,
+    },
     /// Configure rigor global settings (judge API, model, etc.)
     Config {
         /// Action: set, get, list
@@ -366,8 +378,18 @@ pub fn run_cli() -> Result<()> {
         Some(Commands::Log { command }) => log::run_log(command),
         Some(Commands::Sessions { active, last }) => sessions::run_sessions(active, last),
         Some(Commands::Logs { session, follow, lines }) => logs::run_logs(session, follow, lines),
-        Some(Commands::Trust) => crate::daemon::tls::install_ca_trust(),
-        Some(Commands::Untrust) => crate::daemon::tls::remove_ca_trust(),
+        Some(Commands::Trust { tool }) => {
+            match tool.as_deref() {
+                Some(t) => trust::install_tool_wrapper(t),
+                None => crate::daemon::tls::install_ca_trust(),
+            }
+        }
+        Some(Commands::Untrust { tool }) => {
+            match tool.as_deref() {
+                Some(t) => trust::remove_tool_wrapper(t),
+                None => crate::daemon::tls::remove_ca_trust(),
+            }
+        }
         Some(Commands::Config { action, key, value }) => config::run_config(&action, key.as_deref(), value.as_deref()),
         Some(Commands::Map { path, codebase, check, deep }) => map::run_map(path, codebase, check, deep),
         Some(Commands::Gate { subcommand }) => gate::run_gate(&subcommand),
