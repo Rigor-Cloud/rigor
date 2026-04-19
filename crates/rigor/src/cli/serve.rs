@@ -206,35 +206,34 @@ impl ExecReplaceSelf for std::process::Command {
 
 /// Foreground mode: start the daemon, register the session, block until signal.
 fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>) -> Result<()> {
-    // rigor serve works without a rigor.yaml — it just runs with zero constraints.
-    // This lets you start the daemon globally and connect any project to it.
-    let yaml_path = match crate::cli::find_rigor_yaml(path) {
-        Ok(p) => {
-            eprintln!("rigor serve: loaded constraints from {}", p.display());
-            Some(p)
+    // rigor serve is a global daemon — no project context at startup.
+    // Constraints are loaded per-session when traffic arrives (via plugin headers).
+    // If --path is given explicitly, load those constraints as defaults.
+    let (state, constraint_count) = if let Some(ref p) = path {
+        match crate::cli::find_rigor_yaml(Some(p.clone())) {
+            Ok(yp) => {
+                let (event_tx, _) = daemon::ws::create_event_channel();
+                let s = DaemonState::load(yp, event_tx)?;
+                let c = s.config.all_constraints().len();
+                eprintln!("rigor serve: loaded {} constraints from {}", c, p.display());
+                (s, c)
+            }
+            Err(_) => {
+                let (event_tx, _) = daemon::ws::create_event_channel();
+                let s = DaemonState::empty(event_tx)?;
+                (s, 0)
+            }
         }
-        Err(_) => {
-            eprintln!("rigor serve: no rigor.yaml found — running with zero constraints");
-            eprintln!("rigor serve: connect from a project directory, or pass --path <rigor.yaml>");
-            None
-        }
+    } else {
+        let (event_tx, _) = daemon::ws::create_event_channel();
+        let s = DaemonState::empty(event_tx)?;
+        (s, 0)
     };
 
-    // Apply global flags the proxy subsystem expects. `serve` is the "plain
-    // proxy for arbitrary clients" mode — MITM enabled so we can inspect LLM
-    // traffic and evaluate constraints.
     daemon::ws::set_quiet(false);
     daemon::ws::set_mitm_enabled(true);
     daemon::ws::set_transparent(false);
     daemon::ws::set_grounded_client(daemon::ws::GroundedClient::Unknown);
-
-    let (event_tx, _event_rx) = daemon::ws::create_event_channel();
-    let state = if let Some(ref yp) = yaml_path {
-        DaemonState::load(yp.clone(), event_tx)?
-    } else {
-        DaemonState::empty(event_tx)?
-    };
-    let constraint_count = state.config.all_constraints().len();
 
     // Register in the session registry so `rigor sessions` shows us.
     let session_id = uuid::Uuid::new_v4().to_string();
@@ -249,7 +248,7 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
         ended_at: None,
         pid: std::process::id(),
         constraints: constraint_count,
-        config_path: yaml_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "(none)".to_string()),
+        config_path: path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "(global)".to_string()),
         cwd: std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
@@ -278,11 +277,11 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
         print_connection_banner(port, false, Path::new(""));
     }
 
-    eprintln!(
-        "rigor serve: {} constraints{}",
-        constraint_count,
-        yaml_path.as_ref().map(|p| format!(" from {}", p.display())).unwrap_or_default()
-    );
+    if constraint_count > 0 {
+        eprintln!("rigor serve: {} constraints loaded", constraint_count);
+    } else {
+        eprintln!("rigor serve: global mode — constraints loaded per-session from connecting projects");
+    }
     eprintln!("rigor serve: session '{}' ({})", entry_name, &session_id[..8]);
 
     let shared = Arc::new(Mutex::new(state));
