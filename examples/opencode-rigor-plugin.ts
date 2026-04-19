@@ -85,9 +85,26 @@ export const RigorPlugin: Plugin = async ({ client, directory }) => {
     },
 
     // Fires when a new OpenCode session starts.
-    // Register it with rigor so the dashboard can track it.
+    // Register it with rigor so the dashboard can track it, AND tell rigor
+    // which project directory we're in so it can load that project's
+    // rigor.yaml and compile the right constraint set.
     "session.created": async (input) => {
       if (!(await isRigorAlive())) return
+
+      // Register the project directory so the daemon can discover rigor.yaml
+      // and hot-reload constraints for this session.
+      try {
+        await fetch(`${RIGOR_BASE}/api/project/register`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ directory: directory }),
+          signal: AbortSignal.timeout(500),
+        })
+      } catch {
+        // Best-effort — if the daemon can't load the project config we
+        // fall back to whatever constraints it already had.
+      }
+
       try {
         await fetch(`${RIGOR_BASE}/api/gate/register-snapshot`, {
           method: "POST",
@@ -96,7 +113,7 @@ export const RigorPlugin: Plugin = async ({ client, directory }) => {
             session_id: input.info?.id ?? "unknown",
             tool_name: "opencode.session",
             affected_paths: [],
-            metadata: { source: "rigor-plugin" },
+            metadata: { source: "rigor-plugin", directory },
           }),
           signal: AbortSignal.timeout(500),
         })

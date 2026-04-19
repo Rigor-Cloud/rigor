@@ -1,12 +1,30 @@
 //! REST API handlers for dashboard observability tabs.
 
-use axum::extract::Query;
+use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Json, Response};
+use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::logging::session_registry;
 use crate::logging::ViolationLogger;
+use super::SharedState;
+
+/// Walk up from `start` looking for `rigor.yaml`. Returns `None` when we
+/// reach the filesystem root without finding one.
+fn find_rigor_yaml_from(start: &Path) -> Option<PathBuf> {
+    let mut current = start.to_path_buf();
+    loop {
+        let candidate = current.join("rigor.yaml");
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        if !current.pop() {
+            return None;
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/sessions — list all sessions
@@ -216,4 +234,159 @@ pub async fn eval_stats() -> Response {
         constraints,
     })
     .into_response()
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/cost — cumulative session cost tracking
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+struct CostModelBreakdown {
+    model: String,
+    input_tokens: u64,
+    output_tokens: u64,
+    cost_usd: f64,
+}
+
+#[derive(Serialize)]
+struct CostResponse {
+    total_input_tokens: u64,
+    total_output_tokens: u64,
+    total_cost_usd: f64,
+    max_cost_usd: Option<f64>,
+    budget_exceeded: bool,
+    proxy_paused: bool,
+    cost_per_violation: f64,
+    models: Vec<CostModelBreakdown>,
+}
+
+pub async fn cost_stats(State(state): State<SharedState>) -> Response {
+    let st = state.lock().unwrap();
+
+    // Count violations for cost-per-violation
+    let violation_count = {
+        let logger = ViolationLogger::new().ok();
+        logger.and_then(|l| l.read_all().ok()).map(|e| e.len()).unwrap_or(0)
+    };
+    let cost_per_violation = if violation_count > 0 {
+        st.cumulative_cost_usd / violation_count as f64
+    } else {
+        0.0
+    };
+
+    let models: Vec<CostModelBreakdown> = st.cost_by_model.iter()
+        .map(|(model, (inp, out, cost))| CostModelBreakdown {
+            model: model.clone(),
+            input_tokens: *inp,
+            output_tokens: *out,
+            cost_usd: *cost,
+        })
+        .collect();
+
+    let budget_exceeded = st.max_cost_usd
+        .map(|max| st.cumulative_cost_usd > max)
+        .unwrap_or(false);
+
+    Json(CostResponse {
+        total_input_tokens: st.cumulative_input_tokens,
+        total_output_tokens: st.cumulative_output_tokens,
+        total_cost_usd: st.cumulative_cost_usd,
+        max_cost_usd: st.max_cost_usd,
+        budget_exceeded,
+        proxy_paused: st.proxy_paused,
+        cost_per_violation,
+        models,
+    })
+    .into_response()
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/project/register — per-project constraint discovery
+// ---------------------------------------------------------------------------
+//
+// Invoked by the OpenCode plugin's `session.created` hook. The plugin POSTs
+// the active project directory and we walk up from there looking for a
+// `rigor.yaml`. If one is found AND it's different from whatever we already
+// have loaded, we rebuild the argumentation graph + policy engine in place
+// so the next proxied LLM request evaluates against this project's rules.
+//
+// If no rigor.yaml exists in the tree, the daemon keeps its current state
+// (typically "empty" / zero constraints from `rigor serve`). Errors in
+// loading are non-fatal for the session — we just return a 400 so the
+// plugin can log it.
+
+#[derive(Deserialize)]
+pub struct RegisterProjectBody {
+    pub directory: String,
+}
+
+#[derive(Serialize)]
+pub struct RegisterProjectResponse {
+    pub constraints: usize,
+    pub path: String,
+    /// "loaded" — newly loaded this call.
+    /// "cached" — same path was already loaded, no reload happened.
+    /// "none" — no rigor.yaml found in the directory tree.
+    pub status: String,
+}
+
+pub async fn register_project(
+    State(state): State<SharedState>,
+    Json(body): Json<RegisterProjectBody>,
+) -> Response {
+    let start = PathBuf::from(&body.directory);
+
+    // Walk up looking for rigor.yaml. Missing file is a legitimate outcome
+    // (project isn't using rigor) — tell the caller so it can decide whether
+    // to log, not an error.
+    let Some(yaml_path) = find_rigor_yaml_from(&start) else {
+        return Json(RegisterProjectResponse {
+            constraints: 0,
+            path: String::new(),
+            status: "none".to_string(),
+        })
+        .into_response();
+    };
+
+    // Cache check before we grab the write lock: if nothing changed we can
+    // take the short read-lock path and skip the graph rebuild entirely.
+    {
+        let st = state.lock().unwrap();
+        if st.yaml_path == yaml_path {
+            return Json(RegisterProjectResponse {
+                constraints: st.config.all_constraints().len(),
+                path: yaml_path.display().to_string(),
+                status: "cached".to_string(),
+            })
+            .into_response();
+        }
+    }
+
+    let path_display = yaml_path.display().to_string();
+    let result = {
+        let mut st = state.lock().unwrap();
+        st.reload_config(yaml_path)
+    };
+
+    match result {
+        Ok(count) => {
+            eprintln!(
+                "rigor daemon: hot-reloaded {} constraints from {}",
+                count, path_display
+            );
+            Json(RegisterProjectResponse {
+                constraints: count,
+                path: path_display,
+                status: "loaded".to_string(),
+            })
+            .into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("failed to load {}: {}", path_display, e),
+            })),
+        )
+            .into_response(),
+    }
 }

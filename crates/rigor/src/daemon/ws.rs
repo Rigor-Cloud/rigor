@@ -77,6 +77,14 @@ pub enum DaemonEvent {
         output_tokens: u64,
         model: String,
     },
+    /// Per-session cost estimate derived from TokenUsage events
+    SessionCost {
+        session_id: String,
+        input_tokens: u64,
+        output_tokens: u64,
+        total_cost_usd: f64,
+        model: String,
+    },
     /// Semantic relevance link between a claim and a constraint (from LLM-as-judge)
     ClaimRelevance {
         claim_id: String,

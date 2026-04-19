@@ -14,6 +14,7 @@ pub mod scan;
 pub mod search;
 pub mod serve;
 pub mod sessions;
+pub mod setup;
 pub mod show;
 pub mod validate;
 pub mod web;
@@ -106,6 +107,11 @@ pub enum Commands {
         #[arg(long)]
         name: Option<String>,
 
+        /// Maximum session cost in USD. When total estimated cost exceeds
+        /// this value, the proxy is paused automatically.
+        #[arg(long)]
+        max_cost: Option<f64>,
+
         /// Command to ground (everything after --)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, required = true)]
         command: Vec<String>,
@@ -148,6 +154,11 @@ pub enum Commands {
         /// Human-friendly session name (auto-generated if not provided)
         #[arg(long)]
         name: Option<String>,
+
+        /// Maximum session cost in USD. When total estimated cost exceeds
+        /// this value, the proxy is paused automatically.
+        #[arg(long)]
+        max_cost: Option<f64>,
     },
     /// Query and annotate violation logs
     Log {
@@ -319,6 +330,10 @@ pub enum Commands {
         #[arg(long = "dry-run")]
         dry_run: bool,
     },
+    /// Interactive setup wizard for non-engineers.
+    /// Walks through: daemon start, rigor.yaml init, OpenCode plugin install,
+    /// and a health check against the running daemon.
+    Setup,
 }
 
 /// Run the CLI. If no subcommand is given, fall through to hook mode.
@@ -333,11 +348,11 @@ pub fn run_cli() -> Result<()> {
             crate::run()
         }
         Some(Commands::Init { path, ai }) => init::run_init(path, ai),
-        Some(Commands::Ground { path, port, show_logs, no_mitm, transparent, name, command }) => ground::run_ground(path, port, !show_logs, !no_mitm, transparent, name, command),
+        Some(Commands::Ground { path, port, show_logs, no_mitm, transparent, name, max_cost, command }) => ground::run_ground(path, port, !show_logs, !no_mitm, transparent, name, max_cost, command),
         Some(Commands::Daemon { path, port }) => crate::daemon::start_daemon(path, port),
-        Some(Commands::Serve { action, path, port, background, stop, name }) => {
+        Some(Commands::Serve { action, path, port, background, stop, name, max_cost }) => {
             let stop = stop || matches!(action.as_deref(), Some("stop"));
-            serve::run_serve(path, port, background, stop, name)
+            serve::run_serve(path, port, background, stop, name, max_cost)
         }
         Some(Commands::Show { path }) => show::run_show(path),
         Some(Commands::Validate { path }) => validate::run_validate(path),
@@ -368,6 +383,7 @@ pub fn run_cli() -> Result<()> {
         }
         Some(Commands::Eval { report, baseline, compare }) => eval::run_eval(report, baseline, compare),
         Some(Commands::Refine { apply, dry_run }) => refine::run_refine(apply, dry_run),
+        Some(Commands::Setup) => setup::run_setup(),
     }
 }
 

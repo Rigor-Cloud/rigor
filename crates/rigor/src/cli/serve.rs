@@ -64,6 +64,7 @@ pub fn run_serve(
     background: bool,
     stop: bool,
     name: Option<String>,
+    max_cost: Option<f64>,
 ) -> Result<()> {
     if stop {
         return stop_serve();
@@ -73,7 +74,7 @@ pub fn run_serve(
         return run_background(path, port, name);
     }
 
-    run_foreground(path, port, name)
+    run_foreground(path, port, name, max_cost)
 }
 
 /// Kill the running `rigor serve` background daemon, if any.
@@ -205,11 +206,11 @@ impl ExecReplaceSelf for std::process::Command {
 }
 
 /// Foreground mode: start the daemon, register the session, block until signal.
-fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>) -> Result<()> {
+fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>, max_cost: Option<f64>) -> Result<()> {
     // rigor serve is a global daemon — no project context at startup.
     // Constraints are loaded per-session when traffic arrives (via plugin headers).
     // If --path is given explicitly, load those constraints as defaults.
-    let (state, constraint_count) = if let Some(ref p) = path {
+    let (mut state, constraint_count) = if let Some(ref p) = path {
         match crate::cli::find_rigor_yaml(Some(p.clone())) {
             Ok(yp) => {
                 let (event_tx, _) = daemon::ws::create_event_channel();
@@ -229,6 +230,7 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
         let s = DaemonState::empty(event_tx)?;
         (s, 0)
     };
+    state.max_cost_usd = max_cost;
 
     daemon::ws::set_quiet(false);
     daemon::ws::set_mitm_enabled(true);

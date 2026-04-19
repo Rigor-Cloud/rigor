@@ -178,6 +178,16 @@ pub struct DaemonState {
     pub blocked_requests: std::collections::HashSet<String>,
     /// Fallback policy config — governs error handling for each pipeline component.
     pub fallback: FallbackConfig,
+    /// Maximum session cost in USD before pausing the proxy. None = unlimited.
+    pub max_cost_usd: Option<f64>,
+    /// Cumulative cost tracking: total input tokens across all requests.
+    pub cumulative_input_tokens: u64,
+    /// Cumulative cost tracking: total output tokens across all requests.
+    pub cumulative_output_tokens: u64,
+    /// Cumulative cost tracking: total estimated cost in USD.
+    pub cumulative_cost_usd: f64,
+    /// Per-model cost breakdown: model -> (input_tokens, output_tokens, cost_usd)
+    pub cost_by_model: std::collections::HashMap<String, (u64, u64, f64)>,
 }
 
 impl DaemonState {
@@ -270,6 +280,11 @@ impl DaemonState {
                 let (_, _, model) = crate::cli::config::judge_config();
                 model
             },
+            max_cost_usd: None,
+            cumulative_input_tokens: 0,
+            cumulative_output_tokens: 0,
+            cumulative_cost_usd: 0.0,
+            cost_by_model: std::collections::HashMap::new(),
         })
     }
 
@@ -321,7 +336,44 @@ impl DaemonState {
             judge_api_url: judge_url,
             judge_api_key: judge_key,
             judge_model,
+            max_cost_usd: None,
+            cumulative_input_tokens: 0,
+            cumulative_output_tokens: 0,
+            cumulative_cost_usd: 0.0,
+            cost_by_model: std::collections::HashMap::new(),
         })
+    }
+
+    /// Hot-reload the daemon's constraint config from a new `rigor.yaml`
+    /// path. Called by the `/api/project/register` handler when an OpenCode
+    /// session announces its project directory. Returns the number of
+    /// constraints loaded on success.
+    ///
+    /// On failure the existing config is preserved — the caller will see an
+    /// error response but the daemon keeps evaluating against whatever it
+    /// had before.
+    pub fn reload_config(&mut self, yaml_path: PathBuf) -> Result<usize> {
+        let config = load_rigor_config(&yaml_path)?;
+        let mut graph = ArgumentationGraph::from_config(&config);
+        graph.compute_strengths()?;
+
+        let policy_engine = match PolicyEngine::new(&config) {
+            Ok(engine) => Some(engine),
+            Err(e) => {
+                eprintln!(
+                    "rigor daemon: reload failed to compile policy engine: {} (keeping in-memory state)",
+                    e
+                );
+                None
+            }
+        };
+
+        let count = config.all_constraints().len();
+        self.config = config;
+        self.graph = graph;
+        self.yaml_path = yaml_path;
+        self.policy_engine = policy_engine;
+        Ok(count)
     }
 }
 
@@ -507,6 +559,8 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/api/sessions", get(observability_api::list_sessions))
         .route("/api/violations", get(observability_api::search_violations))
         .route("/api/eval", get(observability_api::eval_stats))
+        .route("/api/cost", get(observability_api::cost_stats))
+        .route("/api/project/register", post(observability_api::register_project))
         // Catch-all proxy for ANY other API path (Vertex AI, Azure, etc.)
         // This handles LD_PRELOAD intercepted traffic to unknown endpoints
         .fallback(proxy::catch_all_proxy)
