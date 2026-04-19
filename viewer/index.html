@@ -14,12 +14,15 @@
       <span class="name">rigor</span>
       <span class="subtitle">epistemic grounding</span>
     </div>
-    <div id="status">
+    <div id="session-picker">
+      <select id="session-select" class="session-dropdown">
+        <option value="">Live (all sessions)</option>
+      </select>
       <span id="status-badge" class="status-badge active">ACTIVE</span>
-      <span id="session-id"></span>
       <span id="status-dot" class="dot disconnected"></span>
       <span id="status-text">disconnected</span>
-      <span class="sep">|</span>
+    </div>
+    <div id="status">
       <span id="stat-constraints">0 constraints</span>
       <span class="sep">|</span>
       <span id="stat-requests">0 req</span>
@@ -37,7 +40,6 @@
   <!-- Top-level page tabs -->
   <div id="page-tabs">
     <button class="page-tab active" data-page="live">LIVE</button>
-    <button class="page-tab" data-page="sessions">SESSIONS</button>
     <button class="page-tab" data-page="search">SEARCH</button>
     <button class="page-tab" data-page="eval">EVAL</button>
   </div>
@@ -145,17 +147,6 @@
 
   </div><!-- /page-live -->
 
-  <!-- Page: Sessions -->
-  <div id="page-sessions" class="page">
-    <div class="page-content">
-      <div class="obs-header">
-        <span class="obs-title">Sessions</span>
-        <button id="sessions-refresh" class="obs-btn">Refresh</button>
-      </div>
-      <div id="sessions-list"><div class="empty-hint">Loading sessions...</div></div>
-    </div>
-  </div>
-
   <!-- Page: Search -->
   <div id="page-search" class="page">
     <div class="page-content">
@@ -224,12 +215,73 @@
         btn.classList.add('active');
         var page = document.getElementById('page-' + btn.getAttribute('data-page'));
         if (page) page.classList.add('active');
-        // Auto-load data for observability pages
         var pg = btn.getAttribute('data-page');
-        if (pg === 'sessions') loadSessions();
-        if (pg === 'eval') { loadEval(); loadCost(); }
+        if (pg === 'eval') { loadEval(); if (typeof loadCost === 'function') loadCost(); }
       });
     });
+
+    // ── Session dropdown ──────────────────────────────────────
+    var activeSessionFilter = ''; // empty = show all (live mode)
+
+    function populateSessionDropdown() {
+      fetch('/api/sessions').then(function(r){return r.json();}).then(function(rows){
+        var sel = document.getElementById('session-select');
+        var current = sel.value;
+        sel.innerHTML = '<option value="">Live (all sessions)</option>';
+        rows.forEach(function(s){
+          var status = s.alive ? ' *' : '';
+          var opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name + status + ' (' + s.agent + ')';
+          if (s.id === current) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      }).catch(function(){});
+    }
+
+    document.getElementById('session-select').addEventListener('change', function() {
+      activeSessionFilter = this.value;
+      if (activeSessionFilter) {
+        // Switch to LIVE tab and filter to this session
+        document.querySelectorAll('#page-tabs .page-tab').forEach(function(b){b.classList.remove('active');});
+        document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+        document.querySelector('[data-page="live"]').classList.add('active');
+        document.getElementById('page-live').classList.add('active');
+        // Load historical violations for this session
+        loadSessionViolations(activeSessionFilter);
+      }
+    });
+
+    function loadSessionViolations(sessionId) {
+      fetch('/api/violations?limit=100&session=' + encodeURIComponent(sessionId))
+        .then(function(r){return r.json();})
+        .then(function(rows){
+          // Add violations to the claims list and log
+          var claimsList = document.getElementById('claims-list');
+          if (rows.length > 0) {
+            claimsList.innerHTML = '';
+            rows.forEach(function(v){
+              var div = document.createElement('div');
+              div.className = 'claim-entry';
+              var sevClass = v.severity === 'block' ? 'obs-sev-block' : 'obs-sev-warn';
+              div.innerHTML = '<span class="obs-badge ' + sevClass + '">' + v.severity + '</span> ' +
+                '<strong>' + v.constraint_id + '</strong><br>' +
+                '<span style="color:var(--dim)">' + v.message + '</span><br>' +
+                v.claim_text.map(function(c){return '<span style="color:var(--yellow);font-size:9px">' + c + '</span>';}).join('<br>');
+              claimsList.appendChild(div);
+            });
+            // Switch to claims tab
+            document.querySelectorAll('#tabs button').forEach(function(b){b.classList.remove('active');});
+            document.querySelectorAll('#right-panel .tab').forEach(function(t){t.classList.remove('active');});
+            document.querySelector('[data-tab="claims"]').classList.add('active');
+            document.getElementById('tab-claims').classList.add('active');
+          }
+        }).catch(function(){});
+    }
+
+    // Populate on load + refresh every 10s
+    populateSessionDropdown();
+    setInterval(populateSessionDropdown, 10000);
 
     // Check if a claim with similar text already exists (Jaccard similarity on word sets)
     function findDuplicateClaim(text) {
@@ -1642,25 +1694,6 @@
     }
 
     // ── Observability tabs ──────────────────────────────────────
-
-    // Sessions tab
-    function loadSessions() {
-      fetch('/api/sessions').then(function(r){return r.json();}).then(function(rows){
-        var el = document.getElementById('sessions-list');
-        if (!rows.length) { el.innerHTML = '<div class="empty-hint">No sessions yet</div>'; return; }
-        var html = '<table class="obs-table"><thead><tr><th>Name</th><th>Agent</th><th>Status</th><th>Started</th><th>Constraints</th></tr></thead><tbody>';
-        rows.forEach(function(s){
-          var status = s.alive ? '<span class="obs-badge obs-active">active</span>' :
-            (s.exit_code === 0 ? '<span class="obs-badge obs-done">done</span>' :
-             '<span class="obs-badge obs-error">exit ' + (s.exit_code||'?') + '</span>');
-          var started = s.started_at ? s.started_at.substring(0,19).replace('T',' ') : '-';
-          html += '<tr><td class="obs-name">' + s.name + '</td><td>' + s.agent + '</td><td>' + status + '</td><td>' + started + '</td><td>' + s.constraints + '</td></tr>';
-        });
-        html += '</tbody></table>';
-        el.innerHTML = html;
-      }).catch(function(){ document.getElementById('sessions-list').innerHTML = '<div class="empty-hint">Failed to load</div>'; });
-    }
-    document.getElementById('sessions-refresh').addEventListener('click', loadSessions);
 
     // Search tab
     function doSearch() {

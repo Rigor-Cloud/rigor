@@ -18,6 +18,13 @@ html,body { height:100%; overflow:hidden; background:var(--bg); font-family:var(
 .dot.disconnected { background:var(--red); }
 .sep { color:rgba(255,255,255,0.1); }
 
+/* Session picker */
+#session-picker { display:flex; align-items:center; gap:8px; }
+.session-dropdown { background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--bright); padding:3px 8px; border-radius:3px; font-family:var(--mono); font-size:10px; outline:none; min-width:180px; cursor:pointer; }
+.session-dropdown:hover { border-color:var(--blue); }
+.session-dropdown:focus { border-color:var(--blue); }
+.session-dropdown option { background:var(--bg); color:var(--text); }
+
 /* Status badge */
 .status-badge { font-size:8px; font-weight:700; padding:2px 6px; border-radius:3px; letter-spacing:0.5px; text-transform:uppercase; }
 .status-badge.active { background:rgba(81,207,102,0.15); color:var(--green); }
