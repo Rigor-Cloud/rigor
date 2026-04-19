@@ -11,9 +11,10 @@ use http::header;
 
 use crate::claim::{ClaimExtractor, HeuristicExtractor};
 use crate::claim::transcript::TranscriptMessage;
-use crate::constraint::types::EpistemicType;
+use crate::constraint::types::{Constraint, EpistemicType};
+use crate::evaluator::{EvaluatorPipeline, InProcessLookup, RelevanceLookup, SemanticEvaluator};
 use crate::info_println;
-use crate::policy::{EvaluationInput, PolicyEngine};
+use crate::policy::PolicyEngine;
 use crate::violation::{collect_violations, determine_decision, ConstraintMeta, Decision, SeverityThresholds};
 use super::context::build_epistemic_context;
 use super::ws::{DaemonEvent, EventSender};
@@ -1387,16 +1388,32 @@ async fn proxy_request(
                     }
 
                     if !claims.is_empty() {
-                        let mut engine = match engine_bg.clone() {
+                        // Build a per-iteration pipeline seeded with the
+                        // cached engine (avoids Rego reparse) and wired to
+                        // the in-process relevance cache. This closes the
+                        // semantic feedback loop: once
+                        // `score_claim_relevance` populates the cache,
+                        // subsequent streaming evaluations here see the
+                        // verdicts and can block on them.
+                        let engine = match engine_bg.clone() {
                             Some(e) => e,
                             None => match PolicyEngine::new(&config_bg) {
                                 Ok(e) => e,
                                 Err(_) => { continue; }
                             },
                         };
+                        let mut pipeline = EvaluatorPipeline::with_engine_fallback(engine);
+                        let lookup: std::sync::Arc<dyn RelevanceLookup> =
+                            std::sync::Arc::new(InProcessLookup::new());
+                        pipeline.register(Box::new(SemanticEvaluator::new(lookup)));
 
-                        let eval_input = EvaluationInput { claims: claims.clone() };
-                        if let Ok(raw_violations) = engine.evaluate(&eval_input) {
+                        let all_constraints: Vec<Constraint> = config_bg
+                            .all_constraints()
+                            .into_iter()
+                            .cloned()
+                            .collect();
+                        let raw_violations = pipeline.run(&claims, &all_constraints);
+                        {
                             let thresholds = SeverityThresholds::default();
                             let violations = collect_violations(
                                 raw_violations, &strengths_bg, &thresholds, &constraint_meta_bg, &claims
@@ -2412,18 +2429,19 @@ fn evaluate_text_inline(
         let st = state.lock().unwrap();
         (st.config.clone(), st.graph.get_all_strengths(), st.policy_engine.as_ref().cloned())
     };
-    let mut engine = match cached_engine {
+    let engine = match cached_engine {
         Some(e) => e,
         None => match PolicyEngine::new(&config) {
             Ok(e) => e,
             Err(_) => return "allow".to_string(),
         },
     };
-    let eval_input = EvaluationInput { claims: claims.clone() };
-    let raw_violations = match engine.evaluate(&eval_input) {
-        Ok(v) => v,
-        Err(_) => return "allow".to_string(),
-    };
+    let mut pipeline = EvaluatorPipeline::with_engine_fallback(engine);
+    let lookup: std::sync::Arc<dyn RelevanceLookup> = std::sync::Arc::new(InProcessLookup::new());
+    pipeline.register(Box::new(SemanticEvaluator::new(lookup)));
+
+    let all_constraints: Vec<Constraint> = config.all_constraints().into_iter().cloned().collect();
+    let raw_violations = pipeline.run(&claims, &all_constraints);
     let constraint_meta: HashMap<String, ConstraintMeta> = config
         .all_constraints().iter()
         .map(|c| {
@@ -2516,7 +2534,7 @@ fn extract_and_evaluate_text(
         (st.config.clone(), strengths_map, engine)
     };
 
-    let mut engine = match cached_engine {
+    let engine = match cached_engine {
         Some(e) => e,
         None => match PolicyEngine::new(&config) {
             Ok(e) => e,
@@ -2533,23 +2551,16 @@ fn extract_and_evaluate_text(
         },
     };
 
-    let eval_input = EvaluationInput {
-        claims: claims.clone(),
-    };
+    // Build the evaluator pipeline with the cached Rego engine as the
+    // fallback and SemanticEvaluator on top (reading the in-process
+    // relevance cache). This is the daemon-side counterpart to the
+    // stop-hook's HTTP-backed pipeline in `lib.rs`.
+    let mut pipeline = EvaluatorPipeline::with_engine_fallback(engine);
+    let lookup: std::sync::Arc<dyn RelevanceLookup> = std::sync::Arc::new(InProcessLookup::new());
+    pipeline.register(Box::new(SemanticEvaluator::new(lookup)));
 
-    let raw_violations = match engine.evaluate(&eval_input) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("rigor proxy: failed to evaluate policies: {}", e);
-            let _ = event_tx.send(DaemonEvent::Decision {
-                request_id: request_id.to_string(),
-                decision: "allow".to_string(),
-                violations: 0,
-                claims: claims.len(),
-            });
-            return;
-        }
-    };
+    let all_constraints: Vec<Constraint> = config.all_constraints().into_iter().cloned().collect();
+    let raw_violations = pipeline.run(&claims, &all_constraints);
 
     // Build constraint metadata
     let constraint_meta: HashMap<String, ConstraintMeta> = config
@@ -2711,6 +2722,22 @@ static RELEVANCE_SEMAPHORE: SimpleSemaphore = SimpleSemaphore::new();
 /// Cache for LLM-as-judge results: claim_text -> Vec<(constraint_id, relevance, reason)>
 static RELEVANCE_CACHE: std::sync::LazyLock<std::sync::Mutex<HashMap<String, Vec<(String, String, String)>>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+/// Look up the current LLM-as-judge relevance verdicts for a given claim text.
+///
+/// Returns the cached `(constraint_id, relevance, reason)` tuples populated by
+/// [`score_claim_relevance`]. Only `"high"` and `"medium"` verdicts are ever
+/// cached — a missing entry means either the claim has not been scored yet or
+/// the judge returned `"low"` / no match. Callers MUST treat both cases as
+/// "no verdict" (fail-open).
+///
+/// Exposed so `SemanticEvaluator` (via `RelevanceLookup`) can consume cache
+/// state from both in-process (daemon) and out-of-process (stop-hook via
+/// HTTP) contexts.
+pub fn lookup_relevance(claim_text: &str) -> Vec<(String, String, String)> {
+    let cache = RELEVANCE_CACHE.lock().unwrap();
+    cache.get(claim_text).cloned().unwrap_or_default()
+}
 
 /// Call Sonnet to compute semantic relevance between claims and constraints.
 /// Features: 30s timeout, rate limiting (1 in flight), caching, logging.

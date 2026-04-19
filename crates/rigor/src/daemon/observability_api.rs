@@ -396,3 +396,48 @@ pub async fn register_project(
             .into_response(),
     }
 }
+
+// ---------------------------------------------------------------------------
+// POST /api/relevance/lookup — SemanticEvaluator cache read
+// ---------------------------------------------------------------------------
+//
+// The stop-hook subprocess (`lib.rs`) does not share memory with the daemon,
+// so it cannot read `daemon::proxy::RELEVANCE_CACHE` directly. This endpoint
+// exposes a read-only view of that cache so a remote `HttpLookup` can drive
+// `SemanticEvaluator` verdicts from the stop-hook.
+//
+// Fail-open: a cache miss, a not-yet-scored claim, or an LLM verdict of
+// `"low"` all return an empty `matches` array. The caller (SemanticEvaluator)
+// must treat "empty" as "no verdict" rather than "not relevant".
+
+#[derive(Deserialize)]
+pub struct RelevanceLookupRequest {
+    pub claim_text: String,
+}
+
+#[derive(Serialize)]
+pub struct RelevanceMatchRow {
+    pub constraint_id: String,
+    /// "high" or "medium" (the cache never stores "low").
+    pub relevance: String,
+    pub reason: String,
+}
+
+#[derive(Serialize)]
+pub struct RelevanceLookupResponse {
+    pub matches: Vec<RelevanceMatchRow>,
+}
+
+pub async fn relevance_lookup(
+    Json(body): Json<RelevanceLookupRequest>,
+) -> Response {
+    let matches = crate::daemon::proxy::lookup_relevance(&body.claim_text)
+        .into_iter()
+        .map(|(constraint_id, relevance, reason)| RelevanceMatchRow {
+            constraint_id,
+            relevance,
+            reason,
+        })
+        .collect();
+    Json(RelevanceLookupResponse { matches }).into_response()
+}

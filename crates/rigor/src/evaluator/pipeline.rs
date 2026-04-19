@@ -9,20 +9,24 @@
 //! - [`RegexEvaluator`] — the default Rego/regex path. Wraps a
 //!   [`crate::policy::PolicyEngine`] and evaluates a single claim against a
 //!   single constraint by building a one-claim `EvaluationInput`.
-//! - [`SemanticEvaluator`] — marker evaluator for constraints that are
-//!   better handled by the async LLM-as-judge path in `daemon/proxy.rs`
-//!   (see `score_claim_relevance`). Returns a deferred, non-violating
-//!   result synchronously; the real semantic scoring continues to run
-//!   out-of-band.
+//! - [`SemanticEvaluator`] — the LLM-as-judge path. Reads verdicts from a
+//!   [`RelevanceLookup`] (which in turn reads
+//!   `daemon::proxy::score_claim_relevance`'s cache, either in-process or
+//!   over HTTP). A `high`/`medium` cache hit for (claim_text, constraint_id)
+//!   produces a violation; a miss is fail-open allow (the judge hasn't run
+//!   yet, or returned `low`).
 //!
 //! The routing contract is intentionally simple: the pipeline asks each
 //! evaluator in registration order whether it [`can_evaluate`] the pair, and
 //! uses the first match. If nothing matches, the pipeline falls back to the
 //! default Rego evaluator so existing behaviour is preserved.
 
+use std::sync::Arc;
+
 use crate::claim::Claim;
 use crate::constraint::{Constraint, RigorConfig};
-use crate::policy::{EvaluationInput, PolicyEngine};
+use crate::evaluator::relevance::RelevanceLookup;
+use crate::policy::{EvaluationInput, PolicyEngine, RawViolation};
 
 /// Result of evaluating a single claim against a single constraint.
 #[derive(Debug, Clone)]
@@ -91,6 +95,13 @@ impl RegexEvaluator {
             engine: PolicyEngine::new(config)?,
         })
     }
+
+    /// Construct from a pre-built [`PolicyEngine`]. Use this on hot paths
+    /// (the daemon caches a compiled engine in `DaemonState`) so we avoid
+    /// reparsing Rego for every request.
+    pub fn from_engine(engine: PolicyEngine) -> Self {
+        Self { engine }
+    }
 }
 
 impl ClaimEvaluator for RegexEvaluator {
@@ -138,38 +149,43 @@ impl ClaimEvaluator for RegexEvaluator {
 
 /// Semantic (LLM-as-judge) evaluator.
 ///
-/// The real semantic scoring runs asynchronously in
-/// `daemon/proxy.rs::score_claim_relevance` — it calls the judge model,
-/// caches results, and broadcasts them to the dashboard. This synchronous
-/// evaluator is a *routing marker*: it declares ownership of constraints
-/// tagged `semantic` (or explicitly opted in via the `rigor` field being
-/// empty, meaning "no rule → must be judged"), and returns a non-violating
-/// deferred result so the pipeline doesn't double-evaluate via Rego.
+/// Backed by a [`RelevanceLookup`] that returns cached verdicts produced by
+/// `daemon::proxy::score_claim_relevance`. Two lookup implementations ship:
+/// [`crate::evaluator::relevance::InProcessLookup`] for the daemon and
+/// [`crate::evaluator::relevance::HttpLookup`] for the stop-hook subprocess.
 ///
-/// Downstream, the async judge path continues to run on its own schedule
-/// and emits `ClaimRelevance` events. Making this evaluator a first-class
-/// member of the pipeline means future versions can synchronously block on
-/// the judge if desired without changing the call sites.
+/// Verdict semantics:
+///
+/// - Cache hit for (claim.text, constraint.id) with relevance `"high"` or
+///   `"medium"` → [`EvalResult::violation`] carrying the judge's reason.
+/// - Cache miss → [`EvalResult::allow`]. This is fail-open: the judge may
+///   simply not have scored this claim yet, or may have returned `"low"`
+///   (which the daemon never caches). Either way we must not block.
+///
+/// The synchronous `evaluate` contract is preserved — the judge call itself
+/// runs asynchronously in the daemon; this evaluator only reads the cache
+/// populated by that async pass.
 pub struct SemanticEvaluator {
     /// Case-insensitive tag that marks a constraint as semantic.
     tag: String,
+    lookup: Arc<dyn RelevanceLookup>,
 }
 
 impl SemanticEvaluator {
-    pub fn new() -> Self {
+    /// Construct with the default `"semantic"` routing tag.
+    pub fn new(lookup: Arc<dyn RelevanceLookup>) -> Self {
         Self {
             tag: "semantic".to_string(),
+            lookup,
         }
     }
 
-    pub fn with_tag(tag: impl Into<String>) -> Self {
-        Self { tag: tag.into() }
-    }
-}
-
-impl Default for SemanticEvaluator {
-    fn default() -> Self {
-        Self::new()
+    /// Construct with a custom routing tag.
+    pub fn with_tag(tag: impl Into<String>, lookup: Arc<dyn RelevanceLookup>) -> Self {
+        Self {
+            tag: tag.into(),
+            lookup,
+        }
     }
 }
 
@@ -189,12 +205,28 @@ impl ClaimEvaluator for SemanticEvaluator {
         tagged || constraint.rego.trim().is_empty()
     }
 
-    fn evaluate(&self, _claim: &Claim, constraint: &Constraint) -> EvalResult {
-        // Defer: the real scoring happens asynchronously in the proxy.
-        EvalResult::allow(format!(
-            "semantic constraint {} deferred to LLM-as-judge",
-            constraint.id
-        ))
+    fn evaluate(&self, claim: &Claim, constraint: &Constraint) -> EvalResult {
+        let matches = self.lookup.lookup(claim);
+        if let Some(m) = matches.iter().find(|m| m.constraint_id == constraint.id) {
+            // The judge produced a high/medium match. Surface it as a
+            // violation, preferring the judge's reason when present.
+            let reason = if m.reason.trim().is_empty() {
+                format!(
+                    "semantic match ({}) on constraint {}",
+                    m.relevance, constraint.id
+                )
+            } else {
+                m.reason.clone()
+            };
+            EvalResult::violation(reason, claim.confidence)
+        } else {
+            // No verdict available: fail-open. `collect_violations` will
+            // never see a RawViolation for this pair.
+            EvalResult::allow(format!(
+                "no semantic verdict for {} (not scored or ranked low)",
+                constraint.id
+            ))
+        }
     }
 }
 
@@ -230,6 +262,17 @@ impl EvaluatorPipeline {
             evaluators: Vec::new(),
             fallback: Some(RegexEvaluator::new(config)?),
         })
+    }
+
+    /// Pipeline seeded with a fallback built from a pre-compiled engine.
+    /// Cheaper than [`with_default_fallback`] on hot paths — avoids
+    /// reparsing Rego when the caller already has a cached
+    /// [`PolicyEngine`] (e.g. `DaemonState::policy_engine`).
+    pub fn with_engine_fallback(engine: PolicyEngine) -> Self {
+        Self {
+            evaluators: Vec::new(),
+            fallback: Some(RegexEvaluator::from_engine(engine)),
+        }
     }
 
     /// Register a new evaluator. Evaluators are consulted in registration
@@ -287,6 +330,34 @@ impl EvaluatorPipeline {
     pub fn evaluator_names(&self) -> Vec<&str> {
         self.evaluators.iter().map(|e| e.name()).collect()
     }
+
+    /// Evaluate every claim against every constraint and collapse the
+    /// results into the same [`RawViolation`] shape that
+    /// [`crate::policy::PolicyEngine::evaluate`] produced. This is the
+    /// drop-in replacement call sites (both `lib.rs` and
+    /// `daemon/proxy.rs`) use so the downstream severity/decision path
+    /// (`collect_violations` → `determine_decision`) stays unchanged.
+    ///
+    /// One `RawViolation` is emitted per (claim, constraint) pair that
+    /// the pipeline's evaluators flagged as violated, matching the
+    /// per-claim, per-constraint granularity of the previous pipeline.
+    pub fn run(&self, claims: &[Claim], constraints: &[Constraint]) -> Vec<RawViolation> {
+        let mut raw_violations = Vec::new();
+        for claim in claims {
+            let results = self.evaluate_claim(claim, constraints);
+            for (constraint, result) in constraints.iter().zip(results.iter()) {
+                if result.violated {
+                    raw_violations.push(RawViolation {
+                        constraint_id: constraint.id.clone(),
+                        violated: true,
+                        claims: vec![claim.id.clone()],
+                        reason: result.reason.clone(),
+                    });
+                }
+            }
+        }
+        raw_violations
+    }
 }
 
 impl Default for EvaluatorPipeline {
@@ -300,6 +371,7 @@ mod tests {
     use super::*;
     use crate::claim::ClaimType;
     use crate::constraint::{ConstraintsSection, EpistemicType};
+    use crate::evaluator::relevance::{RelevanceLookup, RelevanceMatch};
 
     fn make_config(constraints: Vec<Constraint>) -> RigorConfig {
         RigorConfig {
@@ -336,6 +408,26 @@ mod tests {
             domain: None,
             references: vec![],
             source: vec![],
+        }
+    }
+
+    /// Test-only lookup: returns a fixed set of matches regardless of the
+    /// claim, so tests can assert SemanticEvaluator's routing + verdict
+    /// behaviour without a live daemon.
+    struct FixedLookup(Vec<RelevanceMatch>);
+
+    impl RelevanceLookup for FixedLookup {
+        fn lookup(&self, _claim: &Claim) -> Vec<RelevanceMatch> {
+            self.0.clone()
+        }
+    }
+
+    /// Test-only lookup that always returns nothing.
+    struct EmptyLookup;
+
+    impl RelevanceLookup for EmptyLookup {
+        fn lookup(&self, _claim: &Claim) -> Vec<RelevanceMatch> {
+            Vec::new()
         }
     }
 
@@ -384,7 +476,7 @@ violation contains v if {
         let tagged = make_constraint("sem", "", vec!["semantic"]);
         let untagged = make_constraint("reg", "violation contains v if { false; v := 0 }", vec![]);
         let claim = make_claim("c1", "text");
-        let ev = SemanticEvaluator::new();
+        let ev = SemanticEvaluator::new(Arc::new(EmptyLookup));
         assert!(ev.can_evaluate(&claim, &tagged));
         assert!(!ev.can_evaluate(&claim, &untagged));
     }
@@ -393,8 +485,55 @@ violation contains v if {
     fn semantic_evaluator_routes_empty_rego() {
         let empty = make_constraint("empty", "", vec![]);
         let claim = make_claim("c1", "text");
-        let ev = SemanticEvaluator::new();
+        let ev = SemanticEvaluator::new(Arc::new(EmptyLookup));
         assert!(ev.can_evaluate(&claim, &empty));
+    }
+
+    #[test]
+    fn semantic_evaluator_flags_when_cache_has_match() {
+        let constraint = make_constraint("sem-claim", "", vec!["semantic"]);
+        let claim = make_claim("c1", "Rust has garbage collection");
+        let lookup = FixedLookup(vec![RelevanceMatch {
+            constraint_id: "sem-claim".to_string(),
+            relevance: "high".to_string(),
+            reason: "Asserts GC in Rust".to_string(),
+        }]);
+        let ev = SemanticEvaluator::new(Arc::new(lookup));
+        let result = ev.evaluate(&claim, &constraint);
+        assert!(result.violated, "expected violation from semantic match");
+        assert!(
+            result.reason.contains("GC in Rust"),
+            "expected judge reason, got {:?}",
+            result.reason
+        );
+    }
+
+    #[test]
+    fn semantic_evaluator_allows_when_cache_miss() {
+        let constraint = make_constraint("sem-claim", "", vec!["semantic"]);
+        let claim = make_claim("c1", "some unrelated claim");
+        let ev = SemanticEvaluator::new(Arc::new(EmptyLookup));
+        let result = ev.evaluate(&claim, &constraint);
+        assert!(!result.violated, "cache miss must fail-open");
+    }
+
+    #[test]
+    fn semantic_evaluator_ignores_unrelated_cache_entries() {
+        // The cache may contain matches for OTHER constraints on the same
+        // claim text — we must not cross-attribute them.
+        let target = make_constraint("sem-target", "", vec!["semantic"]);
+        let claim = make_claim("c1", "multi-link claim");
+        let lookup = FixedLookup(vec![RelevanceMatch {
+            constraint_id: "some-other-constraint".to_string(),
+            relevance: "high".to_string(),
+            reason: "different constraint".to_string(),
+        }]);
+        let ev = SemanticEvaluator::new(Arc::new(lookup));
+        let result = ev.evaluate(&claim, &target);
+        assert!(
+            !result.violated,
+            "must only violate when cache has a match for THIS constraint"
+        );
     }
 
     #[test]
@@ -413,7 +552,7 @@ violation contains v if {
         let sem_c = make_constraint("sem", "", vec!["semantic"]);
         let config = make_config(vec![rego_c.clone(), sem_c.clone()]);
         let mut pipeline = EvaluatorPipeline::with_default_fallback(&config).unwrap();
-        pipeline.register(Box::new(SemanticEvaluator::new()));
+        pipeline.register(Box::new(SemanticEvaluator::new(Arc::new(EmptyLookup))));
         pipeline.register(Box::new(RegexEvaluator::new(&config).unwrap()));
 
         let claim = make_claim("c1", "This code is unsafe");
@@ -421,9 +560,8 @@ violation contains v if {
         assert_eq!(results.len(), 2);
         // Rego-matched claim: violated
         assert!(results[0].violated);
-        // Semantic-routed constraint: deferred, not violated
+        // Semantic-routed constraint with empty cache: not violated (fail-open)
         assert!(!results[1].violated);
-        assert!(results[1].reason.contains("deferred"));
     }
 
     #[test]
@@ -443,7 +581,7 @@ violation contains v if {
         );
         let config = make_config(vec![rego_c.clone()]);
         let mut pipeline = EvaluatorPipeline::with_default_fallback(&config).unwrap();
-        pipeline.register(Box::new(SemanticEvaluator::new()));
+        pipeline.register(Box::new(SemanticEvaluator::new(Arc::new(EmptyLookup))));
 
         let claim = make_claim("c1", "This code is unsafe");
         let results = pipeline.evaluate_claim(&claim, &[rego_c]);

@@ -8,9 +8,13 @@
 //! routed to based on what each one [`can_evaluate`].
 //!
 //! See [`pipeline`] for the trait, [`EvalResult`], and [`EvaluatorPipeline`].
+//! See [`relevance`] for the [`RelevanceLookup`] abstraction that backs
+//! [`SemanticEvaluator`] verdicts.
 
 pub mod pipeline;
+pub mod relevance;
 
 pub use pipeline::{
     ClaimEvaluator, EvalResult, EvaluatorPipeline, RegexEvaluator, SemanticEvaluator,
 };
+pub use relevance::{HttpLookup, InProcessLookup, RelevanceLookup, RelevanceMatch};

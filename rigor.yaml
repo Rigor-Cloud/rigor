@@ -236,6 +236,28 @@ constraints:
     # specific to YOUR project. These are the most valuable constraints —
     # they protect facts that only exist in your codebase.
 
+    # ── Semantic Constraints ───────────────────────────────────────
+    # Constraints tagged `semantic` are routed to the SemanticEvaluator
+    # instead of the Rego/regex path. Verdicts come from the daemon's
+    # LLM-as-judge pass (`score_claim_relevance`) via either the
+    # in-process cache (daemon path) or the `/api/relevance/lookup`
+    # endpoint (stop-hook path). A semantic-tagged constraint with no
+    # Rego snippet fails open until the judge produces a high/medium
+    # verdict for a matching claim.
+
+    - id: rigor-scope-limited
+      epistemic_type: belief
+      name: "Rigor Is a Constraint Enforcement Tool"
+      description: "Rigor is a deterministic constraint enforcement layer over LLM output. It is not an LLM, an agent framework, a model, or a fine-tuning/training system. Claims that Rigor trains models, performs inference, or replaces an LLM are wrong."
+      source:
+        - path: crates/rigor/src/lib.rs
+          anchor: "pub fn run"
+          context: "Rigor's entry point is a constraint evaluator, not an inference engine"
+      rego: ""
+      message: "Rigor enforces constraints on LLM output; it does not itself train or serve models"
+      tags: ["semantic", "rigor", "scope"]
+      domain: "project"
+
   justifications: []
   defeaters: []
 

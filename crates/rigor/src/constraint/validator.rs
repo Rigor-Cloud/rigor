@@ -14,8 +14,18 @@ impl ConstraintValidator {
             if c.name.is_empty() {
                 bail!("Constraint '{}' has an empty name", c.id);
             }
-            if c.rego.is_empty() {
-                bail!("Constraint '{}' has an empty rego snippet", c.id);
+            // Semantic-tagged constraints are evaluated by the LLM-as-judge
+            // path (SemanticEvaluator) and don't require a Rego snippet —
+            // their verdicts come from the daemon's relevance cache.
+            let is_semantic = c
+                .tags
+                .iter()
+                .any(|t| t.eq_ignore_ascii_case("semantic"));
+            if c.rego.is_empty() && !is_semantic {
+                bail!(
+                    "Constraint '{}' has an empty rego snippet (tag it `semantic` to use the LLM-as-judge path)",
+                    c.id
+                );
             }
             if !ids.insert(&c.id) {
                 bail!("Duplicate constraint ID: '{}'", c.id);
@@ -144,5 +154,29 @@ mod tests {
         let config = make_config(vec![c], vec![]);
         let err = ConstraintValidator::validate(&config).unwrap_err();
         assert!(err.to_string().contains("empty rego"));
+    }
+
+    #[test]
+    fn test_semantic_tagged_allows_empty_rego() {
+        // Semantic-tagged constraints are handled by the LLM-as-judge
+        // path and are intentionally allowed to ship without a Rego
+        // snippet. The validator must honour that.
+        let mut c = make_constraint("b1", EpistemicType::Belief);
+        c.rego = String::new();
+        c.tags = vec!["semantic".to_string()];
+        let config = make_config(vec![c], vec![]);
+        assert!(
+            ConstraintValidator::validate(&config).is_ok(),
+            "semantic-tagged empty-rego constraint must validate"
+        );
+    }
+
+    #[test]
+    fn test_semantic_tag_is_case_insensitive() {
+        let mut c = make_constraint("b1", EpistemicType::Belief);
+        c.rego = String::new();
+        c.tags = vec!["SeMaNtIc".to_string()];
+        let config = make_config(vec![c], vec![]);
+        assert!(ConstraintValidator::validate(&config).is_ok());
     }
 }

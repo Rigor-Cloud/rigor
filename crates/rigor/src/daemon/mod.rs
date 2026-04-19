@@ -561,6 +561,7 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/api/eval", get(observability_api::eval_stats))
         .route("/api/cost", get(observability_api::cost_stats))
         .route("/api/project/register", post(observability_api::register_project))
+        .route("/api/relevance/lookup", post(observability_api::relevance_lookup))
         // Catch-all proxy for ANY other API path (Vertex AI, Azure, etc.)
         // This handles LD_PRELOAD intercepted traffic to unknown endpoints
         .fallback(proxy::catch_all_proxy)

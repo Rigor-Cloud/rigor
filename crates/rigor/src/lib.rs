@@ -18,14 +18,16 @@ pub mod fallback;
 
 use anyhow::Result;
 use std::path::Path;
+use std::sync::Arc;
 use tracing::{debug, info, info_span, warn};
 
 use claim::{Claim, ClaimExtractor, HeuristicExtractor};
 use config::find_rigor_lock;
 use config::find_rigor_yaml;
 use constraint::graph::ArgumentationGraph;
+use evaluator::{EvaluatorPipeline, HttpLookup, RelevanceLookup, SemanticEvaluator};
 use hook::{HookResponse, StopHookInput};
-use policy::{EvaluationInput, PolicyEngine};
+use policy::RawViolation;
 use violation::{
     collect_violations, determine_decision, Decision, SeverityThresholds, ViolationFormatter,
 };
@@ -134,16 +136,38 @@ fn evaluate_constraints(yaml_path: &Path, transcript_path: &str) -> Result<()> {
     }
     let strengths = graph.get_all_strengths();
 
-    // Step 3: Create policy engine
-    let mut engine = match PolicyEngine::new(&config) {
-        Ok(engine) => engine,
+    // Step 3: Build the evaluator pipeline.
+    //
+    // The pipeline routes each (claim, constraint) pair to the first
+    // registered evaluator that can handle it, with the Rego-based
+    // RegexEvaluator as a fallback. We register SemanticEvaluator first so
+    // constraints tagged `semantic` (or with empty Rego) take its verdicts
+    // — backed here by an HTTP lookup against the daemon's
+    // /api/relevance/lookup endpoint, since the stop-hook subprocess does
+    // not share memory with the daemon.
+    //
+    // If building the pipeline fails, fall open (same policy as the
+    // previous PolicyEngine::new failure path).
+    let mut pipeline = match EvaluatorPipeline::with_default_fallback(&config) {
+        Ok(p) => p,
         Err(e) => {
-            warn!(error = %e, "Failed to create policy engine, failing open");
+            warn!(error = %e, "Failed to create evaluator pipeline, failing open");
             let response = HookResponse::allow();
             response.write_stdout()?;
             return Ok(());
         }
     };
+
+    // Attach the semantic evaluator. If we cannot build the HTTP lookup
+    // (e.g. no Tokio runtime available), we simply skip it — the fallback
+    // RegexEvaluator still handles every constraint with a Rego rule, and
+    // semantic-tagged constraints with no Rego become fail-open allows.
+    if let Some(lookup) = HttpLookup::from_env() {
+        let lookup: Arc<dyn RelevanceLookup> = Arc::new(lookup);
+        pipeline.register(Box::new(SemanticEvaluator::new(lookup)));
+    } else {
+        warn!("Skipping SemanticEvaluator: failed to construct HttpLookup runtime");
+    }
 
     // Step 4: Extract claims from transcript (or use test claims if env var set)
     let claims = match std::env::var("RIGOR_TEST_CLAIMS") {
@@ -183,20 +207,13 @@ fn evaluate_constraints(yaml_path: &Path, transcript_path: &str) -> Result<()> {
         }
     }
 
-    let eval_input = EvaluationInput {
-        claims: claims.clone(),
-    };
-
-    // Step 5: Evaluate policies
-    let raw_violations = match engine.evaluate(&eval_input) {
-        Ok(v) => v,
-        Err(e) => {
-            warn!(error = %e, "Failed to evaluate policies, failing open");
-            let response = HookResponse::allow();
-            response.write_stdout()?;
-            return Ok(());
-        }
-    };
+    // Step 5: Evaluate each claim against every constraint through the
+    // pipeline. `run` collapses the per-(claim,constraint) EvalResults
+    // back into the `RawViolation` shape so the existing severity/decision
+    // path (`collect_violations` → `determine_decision`) is untouched.
+    let all_constraints: Vec<constraint::types::Constraint> =
+        config.all_constraints().into_iter().cloned().collect();
+    let raw_violations: Vec<RawViolation> = pipeline.run(&claims, &all_constraints);
 
     // Step 6: Build constraint metadata map
     let constraint_meta: std::collections::HashMap<String, violation::ConstraintMeta> = config

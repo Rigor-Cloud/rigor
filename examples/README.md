@@ -39,6 +39,6 @@ After exploring these examples:
 
 ## Getting Help
 
-- File issues: https://github.com/waveywaves/rigor/issues
+- File issues: https://github.com/Rigor-Cloud/rigor/issues
 - Read docs: `docs/`
 - Check built-in constraints: `policies/builtin/`
