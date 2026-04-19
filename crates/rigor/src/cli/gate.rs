@@ -40,11 +40,10 @@ fn read_stdin_json() -> Result<ToolInput> {
 
 fn derive_session_id() -> String {
     // Fallback session ID when stdin JSON is missing a `session_id`.
-    // ANTHROPIC_API_KEY was previously used here and is removed: an API key
-    // is not a session, so hashing it collapsed every session on a machine
-    // to the same fake ID and silently broke gate correlation.
+    // Checks Claude Code, OpenCode, and generic session ID env vars.
     std::env::var("CLAUDE_CODE_SESSION_ID")
         .or_else(|_| std::env::var("CLAUDE_SESSION_ID"))
+        .or_else(|_| std::env::var("OPENCODE_SESSION_ID"))
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "no-session".to_string())

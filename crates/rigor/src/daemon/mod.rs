@@ -89,6 +89,11 @@ pub const MITM_HOSTS: &[&str] = &[
     "asia-southeast1-aiplatform.googleapis.com",
     "aiplatform.googleapis.com",
     "openai.azure.com",
+    // OpenCode Zen and OpenCode Go provider endpoints
+    "opencode.ai",
+    "api.opencode.ai",
+    // OpenRouter (used by both OpenCode and rigor's LLM-as-judge)
+    "openrouter.ai",
 ];
 
 /// Decide whether a CONNECT target host should be MITM'd or blind-tunneled.
@@ -430,6 +435,9 @@ pub fn build_router(state: SharedState) -> Router {
         // Known LLM API proxy routes (with claim extraction + constraint evaluation)
         .route("/v1/messages", post(proxy::anthropic_proxy))
         .route("/v1/chat/completions", post(proxy::openai_proxy))
+        // OpenCode Zen provider routes (same format, prefixed path)
+        .route("/zen/v1/messages", post(proxy::opencode_zen_messages_proxy))
+        .route("/zen/v1/responses", post(proxy::opencode_zen_responses_proxy))
         // Governance API endpoints
         .route("/api/governance/constraints", get(governance::list_constraints))
         .route("/api/governance/constraints/{id}/toggle", post(governance::toggle_constraint))

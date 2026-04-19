@@ -148,7 +148,18 @@ pub enum DaemonEvent {
         chunk: String,
         done: bool,
     },
-    /// Claude Code activity — mirrored for dashboard
+    /// AI coding agent activity — mirrored for dashboard (Claude Code, OpenCode, etc.)
+    AgentEvent {
+        request_id: String,
+        agent_type: String,  // "claude_code" | "opencode"
+        event_type: String,  // "tool_use" | "text" | "thinking" | "session_start" | "session_end"
+        content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tool_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        session_id: Option<String>,
+    },
+    /// Claude Code activity — mirrored for dashboard (legacy, kept for compatibility)
     ClaudeCodeEvent {
         request_id: String,
         event_type: String,  // "tool_use" | "text" | "thinking"
@@ -176,6 +187,39 @@ pub enum DaemonEvent {
         #[serde(skip_serializing_if = "Vec::is_empty", default)]
         reverted_paths: Vec<String>,
     },
+}
+
+/// The type of AI coding agent being grounded by `rigor ground`.
+/// Used for observability tagging (OTEL spans, dashboard events, logs).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GroundedClient {
+    ClaudeCode,
+    OpenCode,
+    Unknown,
+}
+
+impl GroundedClient {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GroundedClient::ClaudeCode => "claude_code",
+            GroundedClient::OpenCode => "opencode",
+            GroundedClient::Unknown => "unknown",
+        }
+    }
+}
+
+/// Global grounded client type — set once during `rigor ground` startup.
+static GROUNDED_CLIENT: std::sync::OnceLock<GroundedClient> = std::sync::OnceLock::new();
+
+/// Set the grounded client type. Called from `rigor ground` after detecting
+/// the target command.
+pub fn set_grounded_client(client: GroundedClient) {
+    let _ = GROUNDED_CLIENT.set(client);
+}
+
+/// Get the grounded client type.
+pub fn grounded_client() -> &'static GroundedClient {
+    GROUNDED_CLIENT.get_or_init(|| GroundedClient::Unknown)
 }
 
 /// Global quiet flag — when true, info-level eprintln is suppressed.

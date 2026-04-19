@@ -284,6 +284,24 @@ pub async fn openai_proxy(
     proxy_request(state, headers, body, "/v1/chat/completions").await
 }
 
+/// Proxy OpenCode Zen Anthropic-format requests (same lifecycle as anthropic_proxy).
+pub async fn opencode_zen_messages_proxy(
+    State(state): State<SharedState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    proxy_request(state, headers, body, "/zen/v1/messages").await
+}
+
+/// Proxy OpenCode Zen OpenAI-format requests (same lifecycle as openai_proxy).
+pub async fn opencode_zen_responses_proxy(
+    State(state): State<SharedState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    proxy_request(state, headers, body, "/zen/v1/responses").await
+}
+
 /// Catch-all proxy: forward ANY request to its original destination.
 /// Handles CONNECT tunnels (for HTTPS_PROXY mode) and direct requests.
 pub async fn catch_all_proxy(
@@ -554,6 +572,12 @@ pub async fn catch_all_proxy(
         path == "/v1/messages"                          // Anthropic
         || path == "/v1/chat/completions"               // OpenAI
         || path == "/v1/completions"                    // OpenAI legacy
+        || path == "/zen/v1/messages"                   // OpenCode Zen (Anthropic format)
+        || path == "/zen/v1/responses"                  // OpenCode Zen (OpenAI Responses format)
+        || path == "/zen/v1/chat/completions"           // OpenCode Zen (OpenAI-compatible format)
+        || path.ends_with("/v1/messages")               // Any provider-prefixed Anthropic route
+        || path.ends_with("/v1/chat/completions")       // Any provider-prefixed OpenAI route
+        || path.ends_with("/v1/responses")              // Any provider-prefixed OpenAI Responses route
         || path.ends_with(":generateContent")           // Vertex AI / Gemini
         || path.ends_with(":streamGenerateContent")     // Vertex AI streaming
         || path.ends_with(":predict")                   // Vertex AI prediction
@@ -1422,6 +1446,41 @@ async fn proxy_request(
                                     violations: violations.len(),
                                     claims: claims.len(),
                                 });
+
+                                // Persist violations to disk (streaming path)
+                                if let Ok(logger) = crate::logging::ViolationLogger::new() {
+                                    let session_meta = crate::logging::SessionMetadata::default();
+                                    for v in &violations {
+                                        let sev = match v.severity {
+                                            crate::violation::Severity::Block => "block",
+                                            crate::violation::Severity::Warn => "warn",
+                                            crate::violation::Severity::Allow => "allow",
+                                        };
+                                        let entry = crate::logging::ViolationLogEntry {
+                                            session: session_meta.clone(),
+                                            constraint_id: v.constraint_id.clone(),
+                                            constraint_name: v.constraint_name.clone(),
+                                            claim_ids: v.claim_ids.clone(),
+                                            claim_text: v.claim_text.clone(),
+                                            base_strength: v.strength,
+                                            computed_strength: v.strength,
+                                            severity: sev.to_string(),
+                                            decision: "block".to_string(),
+                                            message: v.message.clone(),
+                                            supporters: Vec::new(),
+                                            attackers: Vec::new(),
+                                            total_claims: claims.len(),
+                                            total_constraints: 0,
+                                            transcript_path: None,
+                                            claim_confidence: None,
+                                            claim_type: None,
+                                            claim_source: None,
+                                            false_positive: None,
+                                            annotation_note: None,
+                                        };
+                                        let _ = logger.log(&entry);
+                                    }
+                                }
 
                                 // Build violation summary
                                 let violation_lines: Vec<String> = violations.iter()
@@ -2466,6 +2525,45 @@ fn extract_and_evaluate_text(
         violations.len(),
         decision_str
     );
+
+    // Persist violations to ~/.rigor/violations.jsonl for the graph and CLI queries.
+    // This is critical: without this, `rigor log` and the /graph.json endpoint
+    // never see violations from grounded sessions (only from hook-mode invocations).
+    if !violations.is_empty() {
+        if let Ok(logger) = crate::logging::ViolationLogger::new() {
+            let session_meta = crate::logging::SessionMetadata::default();
+            for v in &violations {
+                let severity_str = match v.severity {
+                    crate::violation::Severity::Block => "block",
+                    crate::violation::Severity::Warn => "warn",
+                    crate::violation::Severity::Allow => "allow",
+                };
+                let entry = crate::logging::ViolationLogEntry {
+                    session: session_meta.clone(),
+                    constraint_id: v.constraint_id.clone(),
+                    constraint_name: v.constraint_name.clone(),
+                    claim_ids: v.claim_ids.clone(),
+                    claim_text: v.claim_text.clone(),
+                    base_strength: v.strength,
+                    computed_strength: v.strength,
+                    severity: severity_str.to_string(),
+                    decision: decision_str.to_string(),
+                    message: v.message.clone(),
+                    supporters: Vec::new(),
+                    attackers: Vec::new(),
+                    total_claims: claims.len(),
+                    total_constraints: config.all_constraints().len(),
+                    transcript_path: None,
+                    claim_confidence: None,
+                    claim_type: None,
+                    claim_source: None,
+                    false_positive: None,
+                    annotation_note: None,
+                };
+                let _ = logger.log(&entry);
+            }
+        }
+    }
 
     // Async LLM-as-judge: compute semantic relevance between claims and constraints.
     // Runs in background — does NOT block the response pipeline.

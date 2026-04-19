@@ -4,8 +4,10 @@ pub mod graph;
 pub mod ground;
 pub mod init;
 pub mod log;
+pub mod logs;
 pub mod map;
 pub mod scan;
+pub mod sessions;
 pub mod show;
 pub mod validate;
 pub mod web;
@@ -94,6 +96,10 @@ pub enum Commands {
         #[arg(short, long)]
         transparent: bool,
 
+        /// Human-friendly session name (auto-generated if not provided)
+        #[arg(long)]
+        name: Option<String>,
+
         /// Command to ground (everything after --)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, required = true)]
         command: Vec<String>,
@@ -112,6 +118,27 @@ pub enum Commands {
     Log {
         #[command(subcommand)]
         command: log::LogCommands,
+    },
+    /// List grounding sessions
+    Sessions {
+        /// Only show active (running) sessions
+        #[arg(long)]
+        active: bool,
+        /// Show last N sessions (default 10)
+        #[arg(long)]
+        last: Option<usize>,
+    },
+    /// View session logs
+    Logs {
+        /// Session name or ID to view (default: latest)
+        #[arg(short, long)]
+        session: Option<String>,
+        /// Follow log output in real-time (like tail -f)
+        #[arg(short, long)]
+        follow: bool,
+        /// Number of lines to show (default 50)
+        #[arg(short = 'n', long, default_value = "50")]
+        lines: usize,
     },
     /// Install the rigor CA certificate into the macOS login keychain.
     /// After this, ALL apps trust rigor's MITM certificates — no more
@@ -207,7 +234,7 @@ pub fn run_cli() -> Result<()> {
             crate::run()
         }
         Some(Commands::Init { path, ai }) => init::run_init(path, ai),
-        Some(Commands::Ground { path, port, show_logs, no_mitm, transparent, command }) => ground::run_ground(path, port, !show_logs, !no_mitm, transparent, command),
+        Some(Commands::Ground { path, port, show_logs, no_mitm, transparent, name, command }) => ground::run_ground(path, port, !show_logs, !no_mitm, transparent, name, command),
         Some(Commands::Daemon { path, port }) => crate::daemon::start_daemon(path, port),
         Some(Commands::Show { path }) => show::run_show(path),
         Some(Commands::Validate { path }) => validate::run_validate(path),
@@ -219,6 +246,8 @@ pub fn run_cli() -> Result<()> {
             }
         }
         Some(Commands::Log { command }) => log::run_log(command),
+        Some(Commands::Sessions { active, last }) => sessions::run_sessions(active, last),
+        Some(Commands::Logs { session, follow, lines }) => logs::run_logs(session, follow, lines),
         Some(Commands::Trust) => crate::daemon::tls::install_ca_trust(),
         Some(Commands::Untrust) => crate::daemon::tls::remove_ca_trust(),
         Some(Commands::Config { action, key, value }) => config::run_config(&action, key.as_deref(), value.as_deref()),

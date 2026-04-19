@@ -83,10 +83,12 @@ fn setup_otel_layer() -> Option<
 
     eprintln!("rigor: Configuring OTEL exporter to {}", endpoint);
 
-    // Build resource attributes
+    // Build resource attributes — include the grounded client type if available
+    let grounded = crate::daemon::ws::grounded_client().as_str();
     let resource = Resource::new(vec![
         KeyValue::new("service.name", "rigor"),
         KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+        KeyValue::new("rigor.grounded_client", grounded),
     ]);
 
     // Build exporter with tonic and endpoint

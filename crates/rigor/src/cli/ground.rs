@@ -139,9 +139,22 @@ fn find_layer_lib() -> Option<PathBuf> {
     None
 }
 
+/// Detect if the command being launched is OpenCode.
+fn is_opencode_command(command: &[String]) -> bool {
+    if command.is_empty() {
+        return false;
+    }
+    let prog = std::path::Path::new(&command[0])
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy();
+    prog == "opencode" || prog == "opencode-ai"
+}
+
 /// Apply interception environment variables to the command.
-fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16) {
+fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16, command: &[String]) {
     let base_url = format!("http://127.0.0.1:{}", port);
+    let is_opencode = is_opencode_command(command);
 
     match mode {
         InterceptionMode::HttpProxy => {
@@ -213,6 +226,24 @@ fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16) {
         cmd.env("OPENAI_BASE_URL", &base_url);
         cmd.env("CLOUD_ML_API_ENDPOINT", &format!("127.0.0.1:{}", port));
     }
+
+    // OpenCode-specific env vars
+    if is_opencode {
+        // Generate a session ID for this rigor-grounded OpenCode session.
+        // This allows the gate subsystem to correlate tool events.
+        let session_id = uuid::Uuid::new_v4().to_string();
+        cmd.env("OPENCODE_SESSION_ID", &session_id);
+
+        // OpenCode has an internal HTTP server (default port 4096) for TUI ↔ backend
+        // communication. This MUST NOT go through the proxy or OpenCode will hang.
+        // The NO_PROXY above already includes localhost/127.0.0.1, but OpenCode may
+        // also bind on other local interfaces, so we ensure it's covered.
+        // Additionally, OpenCode uses NODE_EXTRA_CA_CERTS for custom cert trust.
+        cmd.env("NODE_TLS_REJECT_UNAUTHORIZED", "0");
+
+        info_println!("rigor: OpenCode detected — session_id={}", session_id);
+        info_println!("rigor: OpenCode LLM traffic will flow through rigor proxy");
+    }
 }
 
 /// Run `rigor ground <command>` — epistemically ground an AI process.
@@ -223,18 +254,35 @@ fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16) {
 /// Interception strategy (tries in order):
 /// 1. LD_PRELOAD (if layer built) — hooks connect() at libc level
 /// 2. HTTP_PROXY + ANTHROPIC_BASE_URL — env var based redirection
-pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, transparent: bool, command: Vec<String>) -> Result<()> {
+pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, transparent: bool, session_name: Option<String>, command: Vec<String>) -> Result<()> {
     use std::os::unix::io::{AsRawFd, FromRawFd};
+    use crate::logging::session_registry::{self, SessionEntry};
 
-    // Open the rigor ground log file. Always overwrite — fresh log per run.
-    // This is where ALL daemon output goes so the terminal stays clean.
-    let log_path = std::path::PathBuf::from("/tmp/rigor-ground.log");
+    // Generate session ID early so we can use it for log paths
+    let session_id = uuid::Uuid::new_v4().to_string();
+
+    // Determine per-session log path (falls back to /tmp for compat)
+    let log_path = session_registry::session_log_path(&session_id)
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp/rigor-ground.log"));
+
+    // Ensure parent directory exists
+    if let Some(parent) = log_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Also write to the legacy path for backward compat
+    let legacy_log_path = std::path::PathBuf::from("/tmp/rigor-ground.log");
+
     let log_file = std::fs::OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
         .open(&log_path)?;
     let log_fd = log_file.as_raw_fd();
+
+    // Symlink legacy path to the session log
+    let _ = std::fs::remove_file(&legacy_log_path);
+    let _ = std::os::unix::fs::symlink(&log_path, &legacy_log_path);
 
     // Save original stderr/stdout/stdin so we can pass them to the child process.
     // Without this, Claude's TUI would write to our log file instead of the terminal.
@@ -284,9 +332,27 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
     if command.is_empty() {
         anyhow::bail!(
             "Usage: rigor ground <command> [args...]\n\
+             Example: rigor ground opencode\n\
              Example: rigor ground claude --dangerously-skip-permissions"
         );
     }
+
+    // Detect and register the grounded client type for observability tagging
+    let client_type = if is_opencode_command(&command) {
+        daemon::ws::GroundedClient::OpenCode
+    } else {
+        let prog = std::path::Path::new(&command[0])
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        if prog.contains("claude") {
+            daemon::ws::GroundedClient::ClaudeCode
+        } else {
+            daemon::ws::GroundedClient::Unknown
+        }
+    };
+    daemon::ws::set_grounded_client(client_type);
 
     let yaml_path = crate::cli::find_rigor_yaml(path)?;
     let (event_tx, _event_rx) = daemon::ws::create_event_channel();
@@ -298,6 +364,29 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
         constraint_count,
         yaml_path.display()
     );
+
+    // Register session in the session registry
+    let agent_str = daemon::ws::grounded_client().as_str();
+    let session_entry_name = session_name.unwrap_or_else(|| SessionEntry::auto_name(agent_str, &session_id));
+    let session_entry = SessionEntry {
+        id: session_id.clone(),
+        name: session_entry_name.clone(),
+        agent: agent_str.to_string(),
+        started_at: chrono::Utc::now().to_rfc3339(),
+        ended_at: None,
+        pid: std::process::id(),
+        constraints: constraint_count,
+        config_path: yaml_path.display().to_string(),
+        cwd: std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+        requests: None,
+        violations: None,
+        total_tokens: None,
+        exit_code: None,
+    };
+    if let Err(e) = session_registry::register_session(&session_entry) {
+        info_println!("rigor: warning: failed to register session: {}", e);
+    }
+    info_println!("rigor: session '{}' ({})", session_entry_name, &session_id[..8]);
 
     let event_tx_for_server = {
         let st = state.event_tx.clone();
@@ -535,6 +624,29 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
     // Give daemon time to start
     std::thread::sleep(std::time::Duration::from_millis(500));
 
+    // Emit session start event for observability — dashboard and OTEL consumers
+    // can see which AI agent is being grounded and when the session began.
+    let grounded = daemon::ws::grounded_client();
+    let session_event_tx = {
+        let st = shared.lock().unwrap();
+        st.event_tx.clone()
+    };
+    let _ = session_event_tx.send(daemon::ws::DaemonEvent::AgentEvent {
+        request_id: uuid::Uuid::new_v4().to_string(),
+        agent_type: grounded.as_str().to_string(),
+        event_type: "session_start".to_string(),
+        content: format!("Grounding {} with {} constraints", grounded.as_str(), constraint_count),
+        tool_name: None,
+        session_id: if is_opencode_command(&command) {
+            // Will be set on the child; generate same one for correlation
+            None // The actual ID is set in apply_interception
+        } else {
+            std::env::var("CLAUDE_CODE_SESSION_ID").ok()
+        },
+    });
+
+    info_println!("rigor: session started — agent={}, constraints={}", grounded.as_str(), constraint_count);
+
     // Open dashboard
     let _ = open::that(&format!("http://127.0.0.1:{}", port));
 
@@ -591,7 +703,7 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
         }
     };
 
-    apply_interception(&mut cmd, &actual_mode, port);
+    apply_interception(&mut cmd, &actual_mode, port, &command);
 
     // Wire the child process's stdio to the ORIGINAL terminal fds, not our
     // log-file-redirected fds. Without this, Claude's TUI would write to the log file.
@@ -604,9 +716,24 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
 
     let status = cmd.status();
 
-    match status {
-        Ok(s) => info_println!("\nrigor: process exited with {}", s),
-        Err(e) => eprintln!("\nrigor: failed to spawn: {}", e),
+    let exit_code = match &status {
+        Ok(s) => {
+            info_println!("\nrigor: process exited with {}", s);
+            s.code()
+        }
+        Err(e) => {
+            eprintln!("\nrigor: failed to spawn: {}", e);
+            Some(1)
+        }
+    };
+
+    // Update session registry with end time and exit code
+    let session_id_for_update = session_id.clone();
+    if let Err(e) = session_registry::update_session(&session_id_for_update, |entry| {
+        entry.ended_at = Some(chrono::Utc::now().to_rfc3339());
+        entry.exit_code = exit_code;
+    }) {
+        info_println!("rigor: warning: failed to update session: {}", e);
     }
 
     drop(server_handle);
