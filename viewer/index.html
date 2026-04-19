@@ -34,6 +34,17 @@
     </div>
   </div>
 
+  <!-- Top-level page tabs -->
+  <div id="page-tabs">
+    <button class="page-tab active" data-page="live">LIVE</button>
+    <button class="page-tab" data-page="sessions">SESSIONS</button>
+    <button class="page-tab" data-page="search">SEARCH</button>
+    <button class="page-tab" data-page="eval">EVAL</button>
+  </div>
+
+  <!-- Page: Live (the existing 3-column dashboard) -->
+  <div id="page-live" class="page active">
+
   <!-- Main -->
   <div id="main">
     <!-- Left column -->
@@ -73,9 +84,6 @@
         <button data-tab="claims">CLAIMS</button>
         <button data-tab="context">CTX</button>
         <button data-tab="govern">GOV</button>
-        <button data-tab="sessions">SESSIONS</button>
-        <button data-tab="search">SEARCH</button>
-        <button data-tab="eval">EVAL</button>
       </div>
       <div id="tab-events" class="tab active">
         <div id="daemon-logs"></div>
@@ -112,45 +120,9 @@
            </div>
          </div>
        </div>
-       <!-- Sessions tab -->
-       <div id="tab-sessions" class="tab">
-         <div id="sessions-content">
-           <div class="obs-header">
-             <span class="obs-title">Sessions</span>
-             <button id="sessions-refresh" class="obs-btn">Refresh</button>
-           </div>
-           <div id="sessions-list"><div class="empty-hint">Loading sessions...</div></div>
-         </div>
-       </div>
-       <!-- Search tab -->
-       <div id="tab-search" class="tab">
-         <div id="search-content">
-           <div class="obs-header">
-             <input id="search-input" type="text" placeholder="Search violations..." class="obs-search-input">
-             <select id="search-severity" class="obs-select">
-               <option value="">All severities</option>
-               <option value="block">Block</option>
-               <option value="warn">Warn</option>
-             </select>
-             <button id="search-go" class="obs-btn">Search</button>
-           </div>
-           <div id="search-results"><div class="empty-hint">Search across all violations</div></div>
-         </div>
-       </div>
-       <!-- Eval tab -->
-       <div id="tab-eval" class="tab">
-         <div id="eval-content">
-           <div class="obs-header">
-             <span class="obs-title">Constraint Effectiveness</span>
-             <button id="eval-refresh" class="obs-btn">Refresh</button>
-           </div>
-           <div id="eval-summary"></div>
-           <div id="eval-constraints"><div class="empty-hint">Loading eval data...</div></div>
-         </div>
-       </div>
      </div>
    </div>
- 
+
    <!-- Timeline -->
   <div id="timeline-panel">
     <div class="timeline-header">
@@ -169,6 +141,47 @@
       </span>
     </div>
     <canvas id="timeline-canvas"></canvas>
+  </div>
+
+  </div><!-- /page-live -->
+
+  <!-- Page: Sessions -->
+  <div id="page-sessions" class="page">
+    <div class="page-content">
+      <div class="obs-header">
+        <span class="obs-title">Sessions</span>
+        <button id="sessions-refresh" class="obs-btn">Refresh</button>
+      </div>
+      <div id="sessions-list"><div class="empty-hint">Loading sessions...</div></div>
+    </div>
+  </div>
+
+  <!-- Page: Search -->
+  <div id="page-search" class="page">
+    <div class="page-content">
+      <div class="obs-header">
+        <input id="search-input" type="text" placeholder="Search violations..." class="obs-search-input">
+        <select id="search-severity" class="obs-select">
+          <option value="">All severities</option>
+          <option value="block">Block</option>
+          <option value="warn">Warn</option>
+        </select>
+        <button id="search-go" class="obs-btn">Search</button>
+      </div>
+      <div id="search-results"><div class="empty-hint">Search across all violations</div></div>
+    </div>
+  </div>
+
+  <!-- Page: Eval -->
+  <div id="page-eval" class="page">
+    <div class="page-content">
+      <div class="obs-header">
+        <span class="obs-title">Constraint Effectiveness</span>
+        <button id="eval-refresh" class="obs-btn">Refresh</button>
+      </div>
+      <div id="eval-summary"></div>
+      <div id="eval-constraints"><div class="empty-hint">Loading eval data...</div></div>
+    </div>
   </div>
 
   <script src="/assets/3d-force-graph.min.js"></script>
@@ -194,6 +207,21 @@
     var allRetries = []; // [{request_id, blockedText, feedback, retryResult, status, timestamp}]
     // Timeline events: each has a timestamp and type
     var timelineEvents = []; // [{ts, type:'tokens'|'block'|'retry', input, output, model, message}]
+
+    // Top-level page tab switching
+    document.querySelectorAll('#page-tabs .page-tab').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('#page-tabs .page-tab').forEach(function(b){b.classList.remove('active');});
+        document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+        btn.classList.add('active');
+        var page = document.getElementById('page-' + btn.getAttribute('data-page'));
+        if (page) page.classList.add('active');
+        // Auto-load data for observability pages
+        var pg = btn.getAttribute('data-page');
+        if (pg === 'sessions') loadSessions();
+        if (pg === 'eval') loadEval();
+      });
+    });
 
     // Check if a claim with similar text already exists (Jaccard similarity on word sets)
     function findDuplicateClaim(text) {
@@ -1670,15 +1698,6 @@
       }).catch(function(){ document.getElementById('eval-constraints').innerHTML = '<div class="empty-hint">Failed to load</div>'; });
     }
     document.getElementById('eval-refresh').addEventListener('click', loadEval);
-
-    // Auto-load when switching to observability tabs
-    document.querySelectorAll('#tabs button').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var tab = btn.getAttribute('data-tab');
-        if (tab === 'sessions') loadSessions();
-        if (tab === 'eval') loadEval();
-      });
-    });
 
     initGraph();
     loadInitialGraph();
