@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 /// Top-level rigor.yaml configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RigorConfig {
+    #[serde(default)]
     pub constraints: ConstraintsSection,
     #[serde(default)]
     pub relations: Vec<Relation>,
@@ -20,7 +21,7 @@ impl RigorConfig {
 }
 
 /// Constraints grouped by epistemic category.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConstraintsSection {
     #[serde(default)]
     pub beliefs: Vec<Constraint>,

@@ -272,6 +272,57 @@ impl DaemonState {
             },
         })
     }
+
+    /// Create a DaemonState with zero constraints (no rigor.yaml).
+    /// Used by `rigor serve` when run globally without a project context.
+    pub fn empty(event_tx: EventSender) -> Result<Self> {
+        let config = RigorConfig::default();
+        let graph = ArgumentationGraph::from_config(&config);
+
+        let target_api = std::env::var("RIGOR_TARGET_API")
+            .unwrap_or_else(|_| "https://api.anthropic.com".to_string());
+        let api_key = std::env::var("ANTHROPIC_API_KEY").ok();
+
+        let tls_config = match tls::generate_tls_config(MITM_HOSTS) {
+            Ok(cfg) => Some(Arc::new(cfg)),
+            Err(_) => None,
+        };
+        let rigor_ca = match tls::RigorCA::load_or_generate() {
+            Ok(ca) => Some(Arc::new(ca)),
+            Err(_) => None,
+        };
+        let http_client = reqwest::Client::builder()
+            .pool_max_idle_per_host(4)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
+        let (judge_url, judge_key, judge_model) = crate::cli::config::judge_config();
+
+        Ok(Self {
+            config,
+            graph,
+            yaml_path: PathBuf::from("/dev/null"),
+            target_api,
+            api_key,
+            event_tx,
+            policy_engine: None,
+            tls_config,
+            rigor_ca,
+            http_client,
+            disabled_constraints: std::collections::HashSet::new(),
+            proxy_paused: false,
+            block_next: false,
+            action_gates: std::collections::HashMap::new(),
+            gate_snapshots: std::collections::HashMap::new(),
+            gate_decisions: std::collections::HashMap::new(),
+            active_streams: std::collections::HashSet::new(),
+            blocked_requests: std::collections::HashSet::new(),
+            fallback: FallbackConfig::default_config(),
+            judge_api_url: judge_url,
+            judge_api_key: judge_key,
+            judge_model,
+        })
+    }
 }
 
 pub type SharedState = Arc<Mutex<DaemonState>>;

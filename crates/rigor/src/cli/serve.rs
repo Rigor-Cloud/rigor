@@ -206,19 +206,34 @@ impl ExecReplaceSelf for std::process::Command {
 
 /// Foreground mode: start the daemon, register the session, block until signal.
 fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>) -> Result<()> {
-    let yaml_path = crate::cli::find_rigor_yaml(path)?;
+    // rigor serve works without a rigor.yaml — it just runs with zero constraints.
+    // This lets you start the daemon globally and connect any project to it.
+    let yaml_path = match crate::cli::find_rigor_yaml(path) {
+        Ok(p) => {
+            eprintln!("rigor serve: loaded constraints from {}", p.display());
+            Some(p)
+        }
+        Err(_) => {
+            eprintln!("rigor serve: no rigor.yaml found — running with zero constraints");
+            eprintln!("rigor serve: connect from a project directory, or pass --path <rigor.yaml>");
+            None
+        }
+    };
 
     // Apply global flags the proxy subsystem expects. `serve` is the "plain
-    // proxy for arbitrary clients" mode — blind-tunnel is safest (preserves
-    // OAuth / cert pinning for the caller). Users wanting MITM inspection
-    // should use `rigor ground --mitm`.
+    // proxy for arbitrary clients" mode — MITM enabled so we can inspect LLM
+    // traffic and evaluate constraints.
     daemon::ws::set_quiet(false);
-    daemon::ws::set_mitm_enabled(false);
+    daemon::ws::set_mitm_enabled(true);
     daemon::ws::set_transparent(false);
     daemon::ws::set_grounded_client(daemon::ws::GroundedClient::Unknown);
 
     let (event_tx, _event_rx) = daemon::ws::create_event_channel();
-    let state = DaemonState::load(yaml_path.clone(), event_tx)?;
+    let state = if let Some(ref yp) = yaml_path {
+        DaemonState::load(yp.clone(), event_tx)?
+    } else {
+        DaemonState::empty(event_tx)?
+    };
     let constraint_count = state.config.all_constraints().len();
 
     // Register in the session registry so `rigor sessions` shows us.
@@ -234,7 +249,7 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
         ended_at: None,
         pid: std::process::id(),
         constraints: constraint_count,
-        config_path: yaml_path.display().to_string(),
+        config_path: yaml_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "(none)".to_string()),
         cwd: std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
@@ -264,9 +279,9 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
     }
 
     eprintln!(
-        "rigor serve: loaded {} constraints from {}",
+        "rigor serve: {} constraints{}",
         constraint_count,
-        yaml_path.display()
+        yaml_path.as_ref().map(|p| format!(" from {}", p.display())).unwrap_or_default()
     );
     eprintln!("rigor serve: session '{}' ({})", entry_name, &session_id[..8]);
 
