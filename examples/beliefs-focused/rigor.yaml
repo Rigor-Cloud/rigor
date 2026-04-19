@@ -1,0 +1,113 @@
+# Beliefs-Focused Example - External Rego Files
+# This example demonstrates external policy files and support relations.
+
+constraints:
+  beliefs:
+    - id: no-fabricated-apis
+      epistemic_type: belief
+      name: "No Fabricated APIs"
+      description: "Claims about APIs must not fabricate features that don't exist"
+      rego: |
+        import rego.v1
+
+        # Detect fabricated API methods
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)api\.(magical|fabricated|nonexistent|auto_heal)`, c.text)
+          v := {
+            "constraint_id": "no-fabricated-apis",
+            "violated": true,
+            "claims": [c.id],
+            "reason": sprintf("Fabricated API method detected: %v", [c.text])
+          }
+        }
+
+        # Detect claims about nonexistent capabilities
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(supports|provides|enables).*(magic|auto-fix|self-healing|mind-reading)`, c.text)
+          c.confidence > 0.8
+          v := {
+            "constraint_id": "no-fabricated-apis",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Claimed capability does not exist in the library"
+          }
+        }
+
+        # Detect claims about features with certainty but no documentation
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(definitely|certainly|always).*(feature|capability|method)`, c.text)
+          not regex.match(`(?i)(documented|reference|spec|according to)`, c.text)
+          c.confidence > 0.9
+          v := {
+            "constraint_id": "no-fabricated-apis",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "High-certainty feature claim without documentation reference"
+          }
+        }
+      message: "Fabricated API feature detected"
+      tags: ["api", "hallucination"]
+      domain: "general"
+
+    - id: api-accuracy
+      epistemic_type: belief
+      name: "API Accuracy"
+      description: "Claims about API behavior must match documentation"
+      rego: |
+        import rego.v1
+
+        # Detect claims with version mismatches
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)version \d+\.\d+`, c.text)
+          regex.match(`(?i)(deprecated|removed|obsolete)`, c.text)
+          not regex.match(`(?i)(as of|before|prior to)`, c.text)
+          v := {
+            "constraint_id": "api-accuracy",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Version-specific claim lacks temporal qualifier"
+          }
+        }
+      message: "API claim doesn't match documentation"
+      tags: ["api", "accuracy"]
+      domain: "general"
+
+  justifications:
+    - id: test-evidence-supports
+      epistemic_type: justification
+      name: "Test Evidence Supports Claims"
+      description: "Passing tests strengthen related API claims"
+      rego: |
+        import rego.v1
+
+        # Detect functional claims without test evidence
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(works|functions|correctly|successfully)`, c.text)
+          not regex.match(`(?i)(test|tested|verified|confirmed)`, c.text)
+          c.confidence > 0.85
+          v := {
+            "constraint_id": "test-evidence-supports",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Functional claim lacks test evidence reference"
+          }
+        }
+      message: "Claim needs test evidence"
+      tags: ["testing", "support"]
+      domain: "general"
+
+# Argumentation relations
+relations:
+  # Test evidence supports both API beliefs
+  - from: test-evidence-supports
+    to: no-fabricated-apis
+    relation_type: supports
+
+  - from: test-evidence-supports
+    to: api-accuracy
+    relation_type: supports

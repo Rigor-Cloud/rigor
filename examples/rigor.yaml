@@ -1,0 +1,71 @@
+# Example rigor.yaml - Epistemic constraint configuration
+# Demonstrates beliefs, justifications, defeaters, and their relations.
+
+constraints:
+  beliefs:
+    - id: no_unwrap_in_production
+      epistemic_type: belief
+      name: "No unwrap in production"
+      description: "Production code should use proper error handling instead of unwrap()"
+      rego: |
+        violation contains v if {
+          matches := helpers.has_pattern(input.claims, "unwrap")
+          count(matches) > 0
+          some c in matches
+          v := {"constraint_id": "no_unwrap_in_production", "violated": true, "claims": [c.id], "reason": "Found unwrap() usage in production code path"}
+        }
+      message: "Found unwrap() call in production code"
+      tags: ["safety", "rust"]
+
+    - id: architecture_documented
+      epistemic_type: belief
+      name: "Architecture matches documentation"
+      description: "Architectural claims must be consistent with documented architecture"
+      rego: |
+        violation contains v if {
+          matches := helpers.has_pattern(input.claims, "architecture")
+          count(matches) > 0
+          some c in matches
+          not contains(c.text, "documented")
+          v := {"constraint_id": "architecture_documented", "violated": true, "claims": [c.id], "reason": "Architectural claim without documentation reference"}
+        }
+      message: "Architecture claim not backed by documentation"
+      tags: ["correctness", "architecture"]
+
+  justifications:
+    - id: tested_code
+      epistemic_type: justification
+      name: "Code has tests"
+      description: "Tested code is more trustworthy - supports beliefs about code quality"
+      rego: |
+        violation contains v if {
+          matches := helpers.has_pattern(input.claims, "untested")
+          count(matches) > 0
+          some c in matches
+          v := {"constraint_id": "tested_code", "violated": true, "claims": [c.id], "reason": "Code lacks test coverage"}
+        }
+      message: "Missing test coverage"
+      tags: ["testing"]
+
+  defeaters:
+    - id: prototype_code
+      epistemic_type: defeater
+      name: "Prototype exemption"
+      description: "Prototype code is allowed to cut corners - attacks strict beliefs"
+      rego: |
+        violation contains v if {
+          matches := helpers.has_pattern(input.claims, "prototype")
+          count(matches) > 0
+          some c in matches
+          v := {"constraint_id": "prototype_code", "violated": true, "claims": [c.id], "reason": "Prototype code detected - relaxing constraints"}
+        }
+      message: "Prototype code detected"
+      tags: ["workflow"]
+
+relations:
+  - from: tested_code
+    to: no_unwrap_in_production
+    relation_type: supports
+  - from: prototype_code
+    to: no_unwrap_in_production
+    relation_type: attacks

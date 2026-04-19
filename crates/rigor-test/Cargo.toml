@@ -1,0 +1,14 @@
+[package]
+name = "rigor-test"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Dev-only test orchestrator for rigor. Not shipped to end users. Runs Layer 3 (E2E) and Layer 4 (benchmark) suites, produces HTML reports."
+
+[[bin]]
+name = "rigor-test"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+anyhow = { workspace = true }

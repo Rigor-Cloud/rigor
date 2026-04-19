@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/rigor",
+            "description": "Epistemic constraint enforcement - checks Claude's claims against rigor.lock constraints"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+# Basic Rigor Example - Inline Constraints
+# This example demonstrates basic epistemic concepts with inline Rego policies.
+
+constraints:
+  beliefs:
+    - id: no-fabricated-apis
+      epistemic_type: belief
+      name: "No Fabricated APIs"
+      description: "Claims about APIs must not fabricate features that don't exist"
+      rego: |
+        import rego.v1
+
+        # Detect fabricated API methods
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)api\.(magical|fabricated|nonexistent)`, c.text)
+          v := {
+            "constraint_id": "no-fabricated-apis",
+            "violated": true,
+            "claims": [c.id],
+            "reason": sprintf("Fabricated API method detected: %v", [c.text])
+          }
+        }
+
+        # Detect claims about nonexistent capabilities
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(supports|provides).*(magic|auto-fix|self-healing)`, c.text)
+          c.confidence > 0.8
+          v := {
+            "constraint_id": "no-fabricated-apis",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Claimed capability does not exist in the library"
+          }
+        }
+      message: "Fabricated API feature detected"
+      tags: ["api", "hallucination"]
+      domain: "general"
+
+  justifications:
+    - id: require-evidence
+      epistemic_type: justification
+      name: "Require Evidence"
+      description: "Functional claims must reference tests or verification"
+      rego: |
+        import rego.v1
+
+        # Detect claims about functionality without evidence
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(works|functions|correctly)`, c.text)
+          not regex.match(`(?i)(test|tested|verified)`, c.text)
+          c.confidence > 0.85
+          v := {
+            "constraint_id": "require-evidence",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Functional claim lacks test evidence or verification"
+          }
+        }
+      message: "Claim needs evidence - add test reference"
+      tags: ["evidence", "testing"]
+      domain: "general"

@@ -1,0 +1,166 @@
+# Defeaters-Focused Example - Attack Relations & DF-QuAD
+# This example demonstrates how defeaters attack beliefs and how DF-QuAD computes severity.
+
+constraints:
+  beliefs:
+    - id: production-ready
+      epistemic_type: belief
+      name: "Production Ready"
+      description: "Code is ready for production deployment"
+      rego: |
+        import rego.v1
+
+        # Detect production-ready claims
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(production.ready|ready for production|stable|production.grade)`, c.text)
+          c.confidence > 0.8
+          # No prototype markers present
+          not regex.match(`(?i)(prototype|experimental|wip|draft)`, c.text)
+          v := {
+            "constraint_id": "production-ready",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Production-ready claim detected - will be evaluated against defeaters"
+          }
+        }
+      message: "Production-ready claim made"
+      tags: ["maturity", "production"]
+      domain: "general"
+
+    - id: complete-implementation
+      epistemic_type: belief
+      name: "Complete Implementation"
+      description: "Implementation is complete without missing features"
+      rego: |
+        import rego.v1
+
+        # Detect completeness claims
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(complete|finished|fully implemented|done)`, c.text)
+          not regex.match(`(?i)(except|but|however|partial|mostly)`, c.text)
+          c.confidence > 0.85
+          v := {
+            "constraint_id": "complete-implementation",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Completeness claim without qualification"
+          }
+        }
+      message: "Unqualified completeness claim"
+      tags: ["maturity", "completeness"]
+      domain: "general"
+
+  defeaters:
+    - id: prototype-marker
+      epistemic_type: defeater
+      name: "Prototype Marker Defeats Production Claims"
+      description: "Prototype/experimental markers attack production-ready beliefs"
+      rego: |
+        import rego.v1
+
+        # Detect prototype markers that contradict production claims
+        violation contains v if {
+          some c in input.claims
+          # Find production-ready claim
+          regex.match(`(?i)(production|stable|ready)`, c.text)
+          c.confidence > 0.7
+          # Find contradicting prototype markers
+          some p in input.claims
+          p.id != c.id
+          regex.match(`(?i)(prototype|experimental|wip|todo|fixme|draft|hack)`, p.text)
+          v := {
+            "constraint_id": "prototype-marker",
+            "violated": true,
+            "claims": [c.id, p.id],
+            "reason": sprintf("Production claim contradicted by prototype marker: %v", [p.text])
+          }
+        }
+
+        # Detect prototype comments in code claims
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(production|stable)`, c.text)
+          regex.match(`(?i)(TODO:|FIXME:|HACK:|XXX:)`, c.text)
+          v := {
+            "constraint_id": "prototype-marker",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Production claim contains prototype marker (TODO/FIXME/HACK)"
+          }
+        }
+      message: "Prototype code contradicts production-ready claim"
+      tags: ["prototype", "attack"]
+      domain: "general"
+
+    - id: missing-features
+      epistemic_type: defeater
+      name: "Missing Features Attack Completeness"
+      description: "TODO items and missing features attack completeness beliefs"
+      rego: |
+        import rego.v1
+
+        # Detect missing features that contradict completeness
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(complete|finished|done)`, c.text)
+          # Find mentions of missing features
+          some m in input.claims
+          m.id != c.id
+          regex.match(`(?i)(not yet|coming soon|future|planned|missing|lacking)`, m.text)
+          v := {
+            "constraint_id": "missing-features",
+            "violated": true,
+            "claims": [c.id, m.id],
+            "reason": sprintf("Completeness claim contradicted by missing feature: %v", [m.text])
+          }
+        }
+      message: "Missing features contradict completeness claim"
+      tags: ["completeness", "attack"]
+      domain: "general"
+
+  justifications:
+    - id: test-coverage-supports
+      epistemic_type: justification
+      name: "Test Coverage Supports Maturity"
+      description: "High test coverage strengthens production-ready beliefs"
+      rego: |
+        import rego.v1
+
+        # Detect maturity claims without test evidence
+        violation contains v if {
+          some c in input.claims
+          regex.match(`(?i)(production|complete|stable)`, c.text)
+          not regex.match(`(?i)(test|tested|coverage|verified)`, c.text)
+          c.confidence > 0.8
+          v := {
+            "constraint_id": "test-coverage-supports",
+            "violated": true,
+            "claims": [c.id],
+            "reason": "Maturity claim lacks test coverage reference"
+          }
+        }
+      message: "Maturity claim needs test evidence"
+      tags: ["testing", "support"]
+      domain: "general"
+
+# Argumentation relations
+relations:
+  # Defeaters attack beliefs
+  - from: prototype-marker
+    to: production-ready
+    relation_type: attacks
+
+  - from: missing-features
+    to: complete-implementation
+    relation_type: attacks
+
+  # Justifications support beliefs
+  - from: test-coverage-supports
+    to: production-ready
+    relation_type: supports
+
+  - from: test-coverage-supports
+    to: complete-implementation
+    relation_type: supports

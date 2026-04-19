@@ -1,0 +1,11 @@
+[package]
+name = "rigor-harness"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Test harness primitives for rigor: MockAgent, MockLLM, TestDaemon, and friends. Dev-dependency and publishable for future adapter authors."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]

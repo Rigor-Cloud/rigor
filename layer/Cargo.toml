@@ -1,0 +1,13 @@
+[package]
+name = "rigor-layer"
+version = "0.1.0"
+edition = "2021"
+description = "LD_PRELOAD library that intercepts LLM API connections — mirrord-style"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libc = "0.2"
+once_cell = "1.19"
+frida-gum = { version = "0.17", features = ["auto-download"] }
