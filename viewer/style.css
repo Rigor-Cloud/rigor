@@ -25,7 +25,7 @@ html,body { height:100%; overflow:hidden; background:var(--bg); font-family:var(
 .status-badge.disconnected { background:rgba(255,107,107,0.15); color:var(--red); }
 
 /* Main layout — CSS Grid three-column */
-#main { display:grid; grid-template-columns:280px 1fr 280px; height:calc(100% - 36px - 130px); }
+#main { display:grid; grid-template-columns:280px 1fr 280px; height:calc(100vh - 36px - 32px - 130px); }
 
 /* Left column */
 #left-col { display:flex; flex-direction:column; border-right:1px solid var(--border); background:var(--panel); overflow:hidden; }
@@ -292,6 +292,17 @@ html,body { height:100%; overflow:hidden; background:var(--bg); font-family:var(
 .gate-btn-reject { background:rgba(255,71,87,0.15); border-color:rgba(255,71,87,0.4); color:#ff4757; }
 .gate-btn-reject:hover { background:rgba(255,71,87,0.25); }
 .gate-resolved { padding:8px 10px; font-size:10px; text-align:center; }
+
+/* ── Page-level tabs (under header bar) ────────────────────── */
+#page-tabs { display:flex; gap:0; background:var(--panel); border-bottom:1px solid var(--border); padding:0 12px; }
+.page-tab { background:none; border:none; color:var(--dim); font-family:var(--mono); font-size:10px; font-weight:600; padding:8px 16px; cursor:pointer; border-bottom:2px solid transparent; letter-spacing:0.5px; }
+.page-tab:hover { color:var(--text); }
+.page-tab.active { color:var(--bright); border-bottom-color:var(--blue); }
+.page { display:none; }
+.page.active { display:block; }
+#page-live.active { display:block; }
+#page-live #main { height:calc(100vh - 36px - 32px - 130px); }
+.page-content { padding:16px 24px; height:calc(100vh - 36px - 32px); overflow-y:auto; }
 
 /* ── Observability tabs ────────────────────────────────────── */
 .obs-header { display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--border); }
