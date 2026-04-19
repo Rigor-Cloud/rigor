@@ -1,0 +1,36 @@
+Rigor Software License (Placeholder)
+Copyright (c) 2026 Vibhav Bobade
+
+This placeholder governs use of the Rigor binary distribution until the
+full End User License Agreement is published at https://rigorcloud.com/license.
+
+1. GRANT. You are granted a non-exclusive, non-transferable, royalty-free
+   license to install and use the Rigor binary ("the Software") on systems
+   you own or control, for any purpose including commercial evaluation.
+
+2. RESTRICTIONS. You may not: (a) redistribute, sublicense, rent, or sell
+   the Software; (b) modify, reverse-engineer, decompile, or disassemble
+   the Software, except to the extent such restriction is prohibited by
+   applicable law; (c) remove or obscure any proprietary notices; (d) use
+   the Software to build a competing product or service.
+
+3. OWNERSHIP. All right, title, and interest in the Software remain with
+   the copyright holder. No license is granted to any source code.
+
+4. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+   KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+   OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-
+   INFRINGEMENT.
+
+5. LIMITATION OF LIABILITY. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE
+   LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR IN
+   CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+6. TERMINATION. This license terminates automatically upon any breach.
+   Upon termination, you must cease all use of the Software and destroy
+   all copies in your possession.
+
+7. GOVERNING LAW. This license is governed by the laws of [JURISDICTION TBD].
+
+TODO before v0.1.0 production release: replace this placeholder with the
+full EULA drafted with a tech lawyer. Tracked in spec section 12.
