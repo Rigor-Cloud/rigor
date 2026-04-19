@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "PRERELEASE=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PRERELEASE=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Rust stable + mac targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo registry + build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build aarch64-apple-darwin
+        run: cargo build --release --locked --target aarch64-apple-darwin
+
+      - name: Build x86_64-apple-darwin
+        run: cargo build --release --locked --target x86_64-apple-darwin
+
+      - name: Package tarballs
+        id: pkg
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          mkdir -p dist
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            stage="dist/rigor-${VERSION}-${target}"
+            mkdir -p "$stage"
+            cp "target/${target}/release/rigor" "$stage/"
+            cp LICENSE "$stage/"
+            tar -C dist -czf "dist/rigor-${VERSION}-${target}.tar.gz" \
+              "rigor-${VERSION}-${target}"
+            rm -rf "$stage"
+          done
+          ls -la dist/
+
+      - name: Compute SHA256 for each tarball
+        id: sha
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          SHA_ARM=$(shasum -a 256 "dist/rigor-${VERSION}-aarch64-apple-darwin.tar.gz" | awk '{print $1}')
+          SHA_X64=$(shasum -a 256 "dist/rigor-${VERSION}-x86_64-apple-darwin.tar.gz" | awk '{print $1}')
+          echo "SHA_ARM=${SHA_ARM}" >> "$GITHUB_OUTPUT"
+          echo "SHA_X64=${SHA_X64}" >> "$GITHUB_OUTPUT"
+          (cd dist && shasum -a 256 *.tar.gz) > dist/SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          NOTES=$(awk -v tag="## v${VERSION}" '
+            $0 ~ "^" tag {p=1; next}
+            /^## v/ {p=0}
+            p
+          ' CHANGELOG.md || true)
+          if [[ -z "$NOTES" ]]; then
+            NOTES="Release ${VERSION}. See CHANGELOG.md for details."
+          fi
+          {
+            echo "NOTES<<__EOF__"
+            echo "$NOTES"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release on Rigor-Cloud/rigor-releases
+        env:
+          GH_TOKEN: ${{ secrets.RIGOR_RELEASES_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PRERELEASE_FLAG=""
+          if [[ "${{ steps.version.outputs.PRERELEASE }}" == "true" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "v${VERSION}" \
+            --repo Rigor-Cloud/rigor-releases \
+            --title "rigor ${VERSION}" \
+            --notes "${{ steps.notes.outputs.NOTES }}" \
+            ${PRERELEASE_FLAG} \
+            "dist/rigor-${VERSION}-aarch64-apple-darwin.tar.gz" \
+            "dist/rigor-${VERSION}-x86_64-apple-darwin.tar.gz" \
+            "dist/SHA256SUMS.txt"
+
+      - name: Open formula bump PR on Rigor-Cloud/homebrew-rigor
+        env:
+          GH_TOKEN: ${{ secrets.RIGOR_RELEASES_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          SHA_ARM="${{ steps.sha.outputs.SHA_ARM }}"
+          SHA_X64="${{ steps.sha.outputs.SHA_X64 }}"
+          BRANCH="bump-rigor-${VERSION}"
+
+          # Render the formula using the private-repo script
+          bash scripts/render-formula.sh "${VERSION}" "${SHA_ARM}" "${SHA_X64}" > /tmp/rigor.rb
+
+          # Clone the tap
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/Rigor-Cloud/homebrew-rigor.git" tap
+          cd tap
+          git config user.name "rigor-release-bot"
+          git config user.email "release@rigorcloud.com"
+
+          git checkout -b "$BRANCH"
+          mkdir -p Formula
+          cp /tmp/rigor.rb Formula/rigor.rb
+
+          git add Formula/rigor.rb
+          git commit -m "Bump rigor to ${VERSION}"
+          git push -u origin "$BRANCH"
+
+          PR_BODY=$(cat <<EOF
+          Automated bump by release workflow.
+
+          Release: https://github.com/Rigor-Cloud/rigor-releases/releases/tag/v${VERSION}
+
+          \`\`\`
+          aarch64: ${SHA_ARM}
+          x86_64:  ${SHA_X64}
+          \`\`\`
+
+          Merge after brew test-bot passes.
+          EOF
+          )
+
+          gh pr create \
+            --repo Rigor-Cloud/homebrew-rigor \
+            --base main \
+            --head "$BRANCH" \
+            --title "Bump rigor to ${VERSION}" \
+            --body "$PR_BODY"
