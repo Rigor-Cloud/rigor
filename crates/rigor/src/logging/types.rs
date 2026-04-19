@@ -72,6 +72,9 @@ pub struct ViolationLogEntry {
     pub false_positive: Option<bool>,
     /// User annotation: free-form notes
     pub annotation_note: Option<String>,
+    /// Model identifier (e.g. "claude-opus-4-7") — captured from proxy requests.
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 /// Source provenance for a claim — traces back to transcript location.

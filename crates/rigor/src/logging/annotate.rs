@@ -98,6 +98,7 @@ mod tests {
             claim_source: None,
             false_positive: None,
             annotation_note: None,
+            model: None,
         }
     }
 
