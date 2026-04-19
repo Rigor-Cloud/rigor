@@ -75,6 +75,7 @@ pub struct ViolationQuery {
     q: Option<String>,
     constraint: Option<String>,
     severity: Option<String>,
+    session: Option<String>,
     limit: Option<usize>,
 }
 
@@ -119,6 +120,11 @@ pub async fn search_violations(Query(params): Query<ViolationQuery>) -> Response
             }
             if let Some(ref sev) = params.severity {
                 if e.severity != *sev {
+                    return false;
+                }
+            }
+            if let Some(ref sid) = params.session {
+                if !e.session.session_id.starts_with(sid) {
                     return false;
                 }
             }
