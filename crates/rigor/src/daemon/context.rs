@@ -1,6 +1,7 @@
 use crate::constraint::graph::ArgumentationGraph;
 use crate::constraint::types::{EpistemicType, RigorConfig};
 use crate::logging::ViolationLogger;
+use crate::memory::MemoryStore;
 
 /// Build epistemic context to inject into the AI's system prompt.
 /// This teaches the AI the verified truths so it internalizes them
@@ -68,6 +69,52 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
                 }
                 ctx.push_str("\n");
             }
+        }
+    }
+
+    // Cross-session memory: episodic + semantic. We rebuild deterministically
+    // from the violation log on every context build so it's always in sync.
+    // If the log is missing/empty, both sections are silently skipped.
+    if let Ok(memory) = MemoryStore::rebuild_from_log() {
+        let recent = memory.recent_episodes(3);
+        let non_fp: Vec<_> = recent
+            .iter()
+            .filter(|e| e.outcome != "false_positive_dominant")
+            .collect();
+        if !non_fp.is_empty() {
+            ctx.push_str("RELEVANT PAST EPISODES (from previous sessions — do not repeat these errors):\n");
+            for ep in non_fp.iter().take(3) {
+                let sid_short = &ep.session_id[..ep.session_id.len().min(8)];
+                ctx.push_str(&format!(
+                    "• session {} ({}): {} violation(s), constraints: {}\n",
+                    sid_short,
+                    ep.timestamp,
+                    ep.total_violations,
+                    ep.constraint_ids.join(", ")
+                ));
+                for s in ep.sample_claims.iter().take(2) {
+                    ctx.push_str(&format!("   - flagged claim: \"{}\"\n", s));
+                }
+            }
+            ctx.push_str("\n");
+        }
+
+        let warnings = memory.model_warnings();
+        if !warnings.is_empty() {
+            ctx.push_str("MODEL-SPECIFIC WARNINGS (learned from history):\n");
+            for w in &warnings {
+                ctx.push_str(&format!("• {}\n", w));
+            }
+            ctx.push_str("\n");
+        }
+
+        let top = memory.top_relevant_constraints(5);
+        if !top.is_empty() {
+            ctx.push_str("HIGH-RISK CONSTRAINT CATEGORIES (most frequently triggered historically):\n");
+            for (cid, n) in &top {
+                ctx.push_str(&format!("• {} — fired in {} prior session(s)\n", cid, n));
+            }
+            ctx.push_str("\n");
         }
     }
 

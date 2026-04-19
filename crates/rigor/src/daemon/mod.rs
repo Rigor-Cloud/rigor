@@ -3,6 +3,7 @@ pub mod context;
 pub mod gate;
 pub mod gate_api;
 pub mod governance;
+pub mod observability_api;
 pub mod proxy;
 pub mod sni;
 pub mod tls;
@@ -451,6 +452,10 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/api/gate/{gate_id}/reject", post(gate_api::reject_gate))
         // Chat endpoint — lets the dashboard send messages to Claude through rigor's proxy
         .route("/api/chat", post(chat::chat_handler))
+        // Observability API endpoints (consumed by dashboard tabs)
+        .route("/api/sessions", get(observability_api::list_sessions))
+        .route("/api/violations", get(observability_api::search_violations))
+        .route("/api/eval", get(observability_api::eval_stats))
         // Catch-all proxy for ANY other API path (Vertex AI, Azure, etc.)
         // This handles LD_PRELOAD intercepted traffic to unknown endpoints
         .fallback(proxy::catch_all_proxy)

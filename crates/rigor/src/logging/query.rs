@@ -152,6 +152,7 @@ mod tests {
             claim_source: None,
             false_positive,
             annotation_note: None,
+            model: None,
         }
     }
 

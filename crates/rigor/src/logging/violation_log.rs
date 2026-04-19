@@ -133,6 +133,7 @@ mod tests {
             claim_source: None,
             false_positive: None,
             annotation_note: None,
+            model: None,
         }
     }
 
@@ -206,6 +207,7 @@ mod tests {
             claim_source: None,
             false_positive: Some(false),
             annotation_note: Some("Legit warning".to_string()),
+            model: None,
         };
         logger.log(&entry2).unwrap();
 

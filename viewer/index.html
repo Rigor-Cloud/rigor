@@ -73,6 +73,9 @@
         <button data-tab="claims">CLAIMS</button>
         <button data-tab="context">CTX</button>
         <button data-tab="govern">GOV</button>
+        <button data-tab="sessions">SESSIONS</button>
+        <button data-tab="search">SEARCH</button>
+        <button data-tab="eval">EVAL</button>
       </div>
       <div id="tab-events" class="tab active">
         <div id="daemon-logs"></div>
@@ -106,13 +109,49 @@
             <button id="gov-block-next" class="gov-btn gov-btn-red">Block Next</button>
             <button id="gov-force-retry" class="gov-btn gov-btn-orange">Force Retry</button>
             <button id="gov-pause" class="gov-btn gov-btn-dim">Pause</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Timeline -->
+           </div>
+         </div>
+       </div>
+       <!-- Sessions tab -->
+       <div id="tab-sessions" class="tab">
+         <div id="sessions-content">
+           <div class="obs-header">
+             <span class="obs-title">Sessions</span>
+             <button id="sessions-refresh" class="obs-btn">Refresh</button>
+           </div>
+           <div id="sessions-list"><div class="empty-hint">Loading sessions...</div></div>
+         </div>
+       </div>
+       <!-- Search tab -->
+       <div id="tab-search" class="tab">
+         <div id="search-content">
+           <div class="obs-header">
+             <input id="search-input" type="text" placeholder="Search violations..." class="obs-search-input">
+             <select id="search-severity" class="obs-select">
+               <option value="">All severities</option>
+               <option value="block">Block</option>
+               <option value="warn">Warn</option>
+             </select>
+             <button id="search-go" class="obs-btn">Search</button>
+           </div>
+           <div id="search-results"><div class="empty-hint">Search across all violations</div></div>
+         </div>
+       </div>
+       <!-- Eval tab -->
+       <div id="tab-eval" class="tab">
+         <div id="eval-content">
+           <div class="obs-header">
+             <span class="obs-title">Constraint Effectiveness</span>
+             <button id="eval-refresh" class="obs-btn">Refresh</button>
+           </div>
+           <div id="eval-summary"></div>
+           <div id="eval-constraints"><div class="empty-hint">Loading eval data...</div></div>
+         </div>
+       </div>
+     </div>
+   </div>
+ 
+   <!-- Timeline -->
   <div id="timeline-panel">
     <div class="timeline-header">
       <span class="panel-title-inline">Timeline</span>
@@ -1559,36 +1598,92 @@
       return card;
     }
 
-    initGraph();
-    loadInitialGraph();
-    renderTimeline();
-    connect();
+    // ── Observability tabs ──────────────────────────────────────
 
-    // Chat and Claude Code tabs removed — replaced with Judge tab
-  </script>
-</body>
-</html>
-Cap max cards
-      while (container.children.length > MAX_EVENT_CARDS) {
-        container.removeChild(container.lastChild);
-      }
-
-      // Fade out after TTL
-      setTimeout(function() {
-        card.style.transition = 'opacity 1s';
-        card.style.opacity = '0';
-        setTimeout(function() { if (card.parentNode) card.parentNode.removeChild(card); }, 1000);
-      }, EVENT_CARD_TTL);
-
-      return card;
+    // Sessions tab
+    function loadSessions() {
+      fetch('/api/sessions').then(function(r){return r.json();}).then(function(rows){
+        var el = document.getElementById('sessions-list');
+        if (!rows.length) { el.innerHTML = '<div class="empty-hint">No sessions yet</div>'; return; }
+        var html = '<table class="obs-table"><thead><tr><th>Name</th><th>Agent</th><th>Status</th><th>Started</th><th>Constraints</th></tr></thead><tbody>';
+        rows.forEach(function(s){
+          var status = s.alive ? '<span class="obs-badge obs-active">active</span>' :
+            (s.exit_code === 0 ? '<span class="obs-badge obs-done">done</span>' :
+             '<span class="obs-badge obs-error">exit ' + (s.exit_code||'?') + '</span>');
+          var started = s.started_at ? s.started_at.substring(0,19).replace('T',' ') : '-';
+          html += '<tr><td class="obs-name">' + s.name + '</td><td>' + s.agent + '</td><td>' + status + '</td><td>' + started + '</td><td>' + s.constraints + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      }).catch(function(){ document.getElementById('sessions-list').innerHTML = '<div class="empty-hint">Failed to load</div>'; });
     }
+    document.getElementById('sessions-refresh').addEventListener('click', loadSessions);
+
+    // Search tab
+    function doSearch() {
+      var q = document.getElementById('search-input').value;
+      var sev = document.getElementById('search-severity').value;
+      var url = '/api/violations?limit=50';
+      if (q) url += '&q=' + encodeURIComponent(q);
+      if (sev) url += '&severity=' + encodeURIComponent(sev);
+      var el = document.getElementById('search-results');
+      el.innerHTML = '<div class="empty-hint">Searching...</div>';
+      fetch(url).then(function(r){return r.json();}).then(function(rows){
+        if (!rows.length) { el.innerHTML = '<div class="empty-hint">No results</div>'; return; }
+        var html = '';
+        rows.forEach(function(v){
+          var ts = v.timestamp ? v.timestamp.substring(0,19).replace('T',' ') : '';
+          var sevClass = v.severity === 'block' ? 'obs-sev-block' : (v.severity === 'warn' ? 'obs-sev-warn' : 'obs-sev-allow');
+          html += '<div class="obs-violation-card">';
+          html += '<div class="obs-viol-header"><span class="obs-badge ' + sevClass + '">' + v.severity + '</span> <span class="obs-constraint-id">' + v.constraint_id + '</span> <span class="obs-ts">' + ts + '</span></div>';
+          html += '<div class="obs-viol-msg">' + v.message + '</div>';
+          v.claim_text.forEach(function(c){ html += '<div class="obs-viol-claim">' + c + '</div>'; });
+          if (v.model) html += '<div class="obs-viol-model">model: ' + v.model + '</div>';
+          html += '</div>';
+        });
+        el.innerHTML = html;
+      }).catch(function(){ el.innerHTML = '<div class="empty-hint">Search failed</div>'; });
+    }
+    document.getElementById('search-go').addEventListener('click', doSearch);
+    document.getElementById('search-input').addEventListener('keydown', function(e){ if(e.key==='Enter') doSearch(); });
+
+    // Eval tab
+    function loadEval() {
+      fetch('/api/eval').then(function(r){return r.json();}).then(function(data){
+        var sum = document.getElementById('eval-summary');
+        sum.innerHTML = '<div class="obs-eval-grid">' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">' + data.total_violations + '</div><div class="obs-eval-label">violations</div></div>' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">' + data.total_sessions + '</div><div class="obs-eval-label">sessions</div></div>' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">' + data.violations_per_session.toFixed(1) + '</div><div class="obs-eval-label">viols/session</div></div>' +
+          '<div class="obs-eval-stat"><div class="obs-eval-num">' + data.precision.toFixed(0) + '%</div><div class="obs-eval-label">precision</div></div>' +
+          '</div>';
+        var el = document.getElementById('eval-constraints');
+        if (!data.constraints.length) { el.innerHTML = '<div class="empty-hint">No constraint data</div>'; return; }
+        var html = '<table class="obs-table"><thead><tr><th>Constraint</th><th>Hits</th><th>FP</th><th>FP Rate</th><th>Last Fired</th></tr></thead><tbody>';
+        data.constraints.forEach(function(c){
+          var fpClass = c.fp_rate > 30 ? 'obs-sev-block' : (c.fp_rate > 10 ? 'obs-sev-warn' : '');
+          var last = c.last_fired ? c.last_fired.substring(0,10) : '-';
+          html += '<tr><td class="obs-name">' + c.id + '</td><td>' + c.hits + '</td><td>' + c.false_positives + '</td><td class="' + fpClass + '">' + c.fp_rate.toFixed(0) + '%</td><td>' + last + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      }).catch(function(){ document.getElementById('eval-constraints').innerHTML = '<div class="empty-hint">Failed to load</div>'; });
+    }
+    document.getElementById('eval-refresh').addEventListener('click', loadEval);
+
+    // Auto-load when switching to observability tabs
+    document.querySelectorAll('#tabs button').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var tab = btn.getAttribute('data-tab');
+        if (tab === 'sessions') loadSessions();
+        if (tab === 'eval') loadEval();
+      });
+    });
 
     initGraph();
     loadInitialGraph();
     renderTimeline();
     connect();
-
-    // Chat and Claude Code tabs removed — replaced with Judge tab
   </script>
 </body>
 </html>

@@ -1450,6 +1450,7 @@ async fn proxy_request(
                                 // Persist violations to disk (streaming path)
                                 if let Ok(logger) = crate::logging::ViolationLogger::new() {
                                     let session_meta = crate::logging::SessionMetadata::default();
+                                    let mut persisted: Vec<crate::logging::ViolationLogEntry> = Vec::new();
                                     for v in &violations {
                                         let sev = match v.severity {
                                             crate::violation::Severity::Block => "block",
@@ -1477,8 +1478,16 @@ async fn proxy_request(
                                             claim_source: None,
                                             false_positive: None,
                                             annotation_note: None,
+                                            model: Some(model_bg.clone()),
                                         };
                                         let _ = logger.log(&entry);
+                                        persisted.push(entry);
+                                    }
+                                    // Fire alert webhooks (best-effort, non-blocking)
+                                    if !persisted.is_empty() {
+                                        tokio::spawn(async move {
+                                            let _ = crate::alerting::fire_for_violations(&persisted).await;
+                                        });
                                     }
                                 }
 
@@ -2559,6 +2568,7 @@ fn extract_and_evaluate_text(
                     claim_source: None,
                     false_positive: None,
                     annotation_note: None,
+                    model: None,
                 };
                 let _ = logger.log(&entry);
             }

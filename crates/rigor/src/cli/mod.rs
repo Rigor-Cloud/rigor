@@ -1,4 +1,7 @@
+pub mod alert;
 pub mod config;
+pub mod diff;
+pub mod eval;
 pub mod gate;
 pub mod graph;
 pub mod ground;
@@ -6,7 +9,10 @@ pub mod init;
 pub mod log;
 pub mod logs;
 pub mod map;
+pub mod refine;
 pub mod scan;
+pub mod search;
+pub mod serve;
 pub mod sessions;
 pub mod show;
 pub mod validate;
@@ -114,6 +120,35 @@ pub enum Commands {
         #[arg(long, default_value = "8787")]
         port: u16,
     },
+    /// Run rigor as a persistent background daemon that any LLM tool can
+    /// proxy through. Unlike `rigor ground`, this does not wrap a child
+    /// process — clients connect by setting HTTPS_PROXY=http://127.0.0.1:<port>.
+    ///
+    /// Subcommand `rigor serve stop` kills the background daemon.
+    Serve {
+        /// Optional positional action: "stop" to kill the background daemon.
+        action: Option<String>,
+
+        /// Path to rigor.yaml (searches current directory tree if not provided)
+        #[arg(short, long)]
+        path: Option<PathBuf>,
+
+        /// Port to listen on
+        #[arg(long, default_value = "8787")]
+        port: u16,
+
+        /// Daemonize: fork into the background and write PID to ~/.rigor/serve.pid
+        #[arg(long)]
+        background: bool,
+
+        /// Equivalent to `rigor serve stop` — stop the running background daemon.
+        #[arg(long, conflicts_with = "background")]
+        stop: bool,
+
+        /// Human-friendly session name (auto-generated if not provided)
+        #[arg(long)]
+        name: Option<String>,
+    },
     /// Query and annotate violation logs
     Log {
         #[command(subcommand)]
@@ -220,6 +255,70 @@ pub enum Commands {
         #[arg(long)]
         smart: bool,
     },
+    /// Full-text search across all violations and session logs.
+    Search {
+        /// Query to match against claim_text, constraint_id, constraint_name, and message.
+        #[arg(value_name = "QUERY")]
+        query: Option<String>,
+
+        /// Only return violations of this constraint id.
+        #[arg(long)]
+        constraint: Option<String>,
+
+        /// Only return violations with this severity (block|warn|allow).
+        #[arg(long)]
+        severity: Option<String>,
+
+        /// Only return violations at or after this date (YYYY-MM-DD or RFC3339).
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Only return violations whose model identifier contains this substring.
+        #[arg(long)]
+        model: Option<String>,
+
+        /// Maximum number of matches to display.
+        #[arg(long, default_value = "50")]
+        limit: usize,
+    },
+    /// Configure webhook alerts fired when violations are detected.
+    Alert {
+        #[command(subcommand)]
+        command: alert::AlertCommands,
+    },
+    /// Compare two sessions' violation patterns.
+    Diff {
+        /// First session identifier (name or id prefix).
+        session_a: Option<String>,
+        /// Second session identifier (name or id prefix).
+        session_b: Option<String>,
+        /// Compare the last N sessions (currently supports 2).
+        #[arg(long)]
+        last: Option<usize>,
+    },
+    /// Evaluate constraint effectiveness against the violation log.
+    /// Computes precision, recall trend, and per-constraint hit rates.
+    Eval {
+        /// Write a markdown report to .rigor/eval-report.md
+        #[arg(long)]
+        report: bool,
+        /// Save current metrics as the baseline at ~/.rigor/eval-baseline.json
+        #[arg(long)]
+        baseline: bool,
+        /// Compare current metrics against saved baseline
+        #[arg(long)]
+        compare: bool,
+    },
+    /// Analyze violation patterns and suggest constraint refinements.
+    /// Targets constraints with false-positive rate above 30%.
+    Refine {
+        /// Apply suggested refinements directly to rigor.yaml
+        #[arg(long)]
+        apply: bool,
+        /// Print the diff that would be applied, without modifying rigor.yaml
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+    },
 }
 
 /// Run the CLI. If no subcommand is given, fall through to hook mode.
@@ -236,6 +335,10 @@ pub fn run_cli() -> Result<()> {
         Some(Commands::Init { path, ai }) => init::run_init(path, ai),
         Some(Commands::Ground { path, port, show_logs, no_mitm, transparent, name, command }) => ground::run_ground(path, port, !show_logs, !no_mitm, transparent, name, command),
         Some(Commands::Daemon { path, port }) => crate::daemon::start_daemon(path, port),
+        Some(Commands::Serve { action, path, port, background, stop, name }) => {
+            let stop = stop || matches!(action.as_deref(), Some("stop"));
+            serve::run_serve(path, port, background, stop, name)
+        }
         Some(Commands::Show { path }) => show::run_show(path),
         Some(Commands::Validate { path }) => validate::run_validate(path),
         Some(Commands::Graph { path, web, port }) => {
@@ -256,6 +359,15 @@ pub fn run_cli() -> Result<()> {
         Some(Commands::Scan { file, block, json, hook, install, uninstall, status, smart }) => {
             scan::run_scan(file, block, json, hook, install, uninstall, status, smart)
         }
+        Some(Commands::Search { query, constraint, severity, since, model, limit }) => {
+            search::run_search(query, constraint, severity, since, model, limit)
+        }
+        Some(Commands::Alert { command }) => alert::run_alert(command),
+        Some(Commands::Diff { session_a, session_b, last }) => {
+            diff::run_diff(session_a, session_b, last)
+        }
+        Some(Commands::Eval { report, baseline, compare }) => eval::run_eval(report, baseline, compare),
+        Some(Commands::Refine { apply, dry_run }) => refine::run_refine(apply, dry_run),
     }
 }
 

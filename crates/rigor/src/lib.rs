@@ -1,3 +1,4 @@
+pub mod alerting;
 pub mod claim;
 pub mod cli;
 pub mod config;
@@ -7,6 +8,7 @@ pub mod defaults;
 pub mod hook;
 pub mod logging;
 pub mod lsp;
+pub mod memory;
 pub mod observability;
 pub mod policy;
 pub mod violation;
@@ -313,6 +315,7 @@ fn evaluate_constraints(yaml_path: &Path, transcript_path: &str) -> Result<()> {
                         claim_source,
                         false_positive: None,
                         annotation_note: None,
+                        model: None,
                     };
 
                     if let Err(e) = logger.log(&entry) {

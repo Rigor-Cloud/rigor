@@ -295,7 +295,7 @@ pub fn run_web(path: Option<PathBuf>, port: u16) -> Result<()> {
         eprintln!("rigor: press Ctrl+C to stop");
 
         // Open browser
-        let url = format!("http://127.0.0.1:{}", port);
+        let url = format!("http://rigor.local:{}", port);
         let _ = open::that(&url);
 
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

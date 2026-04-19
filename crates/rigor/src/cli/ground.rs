@@ -648,7 +648,7 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
     info_println!("rigor: session started — agent={}, constraints={}", grounded.as_str(), constraint_count);
 
     // Open dashboard
-    let _ = open::that(&format!("http://127.0.0.1:{}", port));
+    let _ = open::that(&format!("http://rigor.local:{}", port));
 
     // Spawn the target command
     // If the first arg is an existing binary, exec it directly.
