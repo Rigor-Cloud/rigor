@@ -42,13 +42,13 @@ async function isRigorAlive(): Promise<boolean> {
   return alive
 }
 
-export const RigorPlugin: Plugin = async ({ client }) => {
+export const RigorPlugin: Plugin = async ({ client, directory }) => {
   // Log plugin load
   await client.app.log({
     body: {
       service: "rigor-plugin",
       level: "info",
-      message: `Rigor plugin loaded, daemon at ${RIGOR_BASE}`,
+      message: `Rigor plugin loaded, daemon at ${RIGOR_BASE}, project=${directory}`,
     },
   })
 
