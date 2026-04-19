@@ -4,135 +4,202 @@
 
 ## APIs & External Services
 
-**LLM Provider APIs (upstream targets of the rigor proxy/MITM):**
+**LLM Endpoints (Proxied via Daemon):**
+- Anthropic Claude - `/v1/messages` endpoint
+  - SDK/Client: reqwest 0.12
+  - Auth: `ANTHROPIC_API_KEY` environment variable
+  - Base URL override: `ANTHROPIC_BASE_URL`
+  - Default: https://api.anthropic.com
 
-- **Anthropic Messages API** — `https://api.anthropic.com/v1/messages`. Default upstream set at `crates/rigor/src/daemon/mod.rs:184`. Proxy handler: `proxy::anthropic_proxy` routed at `crates/rigor/src/daemon/mod.rs:431`. Auth: `x-api-key` header for `sk-ant-api*` keys, `Authorization: Bearer` for `sk-ant-oat*` OAuth tokens — dispatched by `apply_provider_auth` at `crates/rigor/src/daemon/proxy.rs:37`.
-- **OpenAI Chat Completions API** — `https://api.openai.com/v1/chat/completions`. Handler: `proxy::openai_proxy` at `crates/rigor/src/daemon/mod.rs:432`. Auth: `Authorization: Bearer` for `sk-proj-*` / `sk-*` keys.
-- **Google Vertex AI (aiplatform)** — Multi-region endpoints: `us-east5-aiplatform.googleapis.com`, `us-central1-aiplatform.googleapis.com`, `us-west1-aiplatform.googleapis.com`, `europe-west1-aiplatform.googleapis.com`, `europe-west4-aiplatform.googleapis.com`, `asia-southeast1-aiplatform.googleapis.com`, `aiplatform.googleapis.com`. Listed in `MITM_HOSTS` at `crates/rigor/src/daemon/mod.rs:82`.
-- **Azure OpenAI** — `openai.azure.com` (`crates/rigor/src/daemon/mod.rs:91`).
-- **Ollama** — `localhost` intercept (opt-in via `RIGOR_INTERCEPT_HOSTS`) at `layer/src/lib.rs:108`.
-- **OpenRouter** — `https://openrouter.ai/api`. Default LLM-as-judge endpoint used to score claim calibration (`crates/rigor/src/cli/config.rs:71`). Default judge model: `anthropic/claude-sonnet-4-6`. Auth: `Authorization: Bearer` (OpenRouter uses `sk-or-*` key format, detected at `crates/rigor/src/daemon/proxy.rs:2868`).
+- OpenAI - `/v1/chat/completions` endpoint
+  - SDK/Client: reqwest 0.12
+  - Base URL override: `OPENAI_BASE_URL`
+  - Default: https://api.openai.com
 
-**Claude Code (host integration):**
-- Not an HTTP API — Rigor integrates as a `Stop` hook (`examples/claude-hooks.json`), a `UserPromptSubmit` hook (`rigor scan --install`), and as a sub-process launched by `rigor ground claude …`. Reads the Claude Code session transcript JSONL via the path supplied on stdin (`StopHookInput.transcript_path`, `crates/rigor/src/hook/input.rs`).
-- Session IDs read from `CLAUDE_CODE_SESSION_ID` / `CLAUDE_SESSION_ID` (`crates/rigor/src/cli/gate.rs:46`).
+- Google Vertex AI - Multiple regional endpoints
+  - Supported endpoints: us-east5, us-central1, us-west1, europe-west1, europe-west4, asia-southeast1
+  - SDK/Client: reqwest 0.12
+  - Hostname pattern: `*-aiplatform.googleapis.com`
 
-**Traffic interception architecture:**
+- Azure OpenAI
+  - Hostname: openai.azure.com
+  - SDK/Client: reqwest 0.12
 
-Three interception modes (`crates/rigor/src/cli/ground.rs:107`):
+- OpenCode (Zen provider)
+  - Endpoints: `/zen/v1/messages` and `/zen/v1/responses`
+  - Hostname: opencode.ai, api.opencode.ai
+  - SDK/Client: reqwest 0.12
 
-1. **LD_PRELOAD / DYLD_INSERT_LIBRARIES** — The `layer/` crate (cdylib `librigor_layer.{so,dylib}`) hooks `getaddrinfo`, `freeaddrinfo`, `gethostbyname`, `connect`, `connectx` (macOS), `SecTrustEvaluateWithError` (macOS), `dns_configuration_copy` (macOS) using `frida-gum`. Redirects DNS of LLM hosts (`INTERCEPT_HOSTS` at `layer/src/lib.rs:91`) to `127.0.0.1:<DAEMON_PORT>`.
-2. **HTTP proxy env vars** — Sets `HTTPS_PROXY`/`HTTP_PROXY` + SDK base-URL overrides (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `CLOUD_ML_API_ENDPOINT`) on the child (`crates/rigor/src/cli/ground.rs:150`).
-3. **Transparent mode** (`--transparent` / `RIGOR_TRANSPARENT=1`) — Layer's `connect()` hook redirects ALL outbound :443 to the daemon's TLS port; daemon peeks the TLS ClientHello SNI (`crates/rigor/src/daemon/sni.rs`) to decide MITM vs blind tunnel.
-
-TLS MITM is performed via a rigor-generated CA (`RigorCA::load_or_generate`, `crates/rigor/src/daemon/tls.rs`) that signs per-host certs on demand. `rigor trust` / `rigor untrust` install/remove the CA in the macOS login keychain via the `security` CLI.
+**LLM-as-Judge Service:**
+- OpenRouter (default judge provider)
+  - Default endpoint: https://openrouter.ai/api
+  - Configurable via `RIGOR_JUDGE_API_URL` environment variable
+  - Auth: `RIGOR_JUDGE_API_KEY` configuration or environment variable
+  - Model: Default `anthropic/claude-sonnet-4-6` (configurable via `RIGOR_JUDGE_MODEL`)
+  - Config file: `~/.rigor/config`
+  - Uses Reqwest client with timeout support
 
 ## Data Storage
 
 **Databases:**
-- None. Rigor does not use any database (no SQL, no KV store, no ORM).
+- No persistent database required
+- Session metadata captured in-memory during constraint evaluation
+- Cost tracking maintained in daemon state: cumulative tokens and USD costs per-model
 
 **File Storage:**
-- Local filesystem only.
-- `~/.rigor/` — daemon PID (`daemon.pid`), structured logs (`rigor.log`), global config (`config`), CA keypair/cert, violation log JSONL. Created by `crates/rigor/src/daemon/mod.rs:32` and `crates/rigor/src/observability/tracing.rs:13`.
-- `/tmp/rigor-ground.log` — redirected daemon stderr during `rigor ground` runs (`crates/rigor/src/cli/ground.rs:231`).
-- `./rigor.yaml` — project-level constraint config (located by walking up the directory tree, `crates/rigor/src/config/lookup.rs`).
-- `./rigor.lock` — legacy config format, still detected but optional (`crates/rigor/src/lib.rs:78`).
-- Transcripts are READ from paths supplied by Claude Code in the Stop hook payload; rigor does not own transcript storage.
+- Local filesystem only
+- Configuration stored in: `~/.rigor/config` (key=value format)
+- Daemon PID file: `~/.rigor/daemon.pid` (for liveness detection)
+- YAML constraint configuration: `rigor.yaml` in project root
+- Legacy lock file: `rigor.lock` (deprecated, fallback support)
+- Episodic memory: In-memory episodic cache during session
+- WebSocket events streamed to connected clients
 
 **Caching:**
-- In-memory only.
-- Pre-compiled `PolicyEngine` held on `DaemonState` and cloned per request to avoid re-parsing Rego (`crates/rigor/src/daemon/mod.rs:189`).
-- `reqwest::Client` with `pool_max_idle_per_host(4)` shared across requests for upstream connection pooling (`crates/rigor/src/daemon/mod.rs:219`).
-- `once_cell::Lazy` used for hot paths (intercept host set, debug flags, daemon port) at `layer/src/lib.rs:68-127`.
+- No external caching service
+- In-memory caching via Arc<Mutex<>> for constraint strengths and decision caches
+- Per-request episodic memory: `crates/rigor/src/memory/episodic.rs`
+- Active stream tracking: HashSet<String> of session IDs in daemon state
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- None. Rigor has no user accounts, sessions, or auth of its own.
-- Rigor is itself a bump-in-the-wire for *other* services' auth:
-  - Preserves upstream provider auth by forwarding `x-api-key` / `Authorization: Bearer` as dispatched by `apply_provider_auth` (`crates/rigor/src/daemon/proxy.rs:37`).
-  - Defaults to blind-tunnel mode so OAuth flows (Claude Max/Pro, Anthropic OAuth tokens `sk-ant-oat*`) keep end-to-end TLS and don't break cert pinning. MITM is opt-in via `rigor ground --mitm` (`crates/rigor/src/cli/ground.rs:277`).
-- Trust establishment for local MITM: `rigor trust` installs the rigor CA in the macOS login keychain (`crates/rigor/src/daemon/tls.rs:install_ca_trust`).
+- Custom ephemeral auth
+- Stop hook reads from stdin (Claude Code provides credentials in request payload)
+- Daemon checks PID file for process liveness before accepting requests
+- No user login required — based on local process identity
+
+**Credentials Flow:**
+- LLM API keys: Captured from Claude Code's HTTP headers and forwarded to upstream
+- Judge API key: Loaded from `~/.rigor/config` or `RIGOR_JUDGE_API_KEY` env var
+- Sensitive data detection via `sanitize-pii` crate to redact database URLs and credentials
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- No hosted error tracker (no Sentry, Bugsnag, etc.).
-- Error handling is "fail-open" by default — errors are logged via `tracing::warn!` and the hook still returns allow (`crates/rigor/src/lib.rs:113,127,138,190`). `RIGOR_FAIL_CLOSED=1` flips to exit code 2 (`crates/rigor/src/main.rs:8`).
+- Structured logging via Tracing crate with JSON formatting
+- OpenTelemetry integration for distributed tracing (graceful degradation if not configured)
+- Trace export: OTLP (configurable) or stdout fallback
+- Session tracking: Each session gets unique ID for violation correlation
 
 **Logs:**
-- `tracing` 0.1 + `tracing-subscriber` 0.3 with a multi-writer layer (stderr + `~/.rigor/rigor.log`). Configured in `crates/rigor/src/observability/tracing.rs:25`.
-- Log levels: default `rigor=info`; `rigor=debug` when `RIGOR_DEBUG` is set. `RUST_LOG` env filter also respected.
-- Violation logs are written separately as JSONL at `~/.rigor/violations.jsonl` via `ViolationLogger` (`crates/rigor/src/logging/violation_log.rs`). Queryable via `rigor log` subcommands (`crates/rigor/src/cli/log.rs`).
-- Session metadata (git HEAD, dirty state, branch) captured by `SessionMetadata::capture` using `git2` (`crates/rigor/src/logging/session.rs:3`).
+- JSON structured logs via `tracing-subscriber` with `json` feature
+- Log filtering via `env-filter` (controlled by `RUST_LOG` env var)
+- Fallback to stdout when OpenTelemetry export fails
+- Git2 integration: Repository metadata for context in logs
 
-**OpenTelemetry:**
-- OTLP span export over gRPC (tonic) when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Configured in `setup_otel_layer` at `crates/rigor/src/observability/tracing.rs:70`. Resource attributes: `service.name=rigor`, `service.version=<CARGO_PKG_VERSION>`. Gracefully degrades to stderr-only tracing when the endpoint is not set or exporter build fails.
+**Metrics:**
+- Cost tracking: Cumulative input/output token counts per model
+- Cost calculation: USD estimation with per-model breakdown in `cost_by_model`
+- Session metadata: Captured at start of constraint evaluation
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- None (not a hosted service). Rigor is a local CLI + daemon installed per-developer.
+- Daemon serves on HTTP (port 8787 by default, configurable)
+- LD_PRELOAD mode: Daemon runs as background process with PID file tracking
+- TLS termination: Runs Tokio-rustls server with CA-based certificate generation
 
 **CI Pipeline:**
-- GitHub Actions — `.github/workflows/ci.yml`. Runs on every `push` and `pull_request`.
-- Jobs: `test` (`cargo test --all-features`), `clippy` (`cargo clippy --all-targets --all-features -- -D warnings`), `rustfmt` (`cargo fmt -- --check`), `rigor-validate` (builds release and runs `./target/release/rigor validate rigor.yaml` — rigor self-validating against its own constraint config).
-- Runner: `ubuntu-latest`.
-- Actions used: `actions/checkout@v4`, `dtolnay/rust-toolchain@stable`, `Swatinem/rust-cache@v2`.
+- GitHub Actions workflows in `.github/workflows/`
+- CI jobs: Rust test, Clippy linting, Rustfmt check
+- Release workflow: Binary compilation and publishing
 
 ## Environment Configuration
 
 **Required env vars:**
-- None are strictly required for the hook (it silently no-ops when `~/.rigor/daemon.pid` is missing, `crates/rigor/src/lib.rs:51`).
-- For the daemon/proxy path: `ANTHROPIC_API_KEY` (or equivalent), captured at daemon startup (`crates/rigor/src/daemon/mod.rs:186`).
-- For LLM-as-judge: `RIGOR_JUDGE_API_KEY` or `judge.api_key` in `~/.rigor/config` (`crates/rigor/src/cli/config.rs:67`).
 
-**Optional / tuning env vars** — see STACK.md for the full list (`RIGOR_*`, `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `HTTPS_PROXY`, `OTEL_EXPORTER_OTLP_ENDPOINT`, etc.).
+For daemon operation:
+- `RIGOR_TARGET_API` - Target LLM API base URL (default: https://api.anthropic.com)
+- `ANTHROPIC_API_KEY` - API key for Anthropic Claude (optional if provided in request headers)
+- `RIGOR_DAEMON_PORT` - Port for daemon to listen on (default: 8787)
+
+For LLM-as-judge:
+- `RIGOR_JUDGE_API_KEY` - OpenRouter API key (or read from `~/.rigor/config`)
+- `RIGOR_JUDGE_API_URL` - Judge endpoint (default: https://openrouter.ai/api)
+- `RIGOR_JUDGE_MODEL` - Model for judge (default: anthropic/claude-sonnet-4-6)
+
+For proxy/routing:
+- `ANTHROPIC_BASE_URL` - Override Anthropic endpoint for testing/proxy
+- `OPENAI_BASE_URL` - Override OpenAI endpoint for testing/proxy
+
+For observability:
+- `RUST_LOG` - Log level filtering (e.g., `RUST_LOG=rigor=debug`)
 
 **Secrets location:**
-- `~/.rigor/config` — `judge.api_key` stored plaintext. Masked on display by `mask_key` (`crates/rigor/src/cli/config.rs:120`).
-- `ANTHROPIC_API_KEY` read from process environment; not persisted by rigor.
-- No `.env` file support in the codebase.
-- `rigor scan` detects leaked keys/PII in stdin, files, or prompt-submit payloads (`crates/rigor/src/cli/scan.rs`) using the `sanitize-pii` crate.
+- `~/.rigor/config` - Local configuration file (not committed)
+- Environment variables (ephemeral, per-process)
+- Request headers from Claude Code (not persisted)
 
 ## Webhooks & Callbacks
 
 **Incoming:**
 
-The daemon's axum router (`crates/rigor/src/daemon/mod.rs:424`) exposes:
+The daemon exposes REST API endpoints for control and observability:
 
-- `POST /v1/messages` — Anthropic proxy passthrough (handler: `proxy::anthropic_proxy`).
-- `POST /v1/chat/completions` — OpenAI proxy passthrough (handler: `proxy::openai_proxy`).
-- `GET  /api/governance/constraints` — list constraints with current toggle state.
-- `POST /api/governance/constraints/{id}/toggle` — enable/disable a constraint from the dashboard.
-- `POST /api/governance/pause` — flip proxy pass-through.
-- `POST /api/governance/block-next` — force-block the next response (testing).
-- `POST /api/gate/register-snapshot` — gate: snapshot affected paths before a tool runs.
-- `POST /api/gate/tool-completed` — gate: mark a tool invocation complete.
-- `GET  /api/gate/decision/{session_id}` — gate: poll for approve/reject.
-- `POST /api/gate/{gate_id}/approve` — human approves a held action.
-- `POST /api/gate/{gate_id}/reject` — human rejects a held action.
-- `POST /api/chat` — dashboard-originated chat routed through rigor's proxy.
-- `GET  /ws` — WebSocket stream of `DaemonEvent`s to the dashboard (`crates/rigor/src/daemon/ws.rs`).
-- `GET  /health` — returns `"ok"`.
-- `GET  /` — serves the embedded dashboard (`viewer/index.html`).
-- `GET  /graph.json` — constraint graph data for the 3D viewer.
-- `GET  /assets/*path` — embedded viewer assets.
-- Catch-all fallback — `proxy::catch_all_proxy` handles any other path, used for LD_PRELOAD-intercepted traffic to Vertex / Azure / other LLM endpoints (`crates/rigor/src/daemon/mod.rs:448`).
-
-Listeners:
-- HTTP on `127.0.0.1:8787` (default; configurable via `--port` / `RIGOR_DAEMON_PORT`).
-- HTTPS on `127.0.0.1:443` (default; configurable via `RIGOR_DAEMON_TLS_PORT`) with rustls + a multi-SAN self-signed cert or the rigor CA's per-host certs.
+- `POST /v1/messages` - Anthropic proxy (request interception)
+- `POST /v1/chat/completions` - OpenAI proxy (request interception)
+- `POST /zen/v1/messages` - OpenCode Zen messages proxy
+- `POST /zen/v1/responses` - OpenCode Zen responses proxy
+- `POST /api/governance/constraints` - List constraints (GET)
+- `POST /api/governance/constraints/{id}/toggle` - Toggle constraint enforcement
+- `POST /api/governance/pause` - Pause proxy evaluation
+- `POST /api/governance/block-next` - Force-block next response
+- `POST /api/gate/register-snapshot` - Register file snapshot for tool gate
+- `POST /api/gate/tool-completed` - Signal tool completion
+- `GET /api/gate/decision/{session_id}` - Get gate decision
+- `POST /api/gate/{gate_id}/approve` - Approve action gate
+- `POST /api/gate/{gate_id}/reject` - Reject action gate
+- `POST /api/chat` - Internal chat endpoint for viewer
+- `GET /api/sessions` - List sessions and violations
+- `GET /api/violations` - Search violations with filters
+- `GET /api/eval` - Evaluator statistics
+- `GET /api/cost` - Cost tracking statistics
+- `POST /api/project/register` - Register project path for dashboard
+- `POST /api/relevance/lookup` - LLM-as-judge verdict lookup
+- `GET /ws` - WebSocket upgrade for event streaming
+- `GET /health` - Health check endpoint
+- `GET /` - Viewer UI index
+- `GET /assets/{*path}` - Static viewer assets
 
 **Outgoing:**
-- Upstream LLM provider calls (Anthropic, OpenAI, Vertex, Azure) — forwarded by the proxy handlers using the shared `reqwest::Client`.
-- LLM-as-judge calls to OpenRouter (or a configured alternative) for claim calibration (`crates/rigor/src/daemon/proxy.rs:2485`).
-- Language-server subprocesses (`rust-analyzer`, `typescript-language-server`, `pyright-langserver`, `gopls`) spawned via `Command::new` and spoken to over JSON-RPC 2.0 on stdin/stdout (`crates/rigor/src/lsp/client.rs:57`).
-- `grep` subprocess for fast-path anchor reference scanning (`crates/rigor/src/lsp/mod.rs:199`).
-- `security` CLI subprocess on macOS for keychain trust (`crates/rigor/src/daemon/tls.rs`).
-- `open` crate — launches the system browser for `rigor graph --web` (`crates/rigor/src/cli/web.rs`).
-- OTLP/gRPC span export to `OTEL_EXPORTER_OTLP_ENDPOINT` (optional, `crates/rigor/src/observability/tracing.rs:93`).
+
+The daemon makes HTTP requests to:
+
+- LLM endpoints (Anthropic, OpenAI, Vertex AI, Azure, OpenCode, OpenRouter)
+  - Proxy pass-through requests with constraint injection
+  - Request/response streaming support
+  
+- OpenRouter for LLM-as-judge evaluation
+  - API endpoint: `RIGOR_JUDGE_API_URL`
+  - Uses standard OpenRouter API format
+  - Authenticated with `RIGOR_JUDGE_API_KEY`
+
+**WebSocket Streaming:**
+- Real-time event streaming to connected dashboard clients
+- Event types: constraint violations, cost updates, gate decisions, session events
+- Implemented in `crates/rigor/src/daemon/ws.rs`
+
+## TLS/Certificate Management
+
+**MITM Mode:**
+- CA-based certificate generation via Rcgen (pem + x509-parser)
+- Per-host certificates signed by rigor CA
+- CA certificate stored in `~/.rigor/` (auto-generated on first run)
+- Supports modern TLS 1.3 via Rustls
+
+**Hosts intercepted for inspection:**
+- api.anthropic.com
+- api.openai.com
+- Vertex AI endpoints (us-east5, us-central1, us-west1, europe-west1, europe-west4, asia-southeast1, generic)
+- openai.azure.com
+- opencode.ai, api.opencode.ai
+- openrouter.ai
+
+**Blind tunneling (end-to-end TLS preserved):**
+- All other hosts
+- OAuth, CDN, telemetry endpoints unaffected
+- Default behavior: preserve original TLS
 
 ---
 

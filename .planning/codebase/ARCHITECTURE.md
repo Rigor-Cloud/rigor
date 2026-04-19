@@ -4,304 +4,303 @@
 
 ## Pattern Overview
 
-**Overall:** Cargo workspace with a layered pipeline architecture around a central constraint-evaluation engine, plus a long-running async daemon that MITM-proxies LLM API traffic. Two primary execution modes share the same evaluation core: a short-lived CLI/stop-hook process and a persistent HTTP/HTTPS/WebSocket daemon.
+**Overall:** Epistemic Constraint Enforcement Engine with Pluggable Evaluator Pipeline
 
 **Key Characteristics:**
-- Multi-crate Cargo workspace (`rigor`, `rigor-harness`, `rigor-test`) with a separate out-of-workspace `layer` crate (LD_PRELOAD cdylib).
-- Fail-open by default: every optional pipeline stage (config load, graph compute, policy eval, claim extraction, violation logging) degrades to "allow" on error. Controlled via `RIGOR_FAIL_CLOSED` env var.
-- Pipeline-and-engine: CLI/hook entrypoint drives a fixed ordered pipeline (load config → build argumentation graph → compile policies → extract claims → evaluate → collect violations → decide → respond/log). The daemon reuses the same stages on proxied request/response bodies.
-- Embedded Rego (OPA) policy engine via `regorus` for per-constraint evaluation; helpers and constraint snippets wrapped into generated policy modules at runtime.
-- Frida-gum inline hooking in `layer/` to redirect LLM API traffic at the libc level (getaddrinfo/connect/gethostbyname/SecTrustEvaluateWithError) to the local daemon.
-- Axum-based HTTP/WebSocket server in the daemon with TLS termination (rustls + rcgen CA) for MITM of configured LLM hosts.
-- Filter-chain pattern for egress processing (see `crates/rigor/src/daemon/egress/chain.rs`): each filter can pass, transform, or block SSE chunks.
+- Fail-open defensive design (all errors gracefully degrade to allow)
+- Pluggable claim evaluator pipeline with fallback to Rego-based policy engine
+- Argumentation graph with DF-QuAD fixed-point iteration for constraint strength computation
+- Dual-mode operation: stop-hook subprocess (constraint evaluation) and long-lived daemon (proxy + knowledge graph)
+- TLS MITM + transparent proxy for LLM API interception
+- LD_PRELOAD layer for DNS/socket-level interception (mirrord-style architecture)
 
 ## Layers
 
-**CLI / Entry Layer:**
-- Purpose: Parse arguments; dispatch to subcommands or fall through to Claude Code stop-hook mode.
-- Location: `crates/rigor/src/main.rs`, `crates/rigor/src/cli/mod.rs`, `crates/rigor/src/cli/*.rs`
-- Contains: Clap command definitions (`init`, `show`, `validate`, `graph`, `ground`, `daemon`, `log`, `trust/untrust`, `config`, `map`, `gate`, `scan`), per-subcommand handlers, shared `find_rigor_yaml` helper.
-- Depends on: `constraint`, `policy`, `daemon`, `claim`, `logging`, `lsp`, `defaults`.
-- Used by: `main.rs` binary.
+**Configuration & Constraint Loading:**
+- Purpose: Parse and validate rigor.yaml, load epistemic constraints
+- Location: `crates/rigor/src/constraint/loader.rs`, `crates/rigor/src/constraint/types.rs`, `crates/rigor/src/config/`
+- Contains: Configuration parsing (YAML), constraint validation, constraint type definitions
+- Depends on: serde_yml, anyhow
+- Used by: Main hook evaluation pipeline, daemon, CLI validation commands
 
-**Hook Layer (Stop-Hook Protocol):**
-- Purpose: Implement the Claude Code Stop hook JSON-in/JSON-out contract over stdin/stdout.
-- Location: `crates/rigor/src/hook/input.rs`, `crates/rigor/src/hook/output.rs`, orchestrated from `crates/rigor/src/lib.rs::run`.
-- Contains: `StopHookInput`, `HookResponse`, `Metadata`. Read stdin → run pipeline → write JSON `{decision, reason, metadata}` to stdout.
-- Depends on: `claim`, `constraint`, `policy`, `violation`, `logging`, `observability`, `daemon::daemon_alive`.
-- Used by: `cli::run_cli` (when no subcommand given), `lib.rs::run`.
-
-**Config Layer:**
-- Purpose: Locate and load `rigor.yaml` (and legacy `rigor.lock`) by walking up the directory tree from CWD.
-- Location: `crates/rigor/src/config/mod.rs`, `crates/rigor/src/config/lookup.rs`
-- Contains: `find_rigor_yaml`, `find_rigor_yaml_from`, `find_rigor_lock`.
-- Depends on: `std::env`, filesystem only.
-- Used by: Every entrypoint (CLI subcommands, hook, daemon).
-
-**Constraint Layer (Domain Core):**
-- Purpose: Parse `rigor.yaml` into typed `RigorConfig`; validate structure; build and compute the DF-QuAD argumentation graph.
-- Location: `crates/rigor/src/constraint/`
-  - `types.rs`: `RigorConfig`, `Constraint`, `Relation`, `EpistemicType`, `RelationType`, `SourceAnchor`.
-  - `loader.rs`: YAML → `RigorConfig`.
-  - `validator.rs`: Structural/semantic checks on configs.
-  - `graph.rs`: `ArgumentationGraph` with `compute_strengths()` (Rago et al. 2016 DF-QuAD fixed-point iteration, `MAX_ITERATIONS=100`, `EPSILON=0.001`).
-- Depends on: `serde`, `serde_yml` (via loader).
-- Used by: `policy`, `daemon`, CLI (`show`, `validate`, `graph`).
-
-**Claim Layer:**
-- Purpose: Parse assistant transcripts and extract structured `Claim`s for policy evaluation.
+**Claim Extraction:**
+- Purpose: Extract factual claims from LLM chat transcripts
 - Location: `crates/rigor/src/claim/`
-  - `transcript.rs`: Parse JSONL transcripts; `TranscriptMessage`, `get_assistant_messages`.
-  - `types.rs`: `Claim`, `ClaimType`, `SourceLocation`.
-  - `extractor.rs`: `ClaimExtractor` trait + `HeuristicExtractor` (rule-based v1).
-  - `heuristic.rs`: Sentence-level extraction with hedge detection.
-  - `hedge_detector.rs`: Hedge-phrase pattern matching.
-  - `confidence.rs`: Confidence scoring rules.
-- Depends on: `unicode-segmentation`, `regex`, `once_cell`, `uuid`.
-- Used by: `lib.rs::run_hook`, daemon proxy (claim-injection filter).
+- Contains: Heuristic extractor, confidence scoring, hedge detection, claim types
+- Files: `claim/extractor.rs`, `claim/heuristic.rs`, `claim/confidence.rs`, `claim/transcript.rs`
+- Depends on: regex, unicode-segmentation
+- Used by: Main hook evaluation pipeline
 
-**Policy Layer:**
-- Purpose: Compile constraint Rego snippets into a `regorus::Engine` and evaluate claims.
-- Location: `crates/rigor/src/policy/`
-  - `engine.rs`: `PolicyEngine` (wraps `regorus::Engine`; loads `policies/helpers.rego` + per-constraint generated modules `package rigor.constraint_<safe_id>`).
-  - `input.rs`: `EvaluationInput { claims }`.
-- Depends on: `regorus`, `serde`.
-- Used by: `lib.rs::run_hook`, `daemon::DaemonState` (pre-compiled at startup).
+**Constraint Graph & Strength Computation:**
+- Purpose: Build argumentation graph and compute constraint strengths via DF-QuAD fixed-point iteration
+- Location: `crates/rigor/src/constraint/graph.rs`
+- Contains: ConstraintNode, ArgumentationGraph with supports/attacks/undercuts relations
+- Depends on: BTreeMap for deterministic iteration
+- Algorithm: DF-QuAD (Dung's Framework with Quantified Aggregation) per Rago et al. 2016
+  - Product aggregation: agg(M) = ∏(1 - sᵢ)
+  - Influence function: two-case based on attacker/supporter dominance
+  - Convergence: up to 100 iterations or EPSILON=0.001 change threshold
+- Used by: Main hook evaluation, decision logic
 
-**Violation Layer:**
-- Purpose: Transform raw Rego results into typed, prioritized violations; decide block/warn/allow; format user-facing messages.
+**Evaluator Pipeline:**
+- Purpose: Route claim/constraint pairs to appropriate evaluators (pluggable)
+- Location: `crates/rigor/src/evaluator/pipeline.rs`
+- Contains: ClaimEvaluator trait, EvalResult, EvaluatorPipeline router, RegexEvaluator, SemanticEvaluator
+- Pattern: First-match routing — pipeline asks each evaluator `can_evaluate()` in registration order
+- Fallback: RegexEvaluator (wraps PolicyEngine with Rego) always matches
+- Used by: Main hook evaluation pipeline in `lib.rs:run_hook()`
+
+**Policy Engine (Rego-based):**
+- Purpose: Evaluate claims against Rego constraints
+- Location: `crates/rigor/src/policy/engine.rs`
+- Contains: PolicyEngine, EvaluationInput, RawViolation
+- Rego Runtime: regorus crate (open-source Rego interpreter)
+- Used by: RegexEvaluator, fallback for unhandled claim/constraint pairs
+
+**Semantic Evaluator (LLM-as-judge):**
+- Purpose: Use LLM judgments to determine claim relevance to constraints
+- Location: `crates/rigor/src/evaluator/relevance.rs`
+- Contains: SemanticEvaluator, RelevanceLookup trait, HttpLookup (HTTP client to daemon)
+- Verdicts: high/medium/low cached in daemon's knowledge base
+- Depends on: reqwest, tokio for async HTTP
+- Used by: Plugged into evaluator pipeline if HTTP lookup succeeds
+
+**Violation Collection & Decision:**
+- Purpose: Aggregate violations, apply severity thresholds, determine action
 - Location: `crates/rigor/src/violation/`
-  - `types.rs`: `Violation`, `Severity`, `SeverityThresholds` (block `>=0.7`, warn `>=0.4`).
-  - `collector.rs`: `collect_violations`, `determine_decision`, `Decision`, `ConstraintMeta`.
-  - `formatter.rs`: `ViolationFormatter` (terminal output with `owo-colors`).
-- Depends on: `policy`, `claim`, `constraint`.
-- Used by: `lib.rs::run_hook`, daemon egress filters.
+- Contains: Violation types, Severity (Block/Warn/Allow), SeverityThresholds, ViolationFormatter
+- Thresholds: block >= 0.7 strength, warn >= 0.4 strength (tunable)
+- Used by: Main hook evaluation to produce final HookResponse (allow/warn/block)
 
-**Daemon Layer:**
-- Purpose: Long-running HTTP/HTTPS/WebSocket server that proxies LLM API calls, performs MITM on allowlisted hosts, runs the same claim→policy→violation pipeline on responses, and serves the dashboard.
-- Location: `crates/rigor/src/daemon/`
-  - `mod.rs`: `DaemonState`, `SharedState`, `start_daemon`, `build_router`, `daemon_alive` / PID file management (`~/.rigor/daemon.pid`), `MITM_HOSTS`, `should_mitm_target`, gate-related state types.
-  - `proxy.rs` (3092 lines): Anthropic/OpenAI/Vertex/Azure-aware proxy handlers; catch-all proxy; SSE streaming; claim extraction; `/v1/messages` and `/v1/chat/completions` routes plus fallback.
-  - `tls.rs`: `RigorCA` (persistent CA via rcgen), per-host cert signing, macOS keychain install/remove (`install_ca_trust` / `remove_ca_trust`), legacy multi-SAN self-signed fallback.
-  - `sni.rs`: TLS ClientHello SNI peeking for transparent-mode routing.
-  - `ws.rs`: WebSocket event broadcast channel (`EventSender`) + dashboard event protocol.
-  - `gate.rs` / `gate_api.rs`: Action-gate state machine (real-time vs retroactive approval flows).
-  - `governance.rs`: Dashboard REST endpoints (`/api/governance/*` for toggling constraints, pausing, block-next).
-  - `chat.rs`: `/api/chat` — dashboard-initiated LLM calls routed through the proxy.
-  - `context.rs`: Per-session/per-conversation context tracking.
-  - `egress/`: Filter-chain architecture for SSE body processing.
-    - `chain.rs`: `SseChunk`, `FilterError`, filter trait and chain runner.
-    - `claim_injection.rs`: Filter that extracts/injects claims into the stream.
-    - `ctx.rs`: `ConversationCtx` shared across filters.
-- Depends on: `axum`, `hyper`, `rustls`, `tokio-rustls`, `rcgen`, `reqwest`, `tower`, `tokio`, plus all inner layers.
-- Used by: `cli::ground` (spawns daemon + target process), `cli::daemon` (standalone), trust/untrust CLI commands.
-
-**Fallback Layer:**
-- Purpose: Policy-driven error handling for each pipeline component — decides retry/fail-open/fail-closed per `(component, FailureCategory)`.
-- Location: `crates/rigor/src/fallback/`
-  - `types.rs`: `Policy`, `PolicySet`, `ComponentPolicy`, `FallbackConfig`, `FallbackOutcome`, `FailureCategory`.
-  - `config.rs`: YAML loading, policy resolution `policy_for(component, category)`.
-  - `minimums.rs`: Minimum-policy guardrails validated at daemon startup.
-  - `mod.rs`: `FallbackConfig::execute` — single async entrypoint that wraps any fallible operation in a retry/backoff loop governed by its policy.
-- Depends on: `tokio`, `tracing`, `serde`.
-- Used by: `daemon::DaemonState::load` (validated at startup), proxy filter chain.
-
-**LSP Layer:**
-- Purpose: Verify source-anchor constraints by querying a language server (rust-analyzer / tsserver / pyright / gopls).
-- Location: `crates/rigor/src/lsp/mod.rs` (detection, grep-based fallback, anchor verification), `crates/rigor/src/lsp/client.rs` (JSON-RPC LSP client).
-- Depends on: `lsp-types`, `sha2`, `std::process::Command`.
-- Used by: `cli::map`.
-
-**Logging Layer:**
-- Purpose: Structured JSONL violation logging to `~/.rigor/violations.jsonl` with session metadata (git SHA, branch, CWD).
+**Violation Logging:**
+- Purpose: Persist violation telemetry for dashboards and offline analysis
 - Location: `crates/rigor/src/logging/`
-  - `types.rs`: `ViolationLogEntry`, `SessionMetadata`, `ClaimSource`.
-  - `session.rs`: Capture git + CWD metadata via `git2`.
-  - `violation_log.rs`: `ViolationLogger` (append-only JSONL).
-  - `query.rs`: Filter/query logged violations (used by `rigor log`).
-  - `annotate.rs`: Mark violations as false-positive / add notes.
-- Depends on: `git2`, `chrono`, `serde-jsonlines`.
-- Used by: `lib.rs::run_hook`, `cli::log`.
+- Contains: ViolationLogger, SessionMetadata, ViolationLogEntry, ClaimSource
+- Logging target: Configurable via OTEL (stdout, OTLP collector)
+- Fail-open: Logging failures never block constraint evaluation
+- Used by: Main hook evaluation pipeline (post-decision)
 
-**Observability Layer:**
-- Purpose: Initialize `tracing` + OpenTelemetry OTLP export with graceful degradation.
-- Location: `crates/rigor/src/observability/tracing.rs`
-- Depends on: `tracing`, `tracing-subscriber`, `tracing-opentelemetry`, `opentelemetry*`.
-- Used by: `lib.rs::run` (startup + shutdown), daemon.
+**Observability & Tracing:**
+- Purpose: OpenTelemetry integration for structured logging and distributed tracing
+- Location: `crates/rigor/src/observability/`
+- Contains: init_tracing(), shutdown(), OTEL provider setup
+- Features: JSON logging, environment-based filtering, graceful degradation
+- Used by: Top-level run() in lib.rs, daemon, CLI tools
 
-**Defaults Layer:**
-- Purpose: Language- and dependency-level built-in constraints shipped with the binary.
-- Location: `crates/rigor/src/defaults/` (`rust.rs`, `go.rs`, `deps.rs`).
-- Used by: `cli::init`.
+**Hook I/O Interface:**
+- Purpose: StdinStdout contract between Claude Code (caller) and rigor stop-hook
+- Location: `crates/rigor/src/hook/`
+- Input: `StopHookInput` (JSON from stdin) — session_id, transcript_path, cwd, hook_event_name, stop_hook_active flag
+- Output: `HookResponse` (JSON to stdout) — decision (allow/block/warn), reason, metadata
+- Fail-open: Always writes valid JSON response, even on fatal errors
+- Used by: Main hook entry point in `lib.rs:run()`
 
-**Hook Layer (Gate, separate from Stop hook):**
-- Purpose: Pre-tool / post-tool Claude Code hooks for the action-gate feature.
-- Location: `crates/rigor/src/cli/gate.rs` + `crates/rigor/src/daemon/gate.rs` + `crates/rigor/src/daemon/gate_api.rs`.
+**Daemon & Proxy:**
+- Purpose: Long-lived TLS MITM proxy intercepting LLM API calls
+- Location: `crates/rigor/src/daemon/`
+- Contains: proxy.rs (TLS intercept), gate.rs/gate_api.rs (request filtering), chat.rs (message handling), observability_api.rs (telemetry)
+- MITM targets: api.anthropic.com, api.openai.com, Google Vertex, Azure OpenAI, OpenRouter, OpenCode
+- Blind tunneling: Non-MITM hosts get transparent pass-through
+- SNI routing: Uses TLS SNI to route to correct upstream host
+- TLS generation: rcgen for on-the-fly certificate generation (mirrord-style)
+- Used by: `cli/serve.rs` (daemon mode), `cli/ground.rs` (child-wrapping mode)
 
-**Scan Layer:**
-- Purpose: PII/secrets scanning for user prompts via `sanitize-pii`; installable as a Claude Code `UserPromptSubmit` hook.
-- Location: `crates/rigor/src/cli/scan.rs`.
+**LD_PRELOAD Layer:**
+- Purpose: Intercept DNS and socket calls to redirect LLM API traffic
+- Location: `layer/src/lib.rs`
+- Contains: frida-gum hooks for getaddrinfo, gethostbyname, connect, SecTrustEvaluateWithError
+- ReEntrancy protection: DetourGuard to prevent infinite loops when hooked functions call other hooks
+- Transparent mode: All port 443 connections redirected (for Bun/Go clients that bypass DNS hooks)
+- Used by: `cli/ground` mode (loaded via LD_PRELOAD environment variable)
 
-**Network Interception Layer (out-of-workspace crate):**
-- Purpose: Dynamic-library (LD_PRELOAD / DYLD_INSERT_LIBRARIES) that redirects LLM API connections to the local daemon.
-- Location: `layer/src/lib.rs` (957 lines; `crate-type = ["cdylib"]`).
-- Pattern: Frida-gum inline hooks on `getaddrinfo`, `freeaddrinfo`, `gethostbyname`, `connect`, `connectx` (macOS), `getpeername`, `getsockname`, `SecTrustEvaluateWithError` (macOS TLS bypass), `dns_configuration_copy/free` (macOS DNS bypass prevention).
-- Depends on: `frida-gum`, `libc`, `once_cell`.
-- Used by: `cli::ground` (built separately, loaded via env vars).
+**CLI Interface:**
+- Purpose: User-facing commands for constraint management, daemon control, evaluation
+- Location: `crates/rigor/src/cli/`
+- Entry point: `cli/mod.rs` with clap-based argument parser
+- Subcommands: init, show, validate, graph, ground, serve, eval, gate, logs, alert, refine, etc.
+- Used by: main.rs, orchestrated by users or CI/CD systems
 
-**Test/Harness Crates:**
-- `crates/rigor-harness/src/lib.rs`: Placeholder for future `MockAgent`, `MockLLM`, `TestDaemon`, `TestGitRepo`, `MockLSP`, `EventCapture` primitives (empty in current state).
-- `crates/rigor-test/src/main.rs`: Dev-only test orchestrator CLI; `e2e`, `bench`, `report` subcommands stubbed (not yet implemented).
+**Test Harness:**
+- Purpose: Test primitives for adapter authors (future-facing)
+- Location: `crates/rigor-harness/src/lib.rs`
+- Role: Publishable as dev-dependency for authors writing custom evaluators
+- Status: Minimal implementation (Plan A.2/A.3)
+
+**Test Orchestrator:**
+- Purpose: Dev-only test runner (Layer 3 E2E, Layer 4 benchmarks)
+- Location: `crates/rigor-test/src/main.rs`
+- Status: Stub (implemented in later phases D.3)
 
 ## Data Flow
 
-**Stop-Hook Flow (`crates/rigor/src/lib.rs::run_hook`):**
+**Hook Evaluation Flow (Primary):**
 
-1. `observability::init_tracing()` sets up tracing + optional OTLP.
-2. Check `daemon_alive()` — if no daemon, drain stdin and emit `allow` (silent no-op).
-3. `StopHookInput::from_stdin()` parses JSON hook input (`session_id`, `transcript_path`, `stop_hook_active`, etc.).
-4. If `stop_hook_active == true` → emit `allow` (loop-prevention).
-5. `find_rigor_yaml()` / `find_rigor_lock()` walk parents for config.
-6. `SessionMetadata::capture()` records git SHA/branch/CWD.
-7. `constraint::loader::load_rigor_config` → `RigorConfig`.
-8. `ArgumentationGraph::from_config(&config).compute_strengths()` → per-constraint strengths (DF-QuAD fixed-point).
-9. `PolicyEngine::new(&config)` loads `policies/helpers.rego` and wraps each constraint's Rego snippet in a generated module.
-10. Claims: either `RIGOR_TEST_CLAIMS` env override or `HeuristicExtractor::extract(&transcript_messages)`.
-11. `engine.evaluate(&EvaluationInput { claims })` → `Vec<RawViolation>`.
-12. `collect_violations(raw, &strengths, &thresholds, &constraint_meta, &claims)` produces typed `Violation`s with severity.
-13. `determine_decision(&violations)` → `Decision::{Block, Warn, Allow}`.
-14. For each violation, `ViolationLogger::log()` appends to `~/.rigor/violations.jsonl`.
-15. `ViolationFormatter::format_violations` builds reason string.
-16. `HookResponse::{allow, block}` → JSON on stdout, status line on stderr.
-17. `observability::shutdown()` flushes OTEL spans.
+1. Stop-hook process spawned by Claude Code with `RIGOR_HOOK_INPUT` on stdin
+2. `main.rs` → `lib.rs:run()` initializes tracing
+3. `run_hook()` reads `StopHookInput` from stdin
+4. Check: daemon_alive() (kill(pid, 0) against ~/.rigor/daemon.pid)
+   - If daemon missing: write allow() response, return
+5. Load rigor.yaml via `constraint::loader::load_rigor_config()`
+   - Fail-open on parse error
+6. Build `ArgumentationGraph` from config, compute strengths via DF-QuAD
+   - Fail-open on compute error
+7. Build `EvaluatorPipeline` with fallback RegexEvaluator
+   - Register SemanticEvaluator if HttpLookup succeeds (daemon HTTP endpoint reachable)
+8. Extract claims via `HeuristicExtractor` from transcript
+   - Alternative: `RIGOR_TEST_CLAIMS` env var override for testing
+   - Fail-open: empty claims list if parsing fails
+9. Pipeline runs: for each claim, iterate constraints, route to first evaluator that `can_evaluate()`
+   - SemanticEvaluator: high/medium cache hit → violation
+   - RegexEvaluator: evaluate Rego, return EvalResult
+   - Each evaluator returns EvalResult → collapsed into RawViolation
+10. Collect violations with severity thresholds (block >= 0.7, warn >= 0.4)
+11. Compute decision (Block/Warn/Allow) based on highest violation severity
+12. Log violations to ViolationLogger (fail-open on log errors)
+13. Format violations into human-readable message
+14. Write `HookResponse` to stdout (allow/block/warn)
+15. Process exits code 0 (even on errors, unless RIGOR_FAIL_CLOSED=true)
 
-**Daemon Proxy Flow (`crates/rigor/src/daemon/proxy.rs` routes):**
+**Daemon Mode (Persistent):**
 
-1. Client (via `layer/` hooks or `HTTPS_PROXY`) sends request to `127.0.0.1:PORT` or `127.0.0.1:443`.
-2. Axum router dispatches: known paths (`/v1/messages`, `/v1/chat/completions`) → typed proxy handlers; unknown paths → `catch_all_proxy`.
-3. `should_mitm_target(host)` checks `MITM_HOSTS` allowlist. Non-allowlisted → blind tunnel (bytes passed through).
-4. MITM path: decrypt with per-host cert signed by `RigorCA`; inspect request body; optionally inject epistemic context.
-5. Forward upstream via shared `reqwest::Client` (pool size 4 per host).
-6. For SSE streaming responses: feed chunks through `egress::chain` filter pipeline (e.g., `claim_injection`).
-7. `claim_injection` filter extracts claims from streamed assistant text; passes them through the same `PolicyEngine` pre-compiled in `DaemonState`.
-8. Violations broadcast to WebSocket subscribers via `EventSender` (dashboard updates live).
-9. `DaemonState.block_next` / `disabled_constraints` / `proxy_paused` flags (toggled via `/api/governance/*`) influence behavior.
+1. `cli/serve.rs:run_serve()` starts long-lived daemon
+2. Writes PID to ~/.rigor/daemon.pid
+3. Builds `DaemonState` with loaded RigorConfig, PolicyEngine, ArgumentationGraph
+4. Starts Axum router with endpoints:
+   - `/api/relevance/lookup` — fetch cached semantic verdicts
+   - `/api/observability/*` — telemetry ingestion
+   - `/api/gate/*` — request filtering
+   - TLS proxy listener on port 8787 (or custom RIGOR_DAEMON_TLS_PORT)
+5. Intercepts HTTPS traffic via TLS MITM
+6. Extracts claims from LLM messages (request/response bodies)
+7. Scores relevance using semantic evaluator (if configured)
+8. Caches verdicts in episodic memory for hook subprocess HTTP lookup
+9. On SIGTERM/SIGINT: update session registry with ended_at, clean up ~/.rigor/daemon.pid
 
-**Network Interception Flow (`layer/src/lib.rs`):**
+**Ground Mode (Child-wrapping):**
 
-1. Library loaded at process start via `DYLD_INSERT_LIBRARIES` (macOS) or `LD_PRELOAD` (Linux) by `cli::ground`.
-2. `#[used] static INIT` constructor runs `install_hooks()`: Frida-gum inline patches libc exports.
-3. `getaddrinfo_detour` intercepts DNS lookups for `INTERCEPT_HOSTS` (api.anthropic.com, api.openai.com, Vertex/Azure endpoints) → returns `127.0.0.1:DAEMON_PORT`.
-4. `connect_detour` redirects `127.0.0.1:443` (or in `--transparent` mode, all `:443` connections) to `127.0.0.1:DAEMON_PORT`.
-5. `getpeername_detour` returns the ORIGINAL destination so TLS libs don't detect the redirect.
-6. On macOS, `SecTrustEvaluateWithError_detour` forces cert validation to succeed, making the daemon's MITM cert trusted without keychain changes.
-7. Env vars `DYLD_INSERT_LIBRARIES` / `LD_PRELOAD` are cleared post-install so child processes don't inherit the library (hooks persist in-process via frida-gum patches).
+1. `cli/ground.rs` wraps subprocess command
+2. Loads LD_PRELOAD layer (rigor-layer shared library)
+3. Sets HTTPS_PROXY=http://127.0.0.1:8787 to redirect traffic
+4. Spawns daemon in-process or background
+5. Launches child command (e.g., `claude code --some-project`)
+6. Waits for child exit, kills daemon, cleans up
 
 **State Management:**
-- Stop-hook: stateless (fresh process per Claude Code stop event).
-- Daemon: `SharedState = Arc<Mutex<DaemonState>>` passed to all Axum handlers. Contains pre-compiled `PolicyEngine`, `ArgumentationGraph`, `RigorCA`, `reqwest::Client`, gate state maps, disabled-constraint set, fallback config.
-- Persistent artifacts: `~/.rigor/daemon.pid`, `~/.rigor/violations.jsonl`, `~/.rigor/config` (judge API settings), CA cert/key (location managed by `tls::RigorCA`).
+
+- **Constraint Strengths:** Computed once per hook invocation, cached in ArgumentationGraph
+- **Claim Verdicts (Semantic):** Cached in daemon's episodic memory, queried by hook via HTTP
+- **Session Metadata:** Captured at hook start (SessionMetadata with git info, env), logged with violations
+- **PID Files:** Hook checks daemon alive via ~/.rigor/daemon.pid + kill(pid, 0)
 
 ## Key Abstractions
 
-**`RigorConfig` (domain root):**
-- Purpose: Typed representation of `rigor.yaml`.
-- Examples: `crates/rigor/src/constraint/types.rs`
-- Pattern: Serde derive; `all_constraints()` flattens beliefs + justifications + defeaters.
+**Constraint:**
+- Purpose: Epistemic rule to enforce
+- Examples: `crates/rigor/src/constraint/types.rs:Constraint`
+- Fields: id, epistemic_type (belief/justification/defeater), name, description, rego, message, tags, source anchors
+- Pattern: Constraints are data-driven via rigor.yaml, not hardcoded
 
-**`Claim`:**
-- Purpose: A single extracted assertion with confidence, type, and optional source location. Primary input to the Rego engine.
-- Examples: `crates/rigor/src/claim/types.rs`
-- Pattern: UUID-v4 IDs; tagged enum `ClaimType` (`assertion`, `negation`, `code_reference`, `architectural_decision`, `dependency_claim`, `action_intent`); serde rename-all snake_case.
+**Claim:**
+- Purpose: Factual statement extracted from LLM transcript
+- Examples: `crates/rigor/src/claim/types.rs:Claim`
+- Fields: id, text, confidence (0.0-1.0), claim_type (assertion/question/mixed), source (message/sentence indices)
+- Pattern: Claims are probabilistic (confidence score), sourced to chat messages
 
-**`ArgumentationGraph`:**
-- Purpose: DF-QuAD semantics over constraint nodes related by `supports` / `attacks` / `undercuts`. Computes a strength ∈ [0,1] per constraint.
-- Examples: `crates/rigor/src/constraint/graph.rs`
-- Pattern: `BTreeMap<String, ConstraintNode>` for deterministic iteration; fixed-point iteration with epsilon convergence; base strength by epistemic type (belief 0.8, justification 0.9, defeater 0.7).
+**EvalResult:**
+- Purpose: Verdict of single evaluator for claim/constraint pair
+- Fields: violated (bool), confidence (f64), reason (string)
+- Pattern: Fine-grained per-pair, not aggregated (aggregation happens post-pipeline)
 
-**`PolicyEngine`:**
-- Purpose: Embedded OPA/Rego evaluator with a compiled set of per-constraint modules plus shared helpers.
-- Examples: `crates/rigor/src/policy/engine.rs`
-- Pattern: Wraps `regorus::Engine`; generates `package rigor.constraint_<safe_id>` per constraint; `helpers.rego` embedded via `include_str!`. Cloneable so each request gets its own mutable engine.
+**Violation:**
+- Purpose: Aggregated constraint breach
+- Fields: constraint_id, claim_ids (can be multiple), strength (post-DF-QuAD), severity (Block/Warn/Allow), message
+- Pattern: Severity maps from computed strength via thresholds
 
-**`Violation` + `Decision`:**
-- Purpose: Typed result of evaluation with severity and user-facing message; `Decision::{Allow, Warn, Block}` gates hook response.
-- Examples: `crates/rigor/src/violation/types.rs`, `crates/rigor/src/violation/collector.rs`
-- Pattern: Severity derived from strength thresholds (0.7 / 0.4). `Decision` is the highest-severity violation wins.
+**Decision:**
+- Purpose: Final action (Block/Warn/Allow)
+- Pattern: Determined from highest violation severity or lack thereof
 
-**`HookResponse`:**
-- Purpose: Claude Code Stop-hook output schema.
-- Examples: `crates/rigor/src/hook/output.rs`
-- Pattern: `{decision?: "block", reason?, metadata: {version, constraint_count, claim_count, error?, error_message?}}`; `allow()` / `block()` / `error()` constructors.
+**ClaimEvaluator trait:**
+- Purpose: Pluggable strategy for evaluating claim/constraint pairs
+- Methods: name(), can_evaluate(), evaluate()
+- Implementations: RegexEvaluator (Rego-based), SemanticEvaluator (LLM-as-judge)
+- Pattern: Enables future evaluators (ML, symbolic, etc.)
 
-**`DaemonState`:**
-- Purpose: Shared mutable runtime state for the Axum server.
-- Examples: `crates/rigor/src/daemon/mod.rs`
-- Pattern: `Arc<Mutex<DaemonState>>`; pre-compiled `PolicyEngine`; `EventSender` for WebSocket broadcasting; governance toggles (`disabled_constraints`, `proxy_paused`, `block_next`); action-gate HashMaps.
+**RelevanceLookup trait:**
+- Purpose: Fetch cached semantic verdicts
+- Implementations: HttpLookup (queries daemon /api/relevance/lookup), future in-process variant
+- Pattern: Abstracts away HTTP from SemanticEvaluator
 
-**`FallbackConfig` + `FallbackOutcome`:**
-- Purpose: Declarative error-policy for each pipeline component.
-- Examples: `crates/rigor/src/fallback/types.rs`, `crates/rigor/src/fallback/mod.rs`
-- Pattern: `config.execute("component", || async { op })` returns `Ok(T) | Skipped | Blocked(String)`; retries with backoff per policy.
+**ArgumentationGraph:**
+- Purpose: Epistemic argumentation framework
+- Relations: Supports, Attacks, Undercuts
+- Algorithm: DF-QuAD for computing final strengths
+- Pattern: Enables modeling defeasible reasoning (beliefs can be attacked by defeaters)
 
-**`SseChunk` + `FilterError` (egress filter trait):**
-- Purpose: Composable pipeline for SSE body transformations.
-- Examples: `crates/rigor/src/daemon/egress/chain.rs`
-- Pattern: `thiserror`-derived errors (`Blocked { filter, reason }`, `Internal`); async filters with shared `ConversationCtx`.
-
-**`SourceAnchor`:**
-- Purpose: Ground a constraint in specific code locations (file, lines, text pattern).
-- Examples: `crates/rigor/src/constraint/types.rs`
-- Pattern: Anchor text preferred over line numbers (survives edits); verified via LSP or grep (`cli::map`).
+**HookResponse:**
+- Purpose: JSON contract between hook subprocess and Claude Code
+- Variants: allow(), block(reason), warn(reason), error(message)
+- Pattern: Fail-open — always valid JSON, never crashes caller
 
 ## Entry Points
 
-**`rigor` binary (stop hook, default):**
-- Location: `crates/rigor/src/main.rs` → `cli::run_cli()` with no subcommand → `crate::run()` → `lib.rs::run_hook`.
-- Triggers: Claude Code Stop event (piped JSON to stdin).
-- Responsibilities: Full constraint-evaluation pipeline; JSON response on stdout.
+**Stop-hook subprocess:**
+- Location: `crates/rigor/src/main.rs` → `lib.rs:run()`
+- Triggers: Invoked by Claude Code stop-hook on every generation
+- Responsibilities: Read stdin, evaluate constraints, write stdout decision
+- Exit code: 0 (normal) or 2 (RIGOR_FAIL_CLOSED=true fatal error)
 
-**`rigor <subcommand>`:**
-- Location: `crates/rigor/src/cli/mod.rs::run_cli`
-- Triggers: Manual user invocation.
-- Subcommands: `init`, `show`, `validate`, `graph [--web]`, `ground -- <cmd>`, `daemon`, `log <sub>`, `trust`, `untrust`, `config <action>`, `map [--deep] [--check]`, `gate <sub>`, `scan [--hook|--install|--uninstall|--status]`.
+**CLI binary:**
+- Location: `crates/rigor/src/main.rs`
+- Triggers: User or CI runs `rigor <subcommand>`
+- Responsibilities: Route to subcommand handler in `cli/mod.rs`
+- Examples: `rigor init`, `rigor serve`, `rigor ground <cmd>`, `rigor eval <file>`
 
-**`rigor daemon` / `rigor ground -- <cmd>`:**
-- Location: `crates/rigor/src/daemon/mod.rs::start_daemon`
-- Triggers: User wants a persistent proxy; `ground` additionally spawns the target command with LD_PRELOAD/DYLD_INSERT_LIBRARIES pointing at the built `layer` dylib.
-- Responsibilities: HTTP listener (port 8787 default), HTTPS listener (port 443 default, `RIGOR_DAEMON_TLS_PORT` override), WebSocket, dashboard, proxy handlers, governance API.
+**Daemon background process:**
+- Location: `cli/serve.rs:run_serve()`
+- Triggers: `rigor serve --background` or `rigor ground <cmd>` starts it
+- Responsibilities: Run TLS proxy, serve HTTP APIs, cache verdicts
+- Lifecycle: PID in ~/.rigor/daemon.pid, killed via SIGTERM or `rigor serve stop`
 
-**`rigor-layer` (cdylib):**
+**LD_PRELOAD layer:**
 - Location: `layer/src/lib.rs`
-- Triggers: Loaded into a target process via `DYLD_INSERT_LIBRARIES` / `LD_PRELOAD` (set by `cli::ground`).
-- Responsibilities: libc-level redirection of LLM API connections to the daemon.
-
-**`rigor-test` (dev-only):**
-- Location: `crates/rigor-test/src/main.rs`
-- Triggers: Manual; scaffolded for future E2E / benchmark orchestration.
+- Triggers: Loaded via LD_PRELOAD env var by `cli/ground` mode
+- Responsibilities: Hook DNS/socket calls, redirect to daemon
+- Pattern: Transparent to wrapped process
 
 ## Error Handling
 
-**Strategy:** Fail-open by default at every pipeline stage in the stop-hook path (`crates/rigor/src/lib.rs::evaluate_constraints`). Each fallible step emits `warn!` via `tracing` and returns an `allow` `HookResponse`. The top-level `main.rs` wraps `run_cli()`; on error, if `RIGOR_FAIL_CLOSED=true|1` it emits stderr + exit code 2 (Claude Code blocking), otherwise emits an `error()` hook response on stdout and exits 0.
+**Strategy:** Fail-open by default (allow when uncertain), fail-closed opt-in
 
 **Patterns:**
-- `anyhow::Result<T>` + `.context(...)` at all fallible boundaries.
-- Per-component policy governance via `fallback::FallbackConfig::execute` — replaces ad-hoc retry/fail logic with declarative policies (`FailOpen`, `FailClosed`, `FailStartup`, `DegradeWithWarn`, `RetryThenFailOpen`, `RetryThenFailClosed`, `RetryThenDegrade`).
-- `thiserror` for typed errors in the egress filter chain (`FilterError::{Blocked, Internal}`).
-- Graceful degradation in daemon startup: missing TLS config → HTTPS disabled (not fatal); missing CA → fall back to legacy self-signed multi-SAN cert; `reqwest::Client::builder()` failures → fall back to `Client::new()`.
-- `RIGOR_TEST_CLAIMS` env var bypasses transcript extraction for deterministic testing; `RIGOR_DEBUG` enables verbose stderr + raw-input logging.
+- Configuration load errors: write allow(), log warning
+- DF-QuAD compute errors: write allow(), log warning
+- Evaluator pipeline build errors: write allow(), log warning
+- Claim extraction errors: empty claims (no violations), log warning
+- Violation logging errors: continue without logging, log warning
+- HTTP lookup errors: skip SemanticEvaluator, use RegexEvaluator fallback
+- Hook JSON parsing errors: write error() response with message
+
+**Override:** `RIGOR_FAIL_CLOSED=true` env var forces exit code 2 on any error (hard block)
 
 ## Cross-Cutting Concerns
 
-**Logging:** `tracing` crate with `tracing-subscriber` for text/JSON output; `tracing-opentelemetry` exports to OTLP when `OTEL_*` env vars set. `info_span!("rigor_hook")` per hook invocation; `debug!` / `info!` / `warn!` / `error!` throughout the pipeline. See `crates/rigor/src/observability/tracing.rs`. A separate structured `ViolationLogger` writes JSONL audit records to `~/.rigor/violations.jsonl`.
+**Logging:** 
+- Framework: tracing crate with OpenTelemetry integration
+- Initialization: `observability::init_tracing()` called once at startup
+- Shutdown: `observability::shutdown()` flushes OTEL span buffer
+- Format: JSON structured logs (when OTEL enabled), configurable via `RUST_LOG` env var
+- Violation-specific: `logging::ViolationLogger` records detailed violation telemetry
 
-**Validation:** `constraint::validator` enforces structural invariants on `RigorConfig`; `fallback::FallbackConfig::validate()` enforces minimum policies at daemon startup (aborts if violated). Serde deserialization provides schema-level validation.
+**Validation:**
+- Config validation: `constraint::validator.rs` (not yet fully implemented in repo)
+- YAML schema validation: Schema compliance checked on load
+- Constraint source anchors: Durable text patterns for code-anchored constraints
 
-**Authentication:** No built-in user auth — daemon binds `127.0.0.1` only. Upstream auth via forwarded `ANTHROPIC_API_KEY` / per-request headers. Judge API config (`~/.rigor/config` via `cli::config::judge_config`) stores `judge_api_url`, `judge_api_key`, `judge_model`. MITM cert trust managed via macOS keychain (`daemon::tls::install_ca_trust` / `remove_ca_trust`).
-
-**Concurrency:** Short-lived CLI/hook process is single-threaded synchronous. Daemon uses `tokio` multi-thread runtime (`rt-multi-thread`); Axum handlers are async; shared state behind `Arc<Mutex<DaemonState>>`; `DETOUR_BYPASS` thread-local in `layer/` prevents re-entrant hook recursion.
-
-**Embedding:** `policies/helpers.rego` is embedded at compile time via `include_str!` in `crates/rigor/src/policy/engine.rs`. Viewer assets (`viewer/*`) are embedded into the binary via `rust-embed` for the `rigor graph --web` and daemon dashboard routes.
+**Authentication:**
+- Stop-hook: Inherits Claude Code's API keys (passed through environment)
+- Daemon: Proxies requests transparently (never stores API keys in memory)
+- TLS certificates: Generated on-the-fly per upstream host (never stored)
 
 ---
 

@@ -5,108 +5,67 @@
 ## Test Framework
 
 **Runner:**
-- Built-in `cargo test` (Rust's standard test harness)
-- `tokio::test` for async tests — `tokio = { version = "1", features = ["rt-multi-thread", "macros"] }` (`crates/rigor/Cargo.toml:27`)
-- Config: no custom config files; controlled by the `[dev-dependencies]` and `[[bench]]` sections in `crates/rigor/Cargo.toml:70-80`
+- Rust built-in test framework (via `#[test]` and `cargo test`)
+- No external test runner (Cargo default)
+- Config: No explicit test config file
 
-**Benchmark Framework:**
-- `criterion = { version = "0.5", features = ["html_reports"] }` — declared as a dev-dependency (`crates/rigor/Cargo.toml:72`)
-- Two benchmark binaries registered with `harness = false`:
-  - `crates/rigor/benches/hook_latency.rs` — full-pipeline latency target <100 ms
-  - `crates/rigor/benches/evaluation_only.rs` — pure Rego evaluation target <50 ms
+**Benchmarks:**
+- Framework: `criterion` crate
+- Config: `Cargo.toml` defines `[[bench]]` targets with `harness = false`
+- Benchmarks located in: `crates/rigor/benches/`
 
-**Assertion Library:** standard library `assert!`, `assert_eq!`, `assert_ne!`, plus `panic!` in unreachable match arms. No external assertion crate.
-
-**Test scale:** ~265 `#[test]` / `#[tokio::test]` functions across `crates/rigor/src/` (inline) and `crates/rigor/tests/` (integration).
+**Assertion Library:**
+- Rust standard `assert!()`, `assert_eq!()`, `assert_ne!()`
+- Custom helpers for specific patterns (see below)
 
 **Run Commands:**
 ```bash
-cargo test --all-features          # Run every test (what CI runs)
-cargo test --lib                   # Only unit tests in crates/rigor/src/
-cargo test --test integration_hook # Run one integration test file
-cargo test -- --nocapture          # Show println!/eprintln! output
-cargo bench                        # Run criterion benchmarks
-cargo clippy --all-targets --all-features -- -D warnings  # Lint test code too
+cargo test                    # Run all tests
+cargo test --test <name>      # Run specific test file
+cargo test <filter>           # Run tests matching filter
+cargo bench                   # Run criterion benchmarks
+cargo test -- --nocapture    # Show println! output during tests
+cargo test -- --test-threads=1  # Run tests serially
 ```
 
 ## Test File Organization
 
-**Location (two-tier):**
-- **Unit tests** live inline in the source file they test, inside `#[cfg(test)] mod tests { ... }`. This is the default pattern for every pure-logic module — confidence scoring, hedge detection, heuristic claim extraction, violation collection, graph math.
-- **Integration tests** live in `crates/rigor/tests/*.rs` and drive the compiled `rigor` binary via `Command::new(env!("CARGO_BIN_EXE_rigor"))`.
-- **Benchmarks** live in `crates/rigor/benches/*.rs`.
+**Location:**
+- Integration tests: `crates/rigor/tests/` directory (separate from source)
+- Unit tests: Co-located with source in `crates/rigor/src/` modules (if any)
+- Benchmarks: `crates/rigor/benches/` directory
 
-**Naming:**
-- Inline test modules are always named `mod tests`
-- Test function names describe the scenario in `test_<condition>_<expected_outcome>` form, e.g. `test_block_on_violation`, `test_invalid_yaml_fails_open`, `test_threshold_exactly_at_block`, `test_rigor_test_claims_malformed_falls_back`
-- Some integration tests use a flatter verb-phrase style: `claim_injection_plus_custom_filter_compose`, `execute_retry_succeeds_on_second_attempt`, `filter_chain_with_ctx_scratch_passes_state`
+**Naming Convention:**
+- Test files: descriptive snake_case: `integration_hook.rs`, `integration_constraint.rs`, `claim_extraction_e2e.rs`
+- Test functions: `test_<subject>_<condition>()` or `test_<feature>_<expected_behavior>()`
 
-**Structure:**
-```
-crates/rigor/
-├── src/
-│   ├── claim/
-│   │   ├── heuristic.rs       # module code + `#[cfg(test)] mod tests` at bottom
-│   │   └── confidence.rs      # same pattern
-│   ├── violation/
-│   │   └── collector.rs       # inline tests for collect_violations / determine_decision
-│   └── ...
-├── tests/                      # integration tests (spawn the binary)
-│   ├── integration_hook.rs     # stdin/stdout JSON contract
-│   ├── integration_constraint.rs # full constraint pipeline, uses RIGOR_TEST_CLAIMS
-│   ├── true_e2e.rs             # writes real transcript JSONL, no test hooks
-│   ├── dogfooding.rs           # loads production rigor.yaml, tests self-constraint
-│   ├── claim_extraction_e2e.rs # end-to-end claim extraction
-│   ├── egress_integration.rs   # async filter chain tests (#[tokio::test])
-│   └── fallback_integration.rs
-└── benches/
-    ├── hook_latency.rs
-    └── evaluation_only.rs
-```
+**Test Files Present:**
+- `crates/rigor/tests/integration_hook.rs` — Hook input/output pipeline
+- `crates/rigor/tests/integration_constraint.rs` — Constraint loading and evaluation
+- `crates/rigor/tests/fallback_integration.rs` — Fallback behavior
+- `crates/rigor/tests/egress_integration.rs` — Egress/output handling
+- `crates/rigor/tests/claim_extraction_e2e.rs` — E2E claim extraction
+- `crates/rigor/tests/true_e2e.rs` — Full end-to-end flow
+- `crates/rigor/tests/dogfooding.rs` — Self-validation
+- `crates/rigor/benches/hook_latency.rs` — Full pipeline latency
+- `crates/rigor/benches/evaluation_only.rs` — Constraint evaluation performance
 
 ## Test Structure
 
-**Inline unit test module template:**
+**Module Header:**
+All test files start with doc comment describing scope:
 ```rust
-// crates/rigor/src/claim/confidence.rs:39-78
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_definitive_is() {
-        assert_eq!(assign_confidence("X is Y"), 0.9);
-    }
-
-    #[test]
-    fn test_negation_priority() {
-        // Negation should take priority over definitive
-        assert_eq!(assign_confidence("This is not supported"), 0.8);
-    }
-}
+//! Integration tests for the Rigor stop hook.
+//!
+//! These tests verify the complete flow from stdin JSON to stdout JSON response.
 ```
 
-**Async test template:**
+**Helper Functions:**
+Tests use shared helper functions for subprocess invocation and input/output handling.
+
+**Example from `integration_hook.rs`:**
 ```rust
-// crates/rigor/tests/egress_integration.rs:31
-#[tokio::test]
-async fn claim_injection_plus_custom_filter_compose() {
-    let chain = FilterChain::new(vec![
-        Arc::new(ClaimInjectionFilter::new(...)),
-        Arc::new(UppercaseFilter),
-    ]);
-    let mut body = serde_json::json!({ "messages": [...] });
-    let mut ctx = ConversationCtx::new_anonymous();
-
-    chain.apply_request(&mut body, &mut ctx).await.unwrap();
-
-    assert!(body["system"].as_str().unwrap().contains("rigor says"));
-}
-```
-
-**Integration test template (binary spawn):**
-```rust
-// crates/rigor/tests/integration_hook.rs:12-34
+/// Helper to run rigor with JSON input and capture output
 fn run_rigor_with_input(input_json: &Value) -> (String, String, i32) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_rigor"))
         .stdin(Stdio::piped())
@@ -117,232 +76,354 @@ fn run_rigor_with_input(input_json: &Value) -> (String, String, i32) {
 
     {
         let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-        stdin.write_all(input_json.to_string().as_bytes())
+        stdin
+            .write_all(input_json.to_string().as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    let output = child.wait_with_output().expect("Failed to read stdout");
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let exit_code = output.status.code().unwrap_or(-1);
+
+    (stdout, stderr, exit_code)
+}
+
+/// Parse stdout as JSON response
+fn parse_response(stdout: &str) -> Value {
+    serde_json::from_str(stdout).expect("Failed to parse JSON response")
+}
+```
+
+**Setup Pattern:**
+Tests use `tempfile::TempDir` for isolated filesystem setup:
+```rust
+#[test]
+fn test_no_config_allows() {
+    let temp = TempDir::new().unwrap();
+    // No rigor.yaml or rigor.lock in temp dir
+    let input = default_input(temp.path());
+    let (stdout, _stderr, exit_code) = run_rigor_in_dir(temp.path(), &input);
+
+    assert_eq!(exit_code, 0);
+    let response = parse_response(&stdout);
+    assert!(
+        response.get("decision").is_none() || response["decision"].is_null(),
+        "No config should allow"
+    );
+}
+```
+
+**Teardown Pattern:**
+- Implicit via `TempDir` drop (automatic cleanup)
+- No explicit teardown code needed
+
+## Integration Test Patterns
+
+**Subprocess-Based Testing:**
+Tests invoke the compiled binary directly via `Command::new(env!("CARGO_BIN_EXE_rigor"))`.
+
+**Example Pattern:**
+```rust
+fn run_rigor_in_dir_with_env(
+    dir: &std::path::Path,
+    input_json: &Value,
+    env_vars: &[(&str, &str)],
+) -> (String, String, i32) {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_rigor"));
+    cmd.current_dir(dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    for (key, val) in env_vars {
+        cmd.env(key, val);
+    }
+
+    let mut child = cmd.spawn().expect("Failed to spawn rigor process");
+    // ... write input, capture output ...
+    (stdout, stderr, exit_code)
+}
+```
+
+**JSON Input/Output:**
+- Tests construct input as `serde_json::Value` (JSON)
+- Tests parse response with `serde_json::from_str()`
+- Assertions on response fields: `response["decision"].is_null()`
+
+## Error Testing
+
+**Pattern: Fail-Open Validation**
+Tests verify that errors result in allow decisions (fail-open principle):
+
+```rust
+#[test]
+fn test_invalid_json_fails_open() {
+    // Invalid JSON input should fail open (return allow with error)
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rigor"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn rigor process");
+
+    {
+        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+        stdin
+            .write_all(b"not valid json")
             .expect("Failed to write to stdin");
     }
 
     let output = child.wait_with_output().expect("Failed to read stdout");
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     let exit_code = output.status.code().unwrap_or(-1);
-    (stdout, stderr, exit_code)
-}
-```
-
-**Patterns observed:**
-- **AAA (Arrange/Act/Assert) implicit**: tests are typically 5–30 lines, no setup/teardown helpers beyond per-file `fn` factories (`raw(...)`, `default_thresholds()`, `setup_production_config()`)
-- **No `#[before_each]` / `#[after_each]`** — `TempDir::new().unwrap()` at the top of each test gives automatic cleanup via `Drop`
-- **Assertion messages are diagnostic**: many `assert!` / `assert_eq!` include a formatted message with the actual value, e.g. `assert_eq!(exit_code, 0, "stderr: {}", stderr)` and `assert_ne!(response["decision"], ..., "Medium-strength violation should not block. Response: {}", stdout)`
-- **`match` on enum outcomes** rather than unwrap + eq: see `crates/rigor/src/violation/collector.rs:188-194` and `crates/rigor/src/fallback/mod.rs:234-241`:
-  ```rust
-  match determine_decision(&violations) {
-      Decision::Warn { violations } => { assert_eq!(violations.len(), 1); }
-      other => panic!("Expected Warn, got {:?}", other),
-  }
-  ```
-
-## Mocking
-
-**Framework:** no dedicated mocking crate (no `mockall`, `mockito`, `wiremock` in `Cargo.toml`). Mocking is done via hand-rolled trait implementations.
-
-**Hand-rolled mock pattern** (from `crates/rigor/tests/egress_integration.rs:13-29`):
-```rust
-struct UppercaseFilter;
-
-#[async_trait]
-impl EgressFilter for UppercaseFilter {
-    fn name(&self) -> &'static str { "uppercase" }
-
-    async fn apply_request(&self, body: &mut Json, _ctx: &mut ConversationCtx) -> Result<(), FilterError> {
-        // test-specific behavior
-        Ok(())
-    }
-}
-```
-
-**Test-dedicated harness crate:** `crates/rigor-harness/` is reserved for shared primitives (`MockAgent`, `MockLLM`, `TestDaemon`, `TestGitRepo`, `MockLSP`, `EventCapture`) — currently a stub (`crates/rigor-harness/src/lib.rs`, 8 lines) with a comment pointing at `docs/superpowers/specs/2026-04-15-test-harness-architecture-design.md` for the intended API.
-
-**Environment-based test injection** replaces most mocking needs:
-- `RIGOR_TEST_CLAIMS` — env var accepted by `crates/rigor/src/lib.rs:145` that overrides transcript extraction with inline JSON claims. Every integration test that evaluates constraints uses this to supply deterministic claims without touching the extractor.
-- `RIGOR_FAIL_CLOSED` — tested by construction in `crates/rigor/src/main.rs:8`
-- `RIGOR_DEBUG` — toggles debug-level tracing, including raw input JSON logging in `crates/rigor/src/hook/input.rs:22`
-
-**What to Mock:**
-- External process boundaries (LSP servers, Claude CLI) — mock the entire subprocess via fixture data
-- Async egress filters — implement the `EgressFilter` trait directly in the test file
-- LLM API calls — bypass with `RIGOR_TEST_CLAIMS`
-
-**What NOT to Mock:**
-- The `rigor` binary itself — integration tests always spawn the real `CARGO_BIN_EXE_rigor` process
-- `regorus` Rego evaluation — run real Rego policies end-to-end
-- `TempDir` / real filesystem — every test writes real `rigor.yaml` + `transcript.jsonl` files and reads them back
-- `tempfile` + real process spawning are preferred over in-memory shims
-
-## Fixtures and Factories
-
-**Test-data builders** are plain functions inside the test file. Example from `crates/rigor/src/violation/collector.rs:134-145`:
-```rust
-fn raw(id: &str, violated: bool, reason: &str) -> RawViolation {
-    RawViolation {
-        constraint_id: id.to_string(),
-        violated,
-        claims: vec!["c1".to_string()],
-        reason: reason.to_string(),
-    }
-}
-
-fn default_thresholds() -> SeverityThresholds {
-    SeverityThresholds::default()
-}
-```
-
-**Integration test factories** for hook input:
-```rust
-// crates/rigor/tests/integration_constraint.rs:50-59
-fn default_input(dir: &std::path::Path) -> Value {
-    json!({
-        "session_id": "test-constraint",
-        "transcript_path": dir.join("transcript.jsonl").to_string_lossy(),
-        "cwd": dir.to_string_lossy(),
-        "permission_mode": "default",
-        "hook_event_name": "stop",
-        "stop_hook_active": false
-    })
-}
-```
-
-**Embedded fixtures via `include_str!`:**
-- `crates/rigor/tests/integration_constraint.rs:85` loads the example YAML: `let example = include_str!("../../../examples/rigor.yaml");`
-- `crates/rigor/tests/dogfooding.rs:16` embeds the production `rigor.yaml`: `const PRODUCTION_RIGOR_YAML: &str = include_str!("../../../rigor.yaml");`
-- `crates/rigor/src/policy/engine.rs:37` embeds the Rego helpers: `include_str!("../../../../policies/helpers.rego")`
-
-**Inline YAML fixtures:** most integration tests hand-write small `rigor.yaml` strings using raw string literals (`r#"..."#`) for readability — see `crates/rigor/tests/integration_constraint.rs:111-125,172-207`.
-
-**Location:** no `fixtures/` directory. Test data lives alongside the tests either as inline strings or as files written to `TempDir` at runtime. Shared project-level fixtures live at `examples/rigor.yaml` and `policies/helpers.rego`.
-
-## Coverage
-
-**Requirements:** no coverage tool configured, no minimum threshold enforced in CI.
-
-**View Coverage:**
-```bash
-# Not part of the toolchain; if needed, use cargo-llvm-cov or tarpaulin:
-cargo install cargo-llvm-cov
-cargo llvm-cov --all-features --html
-```
-
-**Effective coverage today** (based on `#[cfg(test)]` presence per module — `grep -rc '#\[cfg(test)\]' crates/rigor/src/`):
-- Pure-logic modules have inline unit tests (`claim/*`, `constraint/*`, `violation/*`, `policy/*`, `fallback/*`, `hook/*` indirectly via integration)
-- Daemon / TLS / LSP / CLI glue code is exercised through integration tests rather than unit tests (most `cli/*.rs`, `daemon/*.rs`, `lsp/*.rs` lack inline test modules)
-
-## Test Types
-
-**Unit Tests (inline):**
-- Scope: single function or struct in one file
-- Location: bottom of the source file under `#[cfg(test)] mod tests { use super::*; ... }`
-- Examples: `crates/rigor/src/claim/heuristic.rs:187-353` (21 tests), `crates/rigor/src/violation/types.rs:55-93` (6 tests), `crates/rigor/src/violation/collector.rs:130-292` (5 tests)
-
-**Integration Tests:**
-- Scope: full `rigor` binary invocation — stdin JSON in, stdout JSON out
-- Location: `crates/rigor/tests/*.rs`
-- Seven files, each focusing on a subsystem:
-  - `integration_hook.rs` — hook JSON contract (allow/error/metadata)
-  - `integration_constraint.rs` — full constraint pipeline with `RIGOR_TEST_CLAIMS` injection
-  - `true_e2e.rs` — writes real transcript JSONL, tests heuristic extractor end-to-end
-  - `dogfooding.rs` — runs against the production `rigor.yaml`
-  - `claim_extraction_e2e.rs` — claim extraction in isolation
-  - `egress_integration.rs` — async filter chain (`#[tokio::test]`)
-  - `fallback_integration.rs` — retry + fallback policy orchestration
-- All use `tempfile::TempDir` for isolation and `std::process::Command` to spawn the binary
-
-**E2E Tests:**
-- `true_e2e.rs` and `dogfooding.rs` are the closest thing — no Playwright/Cypress-style browser testing
-- `rigor-test` binary (`crates/rigor-test/src/main.rs`) is intended to host Layer 3 (real-agent E2E) and Layer 4 (token-economy benchmarks), currently a stub shipping with `--help` only
-
-**CI Self-Validation:**
-`.github/workflows/ci.yml:57-74` adds a `rigor-validate` job that builds the release binary then runs `./target/release/rigor validate rigor.yaml` against the project's own config — verifying Rigor can parse and validate its own constraints.
-
-## Common Patterns
-
-**Async Testing:**
-```rust
-// crates/rigor/src/fallback/mod.rs:225-241
-#[tokio::test]
-async fn execute_success_returns_ok() {
-    let cfg = FallbackConfig::default_config();
-    let result = cfg
-        .execute("test_comp", || async {
-            Ok::<i32, (FailureCategory, String)>(42)
-        })
-        .await;
-
-    match result {
-        FallbackOutcome::Ok(v) => assert_eq!(v, 42),
-        other => panic!("expected Ok(42), got {:?}", std::mem::discriminant(&other)),
-    }
-}
-```
-
-**Error Testing (fail-open contract):**
-```rust
-// crates/rigor/tests/integration_constraint.rs:249-263
-#[test]
-fn test_invalid_yaml_fails_open() {
-    let temp = TempDir::new().unwrap();
-    fs::write(temp.path().join("rigor.yaml"), "{{{{not valid yaml").unwrap();
-
-    let input = default_input(temp.path());
-    let (stdout, _stderr, exit_code) = run_rigor_in_dir(temp.path(), &input);
 
     assert_eq!(exit_code, 0, "Should exit 0 (fail open)");
+
     let response = parse_response(&stdout);
     assert!(
         response.get("decision").is_none() || response["decision"].is_null(),
-        "Invalid YAML should fail open (allow). Got: {}",
+        "Should allow (fail open)"
+    );
+    assert_eq!(
+        response["metadata"]["error"], true,
+        "Should indicate error in metadata"
+    );
+}
+```
+
+## Test Data & Fixtures
+
+**Location:**
+- Inline JSON fixtures in test files (via `serde_json::json!()` macro)
+- Example configs embedded via `include_str!()`: `let example = include_str!("../../../examples/rigor.yaml");`
+- Test claims created with builder functions
+
+**Example from `benches/hook_latency.rs`:**
+```rust
+fn create_test_claims() -> Vec<Claim> {
+    vec![
+        Claim::new(
+            "The regorus library provides streaming evaluation support".to_string(),
+            0.85,
+            ClaimType::Assertion,
+            Some(SourceLocation {
+                message_index: 0,
+                sentence_index: 0,
+            }),
+        ),
+        // ... more claims
+    ]
+}
+```
+
+**JSON Fixtures:**
+Tests build input JSON inline:
+```rust
+let input = json!({
+    "session_id": "test-session",
+    "transcript_path": temp.path().join("transcript.jsonl").to_string_lossy(),
+    "cwd": temp.path().to_string_lossy(),
+    "permission_mode": "default",
+    "hook_event_name": "stop",
+    "stop_hook_active": false
+});
+```
+
+## Benchmark Patterns
+
+**Framework:** `criterion` with HTML report generation
+
+**Config:**
+```toml
+[[bench]]
+name = "hook_latency"
+harness = false
+
+[[bench]]
+name = "evaluation_only"
+harness = false
+```
+
+**Benchmark Structure (from `hook_latency.rs`):**
+```rust
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn build_constraint_meta(
+    config: &rigor::constraint::types::RigorConfig,
+) -> HashMap<String, ConstraintMeta> {
+    // ... builds test data ...
+}
+
+fn hook_latency_benchmark(c: &mut Criterion) {
+    c.bench_function("full_hook_pipeline", |b| {
+        b.iter(|| {
+            // Benchmark code here
+        })
+    });
+}
+
+criterion_group!(benches, hook_latency_benchmark);
+criterion_main!(benches);
+```
+
+**Targets:**
+- `hook_latency.rs` — measures complete pipeline (goal: <100ms mean)
+- `evaluation_only.rs` — isolates constraint evaluation performance
+
+## Coverage
+
+**Requirements:** None enforced (no coverage targets configured)
+
+**View Coverage:**
+```bash
+# No built-in coverage setup; would require external tool like tarpaulin
+cargo tarpaulin --out Html
+```
+
+## Test Types
+
+**Unit Tests:**
+- None explicitly visible in this codebase
+- Architecture favors integration tests over unit tests
+- Can be added co-located with modules if needed (Rust convention: `#[cfg(test)] mod tests { }`)
+
+**Integration Tests:**
+- Location: `crates/rigor/tests/`
+- Scope: Full pipeline from input to output
+- Pattern: Subprocess invocation with JSON input/output
+- Focus: Behavior verification, not internal state
+
+**E2E Tests:**
+- Tests like `true_e2e.rs`, `claim_extraction_e2e.rs` verify end-to-end behavior
+- May include real configuration files, real claim extraction
+- Test full constraint evaluation loop
+
+**Performance/Benchmark Tests:**
+- Criterion benchmarks in `crates/rigor/benches/`
+- Measure full pipeline and isolated constraint evaluation
+- Generate HTML reports: `target/criterion/`
+
+## Test Examples
+
+**Basic Allow Test (from `integration_hook.rs`):**
+```rust
+#[test]
+fn test_allow_response_no_config() {
+    // No rigor.lock in temp directory = always allow
+    let temp = TempDir::new().unwrap();
+
+    let input = json!({
+        "session_id": "test-session",
+        "transcript_path": temp.path().join("transcript.jsonl").to_string_lossy(),
+        "cwd": temp.path().to_string_lossy(),
+        "permission_mode": "default",
+        "hook_event_name": "stop",
+        "stop_hook_active": false
+    });
+
+    let (stdout, _stderr, exit_code) = run_rigor_with_input(&input);
+
+    assert_eq!(exit_code, 0, "Should exit with code 0");
+
+    let response = parse_response(&stdout);
+    assert!(
+        response.get("decision").is_null(),
+        "Should allow (decision null or absent)"
+    );
+    assert!(
+        response["metadata"]["version"].is_string(),
+        "Should include version in metadata"
+    );
+}
+```
+
+**Config Loading Test (from `integration_constraint.rs`):**
+```rust
+#[test]
+fn test_valid_config_loads() {
+    let temp = TempDir::new().unwrap();
+    // Copy example rigor.yaml to temp dir
+    let example = include_str!("../../../examples/rigor.yaml");
+    fs::write(temp.path().join("rigor.yaml"), example).unwrap();
+
+    let input = default_input(temp.path());
+    let (stdout, stderr, exit_code) = run_rigor_in_dir(temp.path(), &input);
+
+    assert_eq!(exit_code, 0, "stderr: {}", stderr);
+    let response = parse_response(&stdout);
+    // No claims = no violations = allow
+    assert!(
+        response.get("decision").is_null(),
+        "Valid config with no claims should allow. Got: {}",
         stdout
     );
 }
 ```
 
-**Retry / Counter Testing (shared state across closures):**
+**Environment Variable Injection (from `integration_constraint.rs`):**
 ```rust
-// crates/rigor/src/fallback/mod.rs:273-313
-let call_count = Arc::new(AtomicU32::new(0));
-let cc = call_count.clone();
-let result = cfg.execute("retry_comp", move || {
-    let cc = cc.clone();
-    async move {
-        let n = cc.fetch_add(1, Ordering::SeqCst) + 1;
-        if n == 1 { Err(...) } else { Ok(99) }
+fn run_rigor_in_dir_with_env(
+    dir: &std::path::Path,
+    input_json: &Value,
+    env_vars: &[(&str, &str)],
+) -> (String, String, i32) {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_rigor"));
+    cmd.current_dir(dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    for (key, val) in env_vars {
+        cmd.env(key, val);
     }
-}).await;
-
-assert_eq!(call_count.load(Ordering::SeqCst), 2);
+    // ... rest of invocation ...
+}
 ```
 
-**Boundary / Threshold Testing:** exhaustively cover boundary values, naming each explicitly — see `crates/rigor/src/violation/types.rs:55-93` which tests `0.0`, `0.3999999`, `0.4`, `0.6999999`, `0.7`, and `1.0` as separate functions named by boundary.
+## Test-Only Code
 
-**JSON Response Assertions:** always `parse_response(&stdout)` into `serde_json::Value` then drill with `response["metadata"]["version"]`. Check both structure (`.is_string()`, `.is_none()`, `.as_u64()`) and value.
-
-**Benchmark Pattern (Criterion):**
+**Markers:**
 ```rust
-// crates/rigor/benches/hook_latency.rs:128-148
-c.bench_function("full_hook_latency", |b| {
-    b.iter(|| {
-        let raw_violations = engine.evaluate(black_box(&eval_input)).unwrap();
-        let violations = collect_violations(
-            black_box(raw_violations),
-            black_box(&strengths),
-            // ...
-        );
-        black_box(determine_decision(&violations));
-    });
-});
-
-criterion_group!(benches, benchmark_full_hook_pipeline);
-criterion_main!(benches);
+#[cfg(test)]
+mod tests {
+    // Test-only code
+}
 ```
-Setup (config load, engine init, claim creation) happens **outside** `b.iter(|| ...)` so only the measured hot path is timed. Every input is wrapped in `black_box(...)` to prevent dead-code elimination.
+
+**Test Dependency:**
+From `Cargo.toml`:
+```toml
+[dev-dependencies]
+tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
+```
+
+## Helpful Testing Env Vars
+
+**For constraint evaluation:**
+- `RIGOR_TEST_CLAIMS` — Override transcript extraction with JSON claims (for testing)
+- `RIGOR_DEBUG` — Enable debug-level logging
+
+**Example from `lib.rs`:**
+```rust
+let claims = match std::env::var("RIGOR_TEST_CLAIMS") {
+    Ok(json_str) => {
+        match serde_json::from_str::<Vec<Claim>>(&json_str) {
+            Ok(claims) => {
+                info!(count = claims.len(), "Loaded test claims from RIGOR_TEST_CLAIMS");
+                claims
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to parse RIGOR_TEST_CLAIMS, falling back to transcript");
+                extract_claims_from_transcript(Path::new(transcript_path))?
+            }
+        }
+    }
+    Err(_) => extract_claims_from_transcript(Path::new(transcript_path))?
+};
+```
 
 ---
 

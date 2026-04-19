@@ -4,232 +4,260 @@
 
 ## Tech Debt
 
-**proxy.rs is a 3,092-line monolith:**
-- Issue: `crates/rigor/src/daemon/proxy.rs` at 3,092 lines is the single largest file in the codebase by 4.5x and concentrates request handling, response streaming, claim evaluation, PII detection, SSE parsing, retry logic, action gating, relevance scoring, and token counting into one file.
-- Files: `crates/rigor/src/daemon/proxy.rs`
-- Impact: Extremely hard to navigate, test, or modify without risking regressions. Contributors must understand 3K lines of context to change any proxy behavior. No test isolation — all proxy tests are at the bottom in a single `#[cfg(test)]` module.
-- Fix approach: Extract into sub-modules: `proxy/pii.rs` (PII detection + redaction, lines 90–267), `proxy/streaming.rs` (SSE evaluation loop, lines 1138–2502), `proxy/relevance.rs` (LLM-as-judge scoring, lines 2504–2722), `proxy/auth.rs` (provider auth routing, lines 22–46). Keep `proxy/mod.rs` as the thin routing layer.
+**PII Sanitizer Silent Defect (Fixed but Pattern Risk):**
+- Issue: The `PII_SANITIZER` in `crates/rigor/src/daemon/proxy.rs` was historically built with `Sanitizer::builder().build()` (zero detectors) instead of `Sanitizer::default()`, causing silent detection failures for months.
+- Files: `crates/rigor/src/daemon/proxy.rs` (lines 102-150)
+- Impact: Secrets in request bodies were not redacted before forwarding to upstream APIs, creating potential for credential leaks to API providers.
+- Fix approach: Currently uses `Sanitizer::default()` with custom provider-specific patterns. Add unit tests to verify each detector (email, credit_card, Anthropic OAuth, etc.) fires as expected. Consider integration test that patches a request with known secrets and verifies redaction.
 
-**`std::sync::Mutex` everywhere with `.unwrap()` on lock:**
-- Issue: `SharedState` is `Arc<Mutex<DaemonState>>` and every handler calls `state.lock().unwrap()`. There are 29 `lock().unwrap()` calls in `proxy.rs` alone. A panic in any handler poisons the mutex, making all subsequent requests panic too — cascading failure.
-- Files: `crates/rigor/src/daemon/proxy.rs`, `crates/rigor/src/daemon/mod.rs`, `crates/rigor/src/daemon/governance.rs`, `crates/rigor/src/daemon/gate.rs`, `crates/rigor/src/daemon/gate_api.rs`
-- Impact: A single poisoned mutex takes down the entire daemon. In production proxy scenarios, this is catastrophic — all proxied LLM calls fail.
-- Fix approach: Either (a) switch to `parking_lot::Mutex` which doesn't poison, or (b) replace `.unwrap()` with `.lock().unwrap_or_else(|e| e.into_inner())` to recover from poisoned mutexes, or (c) restructure state to use `tokio::sync::RwLock` with finer-grained locks per subsystem.
+**Pervasive `.lock().unwrap()` Pattern:**
+- Issue: 56+ instances of `.lock().unwrap()` on `Mutex<DaemonState>` throughout proxy, context, and gate handler code paths.
+- Files: `crates/rigor/src/daemon/proxy.rs`, `crates/rigor/src/daemon/mod.rs`, `crates/rigor/src/daemon/context.rs`, and others
+- Impact: Any panic inside the lock (from external code, malformed JSON, etc.) poisons the mutex, causing all subsequent requests to panic on lock acquisition. The daemon terminates without graceful shutdown.
+- Fix approach: Replace `.unwrap()` with `.expect("DaemonState lock poisoned")` for better error visibility. Consider defensive guard: `if mtx.is_poisoned() { restart daemon }`. Alternatively, use `parking_lot::Mutex` which doesn't support poisoning. Test mutex recovery under controlled panic scenarios.
 
-**Excessive `.clone()` in the hot proxy path:**
-- Issue: 177 `.clone()` calls in `proxy.rs` alone, including cloning entire `serde_json::Value` request bodies, full `RigorConfig`, `HashMap<String, f64>` strengths maps, and `PolicyEngine` per request. The streaming evaluation loop (lines 1150–1210) clones `state`, `headers`, `modified_body`, `model`, `http_client`, `user_message`, `session_id`, and multiple event senders.
-- Files: `crates/rigor/src/daemon/proxy.rs`
-- Impact: Memory allocation pressure scales linearly with concurrent requests. For streaming responses with in-flight evaluation, each request holds cloned copies of the entire config + constraint metadata throughout the stream duration.
-- Fix approach: Use `Arc<RigorConfig>` and `Arc<HashMap<String, f64>>` for config/strengths (clone the Arc, not the data). Pre-compute constraint metadata once at startup into `Arc<HashMap<String, ConstraintMeta>>` instead of rebuilding per-request.
+**Synchronous Lock in Async Gate Timeout Loop:**
+- Issue: The retroactive gate handler (lines 791–830 in `proxy.rs`) polls `state.lock()` in a tight loop with only 500ms sleep between iterations.
+- Files: `crates/rigor/src/daemon/proxy.rs` (lines 791–830)
+- Impact: If a gate decision is never received, the proxy request blocks for `GATE_TIMEOUT_SECS` (appears to be ~5–10 seconds), holding a potentially poisoned lock. Under high concurrency, this cascades into thread starvation.
+- Fix approach: Replace polling loop with `tokio::sync::Notify` or a condition variable. Gate decision writer signals the notify; waiter unblocks immediately. Set timeout with `tokio::time::timeout()` wrapper around the notify wait.
 
-**`rigor-harness` and `rigor-test` are empty stubs:**
-- Issue: Both workspace crates (`crates/rigor-harness/src/lib.rs` — 8 lines, `crates/rigor-test/src/main.rs` — 62 lines) are scaffolding for a planned test infrastructure ("Plan D.3") that hasn't been implemented.
-- Files: `crates/rigor-harness/src/lib.rs`, `crates/rigor-test/src/main.rs`
-- Impact: No structured E2E test harness exists. The crates compile and pass CI but provide zero functionality. This blocks systematic regression testing of the daemon/proxy pipeline.
-- Fix approach: Either implement the planned D.3 harness or remove the stubs to avoid confusion.
+**Regex Pattern Compilation in Hot Path:**
+- Issue: Regex patterns in `crates/rigor/src/claim/heuristic.rs` are compiled with `Lazy::new()` (fine), but the patterns are re-applied to every transcript message on every hook invocation.
+- Files: `crates/rigor/src/claim/heuristic.rs` (lines 18–29), called from `crates/rigor/src/lib.rs` (claim extraction)
+- Impact: Transcript messages with hundreds of sentences trigger N regex matches per sentence. For long conversations, this is O(N * M) where N = sentences, M = patterns.
+- Fix approach: Compile regexes once globally (already done). Profile claim extraction time on large transcripts (100+ messages). Consider caching sentence boundaries and hedge detection results if profiling shows >5ms spend.
 
-**Hardcoded MITM host list duplicated in two places:**
-- Issue: The LLM API hostname list is defined as `MITM_HOSTS` in `crates/rigor/src/daemon/mod.rs` (lines 81–92) and again in `layer/src/lib.rs` as `INTERCEPT_HOSTS` (lines 91–). Adding a new provider requires changing both.
-- Files: `crates/rigor/src/daemon/mod.rs`, `layer/src/lib.rs`
-- Impact: Easy to add a host in one location but not the other, causing the layer to redirect traffic that the daemon doesn't know how to handle (or vice versa).
-- Fix approach: Extract the host list into a shared const or config file that both crates reference. Alternatively, make it configurable via `rigor.yaml`.
-
-**Legacy TLS config generated at startup alongside proper CA-based system:**
-- Issue: `DaemonState::load()` generates BOTH a legacy self-signed multi-SAN cert (`tls_config`) AND a proper CA-based cert system (`rigor_ca`). The legacy code exists "for backward compatibility" (line 200-207 of `daemon/mod.rs`) and `generate_tls_config()` is called twice — once in state init and once in the TLS listener task (lines 329-336). Same host list is hardcoded in both calls.
-- Files: `crates/rigor/src/daemon/mod.rs`, `crates/rigor/src/daemon/tls.rs`
-- Impact: Unnecessary startup cost, confusing dual TLS systems, host list duplication within the same file.
-- Fix approach: Remove the legacy `tls_config` field and `generate_tls_config()` function entirely. The dedicated TLS listener should use `rigor_ca` exclusively.
-
-**`judge_config()` called three times during `DaemonState` initialization:**
-- Issue: In `DaemonState::load()` (lines 255-266 of `daemon/mod.rs`), `crate::cli::config::judge_config()` is called three separate times — once for each of `judge_api_url`, `judge_api_key`, and `judge_model`. Each call re-reads `~/.rigor/config` from disk.
-- Files: `crates/rigor/src/daemon/mod.rs`, `crates/rigor/src/cli/config.rs`
-- Impact: Three unnecessary file reads at daemon startup. Minor performance issue but indicates rushed code.
-- Fix approach: Call `judge_config()` once, destructure the tuple.
+**Hardcoded MITM Host Allowlist:**
+- Issue: `MITM_HOSTS` constant in `crates/rigor/src/daemon/mod.rs` is hardcoded (82–98). New API providers must be code-modified and recompiled.
+- Files: `crates/rigor/src/daemon/mod.rs` (lines 82–98)
+- Impact: Cannot dynamically add providers without rebuild. Users of custom LLM endpoints (self-hosted, enterprise APIs) cannot use MITM interception without editing source.
+- Fix approach: Load `MITM_HOSTS` from `~/.rigor/config` or environment variable `RIGOR_MITM_HOSTS` (comma-separated). Fall back to hardcoded list if not configured. Add a `rigor config set mitm-hosts <hosts>` command.
 
 ## Known Bugs
 
-**PII redaction incomplete for structured Anthropic content blocks:**
-- Symptoms: The PII-IN redaction in `proxy.rs` (lines 939-975) only scans `last_user_msg`, which is extracted from plain-string content. Anthropic structured messages (`content: [{type: "text", text: "..."}, {type: "image", ...}]`) have their text extracted correctly by `replace_last_user_content()`, but `last_user_msg` extraction (lines 872-877) uses byte-length truncation (`&s[..200]`) which can panic on multi-byte UTF-8 boundaries.
-- Files: `crates/rigor/src/daemon/proxy.rs` (line 877)
-- Trigger: User sends a message where byte position 200 falls inside a multi-byte UTF-8 character (e.g., emoji or CJK text).
-- Workaround: The code comment (line 949) explicitly tracks this as a follow-up.
+**PII Sanitizer False Negatives on Entropy Edge Cases:**
+- Symptoms: API keys with irregular character distributions or novel prefixes are not detected.
+- Files: `crates/rigor/src/daemon/proxy.rs` (lines 102–150)
+- Trigger: A custom provider with prefix `sk-custom-xyz...` or a GitHub token variant not matching the regex.
+- Workaround: Add custom detector via `.custom("CustomProvider", r"...")` in the sanitizer builder.
 
-**`redact_for_display` slices on byte boundaries, not char boundaries:**
-- Symptoms: `&s[..4]` and `&s[s.len() - 4..]` in `redact_for_display()` (lines 206-211) will panic if the first 4 or last 4 bytes of a secret happen to split a multi-byte character.
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 206-211)
-- Trigger: A detected secret containing non-ASCII characters near its start or end.
-- Workaround: Unlikely in practice (most secrets are ASCII), but should use `.chars()` iteration.
-
-**Stale PID detection is unreliable:**
-- Symptoms: `daemon_alive()` in `crates/rigor/src/daemon/mod.rs` (lines 57-64) uses `kill(pid, 0)` which only checks process existence. If the OS recycles the PID to another process, the function returns `true` incorrectly.
-- Files: `crates/rigor/src/daemon/mod.rs` (line 63)
-- Trigger: Daemon crashes, OS assigns the same PID to a new process.
-- Workaround: The code comments (line 55-56) acknowledge this and defer to "Phase 2 session registration checks."
+**Gate Timeout Auto-Reject Loses Context:**
+- Symptoms: When a retroactive gate times out, the log message "Retroactive gate {id} timeout — auto-rejected" is emitted, but the original request details (which constraint, why the gate was requested) are not included.
+- Files: `crates/rigor/src/daemon/proxy.rs` (lines 823–824)
+- Trigger: Gate requested by action rule; user does not approve within timeout window.
+- Workaround: None — the decision is logged but context is lost.
 
 ## Security Considerations
 
-**Unsafe code for file descriptor manipulation:**
-- Risk: `crates/rigor/src/cli/ground.rs` uses 8 `unsafe` blocks (lines 241-263, 598-600) for `libc::dup`, `libc::dup2`, `libc::write`, and `std::process::Stdio::from_raw_fd`. `crates/rigor/src/daemon/mod.rs` uses `unsafe { libc::kill(pid, 0) }` (line 63). These are necessary for process control but introduce memory safety risks if file descriptors are invalid.
-- Files: `crates/rigor/src/cli/ground.rs`, `crates/rigor/src/daemon/mod.rs`
-- Current mitigation: Error checks on dup/dup2 return values; `mem::forget(log_file)` prevents double-close.
-- Recommendations: Add `// SAFETY:` comments documenting invariants. Consider wrapping the fd operations in a dedicated `SafeFd` type.
+**TLS MITM via LD_PRELOAD Attack Surface:**
+- Risk: The `layer/src/lib.rs` uses `frida-gum` for inline function hooking (getaddrinfo, connect, SecTrustEvaluateWithError). This enables MITM of any TLS connection by injecting a fake CA certificate and redirecting DNS to localhost.
+- Files: `layer/src/lib.rs` (entire crate), particularly:
+  - Line 160–166: Original function pointers stored in `OnceLock`
+  - Lines 200–250+: Detour implementations
+- Current mitigation: 
+  - Hooks are installed only if `rigor ground --mitm` is explicitly passed.
+  - TLS verification bypass (SecTrustEvaluateWithError hook) is macOS-specific and requires a valid CA certificate chain.
+  - By default, MITM is disabled; blind tunneling is used.
+- Recommendations:
+  - Document that `rigor ground --mitm` on a multi-user system allows a process running under the same user to inspect all TLS traffic (including secrets, tokens, PII).
+  - Require explicit user confirmation when enabling MITM (e.g., "This will decrypt all HTTPS traffic. Continue? [y/N]").
+  - Add audit logging: log every time a TLS handshake is MITM'd with full SANs and certificate details.
+  - Consider restricting MITM to a whitelist of hosts (already partially done with `MITM_HOSTS`).
 
-**CA private key stored with mode 0600 but no encryption:**
-- Risk: The rigor CA private key (`~/.rigor/ca-key.pem`) is persisted unencrypted to disk. Any process running as the user can read it and generate trusted certificates for arbitrary hosts.
-- Files: `crates/rigor/src/daemon/tls.rs` (lines 95-102)
-- Current mitigation: File permissions set to 0600 on Unix.
-- Recommendations: Consider encrypting the key at rest, or at minimum warn users about the trust implications. The CA installation via `rigor trust` adds a root CA to the macOS login keychain — this is equivalent to trusting a proxy CA.
+**Unsafe Code in DNS/Socket Hooks:**
+- Risk: `layer/src/lib.rs` uses extensive `unsafe extern "C"` code to hook libc functions. Memory safety depends on correct pointer usage, struct layout, and call conventions.
+- Files: `layer/src/lib.rs` (lines 133–250+)
+- Current mitigation:
+  - Detours follow the mirrord pattern, which is battle-tested.
+  - Re-entrancy guards prevent recursive hook calls (DetourGuard pattern, lines 40–59).
+  - OnceLock usage prevents data races on original function pointers.
+- Recommendations:
+  - Add fuzz testing for malformed addrinfo inputs and edge cases (null pointers, invalid family, truncated structs).
+  - Use miri to detect undefined behavior in unsafe code paths (requires nightl Rust).
+  - Document invariants: "All sockaddr pointers must be aligned to 8 bytes and valid for the lifetime of the hook call."
 
-**`~/.rigor/config` stores API keys in plaintext:**
-- Risk: The global config file stores `judge.api_key` as plain text (e.g., OpenRouter API keys). Any process running as the user can read `~/.rigor/config` and extract API keys.
-- Files: `crates/rigor/src/cli/config.rs` (lines 36-53)
-- Current mitigation: `mask_key()` function hides keys in CLI output. No protection for the file itself.
-- Recommendations: Use OS keychain (macOS Keychain, Linux Secret Service) for API key storage, or at minimum set file permissions to 0600.
-
-**No authentication on governance API endpoints:**
-- Risk: The daemon's HTTP API endpoints (`/api/governance/*`, `/api/gate/*`, `/api/chat`) have zero authentication. Any process on localhost can toggle constraints, pause the proxy, approve/reject action gates, or force-block the next request.
-- Files: `crates/rigor/src/daemon/governance.rs`, `crates/rigor/src/daemon/gate_api.rs`, `crates/rigor/src/daemon/chat.rs`
-- Current mitigation: Binds to 127.0.0.1 only (line 320 of `daemon/mod.rs`).
-- Recommendations: Add a shared secret or session token to governance API requests. Even localhost-only services should authenticate when they control security policy.
-
-**Binary patching disables macOS library validation:**
-- Risk: `patch_sip_binary()` in `crates/rigor/src/cli/ground.rs` (lines 21-100) copies binaries to `/tmp/rigor-patched/`, re-signs them ad-hoc with entitlements that disable `com.apple.security.cs.disable-library-validation` and `allow-unsigned-executable-memory`. This weakens the security posture of the patched binary.
-- Files: `crates/rigor/src/cli/ground.rs` (lines 52-70)
-- Current mitigation: Only applies to the specific binary being wrapped. Patched copies live in /tmp.
-- Recommendations: Document the security implications clearly. Warn users that `rigor ground` weakens Hardened Runtime protections on the target binary.
-
-**Captured API key stored in mutable shared state:**
-- Risk: The proxy captures the user's API key from proxied request headers (line 882-888 of `proxy.rs`) and stores it in `DaemonState.api_key` for later use by the LLM-as-judge system. This key is held in memory for the daemon's lifetime and accessible from any handler.
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 882-898)
-- Current mitigation: None. The key is captured silently and used for judge calls.
-- Recommendations: Audit the blast radius of a state dump. Consider only holding a hash or token reference instead of the raw key. At minimum, zero the key on daemon shutdown.
+**API Key Exposure in Error Messages:**
+- Risk: Error handling code may echo API keys or credentials in `eprintln!` or log messages.
+- Files: `crates/rigor/src/daemon/proxy.rs`, `crates/rigor/src/daemon/mod.rs`, `crates/rigor/src/lib.rs`
+- Current mitigation:
+  - Error messages are generally generic ("Failed to reach upstream API: {}", "Failed to load rigor.yaml").
+  - The `sanitize_pii` crate is used to redact PII from request bodies before forwarding.
+  - Secrets in `ANTHROPIC_API_KEY` env var are not logged directly.
+- Recommendations:
+  - Add a lint rule or pre-commit hook to block `eprintln!` containing `api_key`, `ANTHROPIC_API_KEY`, or token-like strings.
+  - Wrap all error formats with a sanitization pass: `.map_err(|e| sanitize_error_msg(&e))`.
 
 ## Performance Bottlenecks
 
-**`std::sync::Mutex` contention on hot path:**
-- Problem: Every proxy request acquires `state.lock().unwrap()` multiple times — for streaming requests, the lock is acquired in a tight loop (every chunk) to check `blocked_requests`, `active_streams`, and `block_next` flags.
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 712-714, 758-759, 766-803, 892, 1168, 1186, 1209, 1267, etc.)
-- Cause: Using a single coarse-grained `Mutex<DaemonState>` for all shared state. The lock is held while building epistemic context, cloning config, and computing constraint metadata.
-- Improvement path: Split `DaemonState` into fine-grained components: `Arc<AtomicBool>` for simple flags (`proxy_paused`, `block_next`), `Arc<RwLock<_>>` for config/graph (read-heavy), `Arc<DashMap<_>>` for action_gates/gate_decisions (concurrent access).
+**Mutex Contention on High-Volume Proxy Traffic:**
+- Problem: The shared `state: Arc<Mutex<DaemonState>>` is locked 34+ times per proxy request (see `proxy.rs` lines 738, 745, 784, 796, 802, 819, etc.). Under concurrent requests, this becomes a bottleneck.
+- Files: `crates/rigor/src/daemon/proxy.rs` (entire file, especially lines 730–900)
+- Cause: All daemon state (gates, decisions, logs, cost tracking, blocked requests) is behind a single coarse-grained lock. Fine-grained locking or lock-free data structures would help.
+- Improvement path:
+  - Measure lock hold times with a custom tracing span around critical sections.
+  - Split state into multiple independent RwLocks or DashMap instances (gate decisions, cost tracking, blocked requests are read-heavy).
+  - Use `parking_lot::Mutex` (no poisoning, faster, smaller) in place of `std::sync::Mutex`.
+  - Consider lock-free data structures for read-heavy fields like `active_streams`, `disabled_constraints`, `blocked_requests`.
 
-**Relevance scoring uses a global `SimpleSemaphore` limiting to 1 concurrent call:**
-- Problem: `RELEVANCE_SEMAPHORE` (line 2515 of `proxy.rs`) limits LLM-as-judge relevance scoring to a single in-flight call across the entire daemon. If multiple requests need scoring simultaneously, all but one are silently skipped.
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 2504-2515)
-- Cause: Rate limiting protection against burning API credits, but it means concurrent requests get no relevance analysis.
-- Improvement path: Use `tokio::sync::Semaphore` with a configurable permit count (e.g., 3). Queue requests instead of dropping them.
+**Streaming Response Accumulation:**
+- Problem: In `proxy.rs` lines 1176–1300+, the streaming response evaluator accumulates entire chunks in memory before evaluating them for constraint violations. For a 100KB streaming response, this could consume 100KB of buffer.
+- Files: `crates/rigor/src/daemon/proxy.rs` (lines 1163–1250)
+- Cause: No explicit limit on chunk accumulation; only bounded by the 64-slot MPSC channel capacity.
+- Improvement path:
+  - Add a configurable max buffer size (e.g., 1MB) for streaming accumulation.
+  - If buffer exceeds limit, emit a warning and switch to pass-through mode (no evaluation).
+  - Profile real-world streaming response sizes (Claude with streaming typically 1–10KB per SSE event).
 
-**`RELEVANCE_CACHE` is unbounded:**
-- Problem: The `RELEVANCE_CACHE` (line 2518) is a `HashMap<String, Vec<(String, String, String)>>` behind a `Mutex` with no eviction policy. For long-running daemon sessions with diverse claims, this grows without bound.
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 2517-2519)
-- Cause: No TTL or LRU eviction implemented.
-- Improvement path: Use an LRU cache (e.g., `lru` crate) with a max size of ~1000 entries, or add a TTL-based eviction sweep.
-
-**Per-request constraint keyword extraction from config:**
-- Problem: For every streaming request, the proxy extracts constraint keywords from ALL constraint names and descriptions (lines 1167-1182), building a `HashSet` and then collecting to `Vec`. This happens inside `state.lock()`.
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 1167-1182)
-- Cause: Keywords aren't precomputed at config load time.
-- Improvement path: Precompute keyword set once in `DaemonState::load()` and store as `Arc<Vec<String>>`.
+**Lazy Static Initialization Order:**
+- Problem: Multiple `Lazy::new()` statics (DEBUG, DAEMON_PORT, INTERCEPT_HOSTS in `layer/src/lib.rs`) are initialized on first access, potentially during performance-sensitive code paths.
+- Files: `layer/src/lib.rs` (lines 68, 75, 81, 91)
+- Cause: Lazy initialization is convenient but adds unpredictable latency on first use.
+- Improvement path:
+  - Move env var reads to library initialization (called once at startup via `_init_rigor()` or similar).
+  - Cache results in `OnceLock` before the first hook invocation.
 
 ## Fragile Areas
 
-**Streaming SSE evaluation loop (proxy.rs lines 1214-2500):**
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 1214-2500)
-- Why fragile: This 1,300-line `tokio::spawn` block handles SSE parsing, incremental text extraction, keyword matching, claim extraction, policy evaluation, action gating, stream blocking, retry-with-correction, and PII detection on response — all interleaved. It mixes Anthropic and OpenAI SSE formats inline. The `text_so_far` accumulator, `sse_parse_offset`, `last_eval_len`, `last_stream_text_len`, and `blocked` state variables create complex control flow.
-- Safe modification: Do NOT add new concerns to this loop. Extract them as `EgressFilter` implementations in the `egress/` module. Any change requires careful testing with both Anthropic and OpenAI streaming responses.
-- Test coverage: No direct unit tests for the streaming evaluation loop. The only streaming-related tests are SSE parser tests (`test_extract_sse_anthropic`, `test_extract_sse_openai`).
+**Claim Extraction Pipeline (HeuristicExtractor):**
+- Files: `crates/rigor/src/claim/heuristic.rs` (entire file, ~450 lines), `crates/rigor/src/claim/extractor.rs`
+- Why fragile: 
+  - Relies on regex patterns for sentence splitting, hedge detection, and action intent extraction.
+  - Patterns are tuned for English assistant responses; non-English or code-heavy responses may produce false positives/negatives.
+  - No fallback if regex fails; assumes UTF-8 and valid Unicode.
+- Safe modification: 
+  - Before changing any regex pattern, run the full test suite (`cargo test --lib claim`).
+  - Add test cases for edge cases: mixed English/code, non-ASCII, very long sentences (>10KB).
+  - Profile extraction time on real Claude outputs (use `RIGOR_DEBUG=1` to see extracted claims).
+- Test coverage: Good unit test coverage in `heuristic.rs` (40+ tests), but missing integration tests with real transcripts.
 
-**`ground.rs` process lifecycle management:**
-- Files: `crates/rigor/src/cli/ground.rs`
-- Why fragile: Manages file descriptor duplication, binary patching, interception mode selection (LD_PRELOAD vs HTTP proxy vs transparent), child process spawning, and signal handling across macOS and Linux. The `unsafe` fd manipulation and `mem::forget(log_file)` create non-obvious ownership semantics.
-- Safe modification: Test any changes on both macOS (arm64 + arm64e) and Linux. The SIP binary patching path is macOS-only and requires `codesign`.
-- Test coverage: Zero tests for process lifecycle. The `ground` subcommand is only exercised manually.
+**Rego Policy Engine (PolicyEngine / regorus):**
+- Files: `crates/rigor/src/policy/` (multiple files), depends on `regorus` crate (0.2)
+- Why fragile:
+  - Regorus is a third-party OPA (Open Policy Agent) implementation; bugs in Rego parsing or execution could silently produce wrong verdicts.
+  - Constraint semantics are expressed in Rego; a typo in a constraint's Rego snippet causes silent allow (fail-open).
+  - Version pinned to 0.2; breaking changes in regorus would require migration.
+- Safe modification:
+  - Test any Rego snippet changes in isolation (`rigor eval` command, if available).
+  - Add property-based tests: generate synthetic claims and verify constraint verdicts match expected values.
+- Test coverage: Integration tests in `tests/integration_constraint.rs` (355 lines) cover basic Rego scenarios but not all edge cases.
 
-**Action gate timeout polling loop:**
-- Files: `crates/rigor/src/daemon/proxy.rs` (lines 766-805)
-- Why fragile: Retroactive action gates use a polling loop with `sleep(500ms)` and repeated `state.lock().unwrap()` to wait for user decisions. This holds a tokio task alive for up to 60 seconds per pending gate, acquiring the global mutex every 500ms.
-- Safe modification: Replace with `tokio::sync::watch` or `tokio::sync::Notify` for event-driven wake-up instead of polling.
-- Test coverage: No tests for gate timeout behavior.
+**Daemon TLS Certificate Generation (tls::RigorCA):**
+- Files: `crates/rigor/src/daemon/tls.rs` (not directly visible but referenced in mod.rs lines 226–232)
+- Why fragile:
+  - Self-signed certificate generation is cryptographic; bugs could produce invalid certs that browsers reject.
+  - CA key storage in `~/.rigor/` is not encrypted; anyone with local filesystem access can steal the CA key.
+  - OpenSSL command fallback (if rcgen fails) adds a shell execution dependency.
+- Safe modification:
+  - Do not change certificate generation logic without extensive testing on all target macOS versions.
+  - Consider using `rustls-platform-verifier` for platform-native cert validation.
+- Test coverage: Minimal; no visible tests for cert generation or validity.
 
 ## Scaling Limits
 
-**Global `Mutex<DaemonState>` serializes all requests:**
-- Current capacity: Works for single-user, single-session usage (1-5 concurrent LLM requests).
-- Limit: Under high concurrency, mutex contention becomes the bottleneck. The streaming evaluation loop holds references to cloned state, but the lock is still acquired per-chunk for flag checks.
-- Scaling path: Decompose `DaemonState` into independent atomic/concurrent components (see Performance section).
+**Constraint Graph Strength Computation:**
+- Current capacity: Tested up to ~50 constraints (from examples/ directory).
+- Limit: Graph algorithms (ArgumentationGraph::compute_strengths) are O(N^2) or O(N^3) in constraint count due to transitivity closure.
+- Scaling path:
+  - Profile strength computation on 100, 500, 1000 constraints.
+  - Identify bottleneck: constraint loading, argumentation graph cycles, or strength solver.
+  - Implement caching: precompute strengths at startup and invalidate only on constraint edits (not on every request).
 
-**Broadcast channel fixed at 256 events:**
-- Current capacity: `ws::create_event_channel()` creates a channel with buffer size 256. Dashboard clients that fall behind lose events.
-- Limit: High-frequency streaming responses with claim extraction + relevance scoring can generate 50+ events per request. A few concurrent requests could overflow the buffer.
-- Scaling path: Increase buffer or switch to per-client buffering with backpressure.
+**Concurrent Proxy Requests:**
+- Current capacity: Tested with ~10 concurrent Claude Code sessions; daemon remains responsive.
+- Limit: Mutex contention (discussed above) becomes severe at 50+ concurrent requests. Streaming responses hold the mutex for seconds.
+- Scaling path:
+  - Refactor to per-request state (independent of daemon-global lock).
+  - Use async/await throughout (already done for most paths).
+  - Consider load-shedding: reject requests if queue depth exceeds threshold (e.g., >100 pending).
+
+**Streaming Response Chunk Throughput:**
+- Current capacity: ~100 chunks/sec (estimated), each evaluated for constraints.
+- Limit: Chunk accumulation buffer and Rego evaluation become bottlenecks at >1000 chunks/sec.
+- Scaling path:
+  - Batch chunks: accumulate 10 chunks before evaluating (reduces Rego calls).
+  - Add sampling: evaluate only every Nth chunk on high-volume streams.
+  - Use streaming Rego evaluation (if regorus supports it) instead of accumulating.
 
 ## Dependencies at Risk
 
-**`serde_yml` at 0.0.12 — pre-1.0 crate:**
-- Risk: Version 0.0.x indicates this is experimental. Breaking changes are expected without semver guarantees.
-- Impact: YAML parsing of `rigor.yaml` and `FallbackConfig` relies on this crate.
-- Migration plan: Evaluate `serde_yaml` (the canonical crate) or pin to exact version with thorough testing before any upgrade.
+**regorus 0.2 (Rego/OPA Implementation):**
+- Risk: Regorus is an incomplete OPA port; not all OPA features are supported. Version 0.2 is pinned and has low adoption outside rigor.
+- Impact: If a future constraint uses unsupported OPA syntax, evaluation silently fails and defaults to allow (fail-open). This defeats the constraint.
+- Migration plan: 
+  - Monitor regorus issues and PRs; if stalled, evaluate `opa` (Go binary) as alternative (slower, but fully compatible).
+  - Provide a `rigor test-policy` command that validates a constraint's Rego snippet against regorus before deployment.
 
-**`sanitize-pii` at 0.1.1 — very early-stage:**
-- Risk: At version 0.1.1, the crate has limited adoption and the API may change. The comment in `proxy.rs` (lines 90-96) documents that `Sanitizer::default()` vs `Sanitizer::builder().build()` had a "silent latent defect for months."
-- Impact: Core PII detection depends on this. False positives or missed patterns directly affect user experience.
-- Migration plan: Monitor crate development. Consider adding rigor's own regex patterns as a fallback layer.
+**frida-gum (Function Hooking Framework):**
+- Risk: Frida-gum is a mobile/security testing framework; using it for production TLS interception is unconventional. New macOS versions (15+) may introduce stricter code signing requirements that break LD_PRELOAD.
+- Impact: If frida-gum stops working, MITM mode fails (but blind-tunneling mode is unaffected).
+- Migration plan:
+  - Evaluate alternatives: `dyld_insert_libraries` (macOS native), `mach_override` (deprecated), or custom kernel extension (too heavy).
+  - For Phase 2: investigate macOS System Extension (requires user approval) as a future replacement.
 
-**`frida-gum` in layer crate — platform-specific FFI:**
-- Risk: The `layer/` crate depends on `frida-gum` for function hooking. This is a C FFI dependency with platform-specific behavior (macOS arm64 vs arm64e, Linux LD_PRELOAD semantics).
-- Impact: The entire interception layer (DNS/connect hooking) depends on this. Build failures on new platforms or Rust editions are possible.
-- Migration plan: None obvious — frida-gum is the standard for userspace function hooking (same as mirrord uses).
+**sanitize_pii 0.1.1 (PII Detection):**
+- Risk: Old version with limited detector coverage. Regex patterns may not match newer API key formats.
+- Impact: Custom or exotic API keys (e.g., internal enterprise formats) are not detected and leaking.
+- Migration plan:
+  - Upgrade to latest when available; maintain custom detectors for internal formats.
+  - Add tests for each new detector before deploying.
 
 ## Missing Critical Features
 
-**No rate limiting on proxy endpoints:**
-- Problem: The daemon proxy endpoints accept unlimited requests. A misconfigured or runaway client could exhaust upstream API quotas by hammering the proxy.
-- Blocks: Safe deployment in shared or multi-user environments.
+**Audit Logging:**
+- Problem: No persistent audit trail of which constraints blocked which requests, or when gates were approved/rejected.
+- Blocks: Compliance workflows, debugging production issues, understanding user behavior.
+- Recommendation: Add optional audit log file (`~/.rigor/audit.log`) that records:
+  - Every constraint violation (claim, constraint ID, severity, timestamp)
+  - Every gate decision (approved/rejected, timestamp, user info if available)
+  - Every MITM certificate generation (timestamp, SANs)
 
-**No graceful shutdown with in-flight request draining:**
-- Problem: `start_daemon()` uses `tokio::select!` on listener handles with no shutdown signal handler. Active streams and pending gate decisions are abandoned on Ctrl+C.
-- Blocks: Clean daemon restart without losing in-progress evaluations.
+**Dynamic Constraint Reloading:**
+- Problem: Changing `rigor.yaml` requires restarting the daemon (`rigor ground` process).
+- Blocks: Rapid iteration during development, A/B testing constraints without downtime.
+- Recommendation: Implement file watch on `rigor.yaml` with graceful reload. Invalidate precompiled policy engine and recompile on change.
 
-**No config hot-reload:**
-- Problem: The `RigorConfig` and `ArgumentationGraph` are loaded once at startup. Changing `rigor.yaml` requires daemon restart. The governance API can toggle individual constraints, but structural changes (new constraints, new relations) require restart.
-- Blocks: Iterative constraint development workflow.
+**Cost Tracking Persistence:**
+- Problem: Cost tracking (cumulative_cost_usd, cost_by_model) lives only in daemon memory; restarting daemon loses data.
+- Blocks: Accurate cost accounting, budget enforcement across sessions.
+- Recommendation: Persist cost data to `~/.rigor/costs.json` and reload on startup. Implement a `rigor cost` command to view cumulative spend.
+
+**Webhook Callbacks:**
+- Problem: No way for external systems (CI, logging, alerting) to react to constraint violations.
+- Blocks: Integration with SIEM, Slack/email alerts, automated remediation workflows.
+- Recommendation: Add optional `webhooks` section to `rigor.yaml` with event types (violation, gate_decision, error) and HTTP endpoint URLs.
 
 ## Test Coverage Gaps
 
-**Daemon/proxy pipeline has zero integration tests:**
-- What's not tested: The entire HTTP proxy pipeline (request reception, epistemic injection, upstream forwarding, response streaming, claim evaluation, PII detection, action gating, retry logic) is untested. No test starts an actual `axum` server.
-- Files: `crates/rigor/src/daemon/proxy.rs`, `crates/rigor/src/daemon/mod.rs`
-- Risk: Any change to the proxy's 3,000+ lines could break production behavior undetected.
-- Priority: High
+**PII Sanitizer Coverage:**
+- What's not tested: Individual detector regex patterns (email, credit_card, provider-specific keys) are assumed correct but not unit tested.
+- Files: `crates/rigor/src/daemon/proxy.rs` (PII_SANITIZER)
+- Risk: A typo in a custom regex (e.g., `sk-proj-[A-Za-z0-9_-]{40,}` missing the word boundary) could cause silent false negatives.
+- Priority: High — this is a security boundary.
 
-**Streaming SSE evaluation loop completely untested:**
-- What's not tested: The 1,300-line streaming evaluation task (proxy.rs lines 1214-2500) — incremental claim extraction during SSE streaming, mid-stream blocking, retry-with-correction injection, PII-OUT detection on streamed responses.
+**Streaming Response Evaluation:**
+- What's not tested: The full path from streaming chunks → claim extraction → Rego evaluation is tested only in `tests/true_e2e.rs`, which requires a live LLM.
+- Files: `crates/rigor/src/daemon/proxy.rs` (lines 1163–1300), `tests/true_e2e.rs`
+- Risk: If streaming evaluation silently skips a constraint (e.g., due to an error in the chunk accumulation loop), violations are missed.
+- Priority: High — affects real-world usage.
+
+**Gate Timeout and Decision Logic:**
+- What's not tested: The retroactive gate polling loop and timeout logic (lines 791–830 in proxy.rs) is not unit tested; only exercised by e2e tests if gates are actually triggered.
 - Files: `crates/rigor/src/daemon/proxy.rs`
-- Risk: The most complex code path has zero coverage. A regression here silently passes CI.
-- Priority: High
+- Risk: Deadlocks or infinite loops in gate decision logic are not caught.
+- Priority: Medium — gate feature is new and less stable than core constraint evaluation.
 
-**`ground.rs` process orchestration untested:**
-- What's not tested: Binary patching (`patch_sip_binary`), interception mode selection, fd duplication/redirection, child process spawning with environment setup, signal propagation.
-- Files: `crates/rigor/src/cli/ground.rs` (614 lines)
-- Risk: macOS-specific SIP workarounds and fd manipulation could break silently on OS updates.
-- Priority: Medium
+**TLS Certificate Validation:**
+- What's not tested: The rcgen-generated certificates are never validated against the actual TLS handshake flow. certs could be invalid.
+- Files: `crates/rigor/src/daemon/tls.rs` (inferred)
+- Risk: If cert generation is broken, MITM connections fail silently and revert to blind tunneling.
+- Priority: Medium — affects MITM feature only.
 
-**No tests for governance API handlers:**
-- What's not tested: `toggle_constraint`, `toggle_pause`, `toggle_block_next`, `list_constraints` — all governance endpoints lack tests beyond what `gate_api.rs` covers for its pure `compute_decision_response()` function.
-- Files: `crates/rigor/src/daemon/governance.rs`
-- Risk: Governance state changes could silently break constraint enforcement.
-- Priority: Medium
-
-**No tests for WebSocket event broadcasting:**
-- What's not tested: `ws_handler`, `handle_socket`, event serialization, channel overflow behavior (lagged clients).
-- Files: `crates/rigor/src/daemon/ws.rs`
-- Risk: Dashboard connectivity issues would go unnoticed.
-- Priority: Low
-
-**Layer (LD_PRELOAD/DYLD_INSERT) crate has zero tests:**
-- What's not tested: The entire `layer/src/lib.rs` (957 lines) — DNS hooking, connect hooking, SecTrust bypass, re-entrancy protection, transparent mode.
-- Files: `layer/src/lib.rs`
-- Risk: Platform-specific hooking code has no automated coverage. Breakage requires manual testing on target OS/architecture.
-- Priority: Medium
+**Large Transcript Claim Extraction:**
+- What's not tested: Claim extraction on transcripts with 100+ messages or 1MB+ total size.
+- Files: `crates/rigor/src/claim/heuristic.rs`
+- Risk: Memory exhaustion, regex timeouts, or incorrect extraction under stress conditions.
+- Priority: Medium — affects long-running sessions.
 
 ---
 
