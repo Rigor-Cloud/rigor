@@ -151,10 +151,23 @@ fn is_opencode_command(command: &[String]) -> bool {
     prog == "opencode" || prog == "opencode-ai"
 }
 
+/// Detect if the command being launched is OpenAI Codex CLI (`@openai/codex`).
+fn is_codex_command(command: &[String]) -> bool {
+    if command.is_empty() {
+        return false;
+    }
+    let prog = std::path::Path::new(&command[0])
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy();
+    prog == "codex"
+}
+
 /// Apply interception environment variables to the command.
 fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16, command: &[String]) {
     let base_url = format!("http://127.0.0.1:{}", port);
     let is_opencode = is_opencode_command(command);
+    let is_codex = is_codex_command(command);
 
     match mode {
         InterceptionMode::HttpProxy => {
@@ -243,6 +256,15 @@ fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16, com
 
         info_println!("rigor: OpenCode detected — session_id={}", session_id);
         info_println!("rigor: OpenCode LLM traffic will flow through rigor proxy");
+    }
+
+    // Codex-specific env vars. The OpenAI Codex CLI (`@openai/codex`) uses the
+    // standard `openai` Node SDK, which honors OPENAI_BASE_URL and HTTPS_PROXY
+    // already set above. The only extra we need is disabling TLS verification
+    // so Node accepts rigor's MITM cert without a system-keychain CA install.
+    if is_codex {
+        cmd.env("NODE_TLS_REJECT_UNAUTHORIZED", "0");
+        info_println!("rigor: Codex CLI detected — LLM traffic will flow through rigor proxy");
     }
 }
 

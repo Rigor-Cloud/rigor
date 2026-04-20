@@ -5,6 +5,7 @@
 //!
 //!   rigor trust opencode   -> creates ~/.rigor/bin/opencode
 //!   rigor trust claude     -> creates ~/.rigor/bin/claude
+//!   rigor trust codex      -> creates ~/.rigor/bin/codex
 //!   rigor untrust opencode -> removes ~/.rigor/bin/opencode
 
 use anyhow::{Context, Result};
@@ -12,7 +13,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
-const SUPPORTED_TOOLS: &[&str] = &["opencode", "claude"];
+const SUPPORTED_TOOLS: &[&str] = &["opencode", "claude", "codex"];
 
 fn rigor_bin_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("Cannot determine home directory")?;
@@ -65,6 +66,57 @@ fn is_rigor_bin_in_path() -> bool {
     path_var.split(':').any(|p| p == rigor_bin)
 }
 
+/// System CA bundle path, OS-specific. Returned path is what we concatenate
+/// with rigor's CA to build `~/.rigor/ca-bundle.pem`. Falls back to None if
+/// we can't find a system bundle — the generated bundle will contain only
+/// rigor's CA, which means non-MITM'd hosts will fail to verify. Not great,
+/// but better than failing the `rigor trust` install.
+fn system_ca_bundle_path() -> Option<PathBuf> {
+    // macOS ships one at /etc/ssl/cert.pem (Homebrew OpenSSL compat);
+    // most Linux distros ship /etc/ssl/certs/ca-certificates.crt.
+    for candidate in ["/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt"] {
+        let p = PathBuf::from(candidate);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    None
+}
+
+/// Ensure `~/.rigor/ca-bundle.pem` exists and contains rigor's CA plus the
+/// system trust anchors, so Rust-native-TLS clients (rustls via
+/// `rustls-native-certs`, reqwest, Codex) trust both rigor's MITM certs and
+/// everyone else's real certs.
+///
+/// Why this exists: pointing `SSL_CERT_FILE` at *only* `~/.rigor/ca.pem`
+/// works for MITM'd hosts but breaks every blind-tunneled host because the
+/// upstream's real cert is no longer rooted in any trusted CA. We need both
+/// sets in one file.
+fn ensure_ca_bundle() -> Result<PathBuf> {
+    let home = dirs::home_dir().context("Cannot determine home directory")?;
+    let rigor_dir = home.join(".rigor");
+    fs::create_dir_all(&rigor_dir)?;
+    let rigor_ca = rigor_dir.join("ca.pem");
+    let bundle = rigor_dir.join("ca-bundle.pem");
+
+    if !rigor_ca.exists() {
+        anyhow::bail!(
+            "rigor CA not found at {}. Run `rigor serve` once to generate it.",
+            rigor_ca.display()
+        );
+    }
+
+    let mut contents = fs::read(&rigor_ca)?;
+    if !contents.ends_with(b"\n") {
+        contents.push(b'\n');
+    }
+    if let Some(sys) = system_ca_bundle_path() {
+        contents.extend(fs::read(&sys)?);
+    }
+    fs::write(&bundle, &contents)?;
+    Ok(bundle)
+}
+
 pub fn install_tool_wrapper(tool: &str) -> Result<()> {
     if !SUPPORTED_TOOLS.contains(&tool) {
         anyhow::bail!(
@@ -77,6 +129,11 @@ pub fn install_tool_wrapper(tool: &str) -> Result<()> {
     let real_binary = find_real_binary(tool)?;
     let bin_dir = rigor_bin_dir()?;
     let wrapper_path = bin_dir.join(tool);
+    // Generate a combined CA bundle so Rust-native-TLS clients (Codex, any
+    // reqwest / rustls-native-certs based tool) trust rigor's MITM certs
+    // without breaking trust for blind-tunneled hosts.
+    let ca_bundle = ensure_ca_bundle()?;
+    let ca_bundle_str = ca_bundle.to_string_lossy();
 
     // Generate the wrapper script
     let wrapper = format!(
@@ -97,8 +154,12 @@ export no_proxy="${{no_proxy:-localhost,127.0.0.1,::1}}"
 export ANTHROPIC_BASE_URL="${{ANTHROPIC_BASE_URL:-http://127.0.0.1:8787}}"
 export OPENAI_BASE_URL="${{OPENAI_BASE_URL:-http://127.0.0.1:8787}}"
 
-# Accept rigor's MITM cert
+# Accept rigor's MITM cert across all TLS stacks:
+#   Node/Bun   → NODE_TLS_REJECT_UNAUTHORIZED=0 (skip verification entirely)
+#   Rust/rustls → SSL_CERT_FILE pointing at a bundle of rigor CA + system CAs
+#                 (Codex, reqwest-based tools, anything using rustls-native-certs)
 export NODE_TLS_REJECT_UNAUTHORIZED=0
+export SSL_CERT_FILE="${{SSL_CERT_FILE:-{ca_bundle}}}"
 
 # Session tracking
 export OPENCODE_SESSION_ID="${{OPENCODE_SESSION_ID:-$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo rigor-$$)}}"
@@ -107,7 +168,8 @@ export RIGOR_ROUTED=1
 exec {real_binary} "$@"
 "#,
         tool = tool,
-        real_binary = real_binary
+        real_binary = real_binary,
+        ca_bundle = ca_bundle_str,
     );
 
     fs::write(&wrapper_path, &wrapper)?;
