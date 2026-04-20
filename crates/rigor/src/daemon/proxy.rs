@@ -297,6 +297,59 @@ fn gen_ai_span(system: &'static str) -> tracing::Span {
     )
 }
 
+/// Map a CONNECT target hostname (e.g., `api.openai.com:443`) to a
+/// GenAI semconv `gen_ai.system` value when the host is a known LLM
+/// provider. Returns `None` for non-LLM hosts (OAuth, CDN, telemetry,
+/// …) — those get a different span type.
+fn gen_ai_system_for_host(target: &str) -> Option<&'static str> {
+    let host = target.split(':').next().unwrap_or(target);
+    if host == "api.anthropic.com" || host.ends_with(".anthropic.com") {
+        Some("anthropic")
+    } else if host == "api.openai.com" || host.ends_with(".openai.com") {
+        Some("openai")
+    } else if host == "chatgpt.com" || host.ends_with(".chatgpt.com") {
+        // Codex ChatGPT-auth mode + ChatGPT web app both hit chatgpt.com.
+        Some("chatgpt_codex")
+    } else if host.ends_with("aiplatform.googleapis.com") {
+        Some("google_vertex")
+    } else if host == "openai.azure.com" || host.ends_with(".openai.azure.com") {
+        Some("azure_openai")
+    } else if host == "opencode.ai" || host == "api.opencode.ai" {
+        Some("opencode_zen")
+    } else if host == "openrouter.ai" || host.ends_with(".openrouter.ai") {
+        Some("openrouter")
+    } else {
+        None
+    }
+}
+
+/// Span covering the full lifetime of a CONNECT tunnel through the MITM
+/// proxy. For LLM hosts this is the WebSocket / REST transport layer
+/// beneath the explicit per-endpoint `gen_ai.llm.request` spans — it
+/// surfaces streaming traffic (Codex's wss://api.openai.com/v1/responses,
+/// realtime voice APIs, ChatGPT backend streams) that never hits a POST
+/// handler and so wouldn't otherwise emit a GenAI-semconv span.
+///
+/// For non-LLM hosts it emits a neutral `rigor.proxy.tunnel` span with
+/// the host attribute, so operators still see every tunnel in traces.
+pub(crate) fn tunnel_span(target: &str, mitm: bool) -> tracing::Span {
+    let host = target.split(':').next().unwrap_or(target).to_string();
+    match gen_ai_system_for_host(target) {
+        Some(system) => info_span!(
+            "gen_ai.tunnel",
+            "gen_ai.system" = system,
+            "rigor.tool" = %super::ws::grounded_client().as_str(),
+            "rigor.target" = %host,
+            "rigor.mitm" = mitm,
+        ),
+        None => info_span!(
+            "rigor.proxy.tunnel",
+            "rigor.target" = %host,
+            "rigor.mitm" = mitm,
+        ),
+    }
+}
+
 /// Proxy Anthropic API requests: inject epistemic context, forward, stream back.
 pub async fn anthropic_proxy(
     State(state): State<SharedState>,
@@ -316,6 +369,35 @@ pub async fn openai_proxy(
 ) -> Response {
     proxy_request(state, headers, body, "/v1/chat/completions")
         .instrument(gen_ai_span("openai"))
+        .await
+}
+
+/// Proxy OpenAI Responses API (the newer endpoint used by Codex CLI and
+/// ChatGPT-native clients). Shape is similar enough to /v1/chat/completions
+/// that it rides the same proxy_request path. NOTE: Codex actually upgrades
+/// to a WebSocket at wss://api.openai.com/v1/responses; that case is
+/// currently served by the CONNECT/MITM tunnel path (see catch_all_proxy)
+/// and doesn't reach this handler — here we cover the REST fallback.
+pub async fn openai_responses_proxy(
+    State(state): State<SharedState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    proxy_request(state, headers, body, "/v1/responses")
+        .instrument(gen_ai_span("openai"))
+        .await
+}
+
+/// Proxy ChatGPT backend-api used by Codex's ChatGPT-auth mode. The path
+/// `/backend-api/codex/*` on `chatgpt.com` carries LLM traffic when a user
+/// authenticates via "Sign in with ChatGPT" instead of an API key.
+pub async fn chatgpt_backend_proxy(
+    State(state): State<SharedState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    proxy_request(state, headers, body, "/backend-api/codex")
+        .instrument(gen_ai_span("chatgpt_codex"))
         .await
 }
 
@@ -403,6 +485,13 @@ pub async fn catch_all_proxy(
         } else {
             None
         };
+
+        // Tunnel-lifetime span. For LLM hosts this becomes a
+        // `gen_ai.tunnel` span that external OTel backends can consume;
+        // for other hosts it's a neutral `rigor.proxy.tunnel` span.
+        // Carries the WebSocket-style traffic that never hits an explicit
+        // /v1/messages-style handler (Codex wss://.../v1/responses, etc.).
+        let span = tunnel_span(&target_clone, should_mitm);
 
         tokio::spawn(async move {
             let upgraded = match hyper::upgrade::on(req).await {
@@ -548,7 +637,7 @@ pub async fn catch_all_proxy(
 
             crate::daemon::ws::emit_log(&event_tx_clone, "info", "proxy",
                 format!("MITM tunnel closed: {}", target_clone));
-        });
+        }.instrument(span));
 
         // Return 200 immediately so the client sees the tunnel is open
         return Response::builder()

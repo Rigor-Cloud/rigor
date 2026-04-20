@@ -95,6 +95,13 @@ pub const MITM_HOSTS: &[&str] = &[
     "api.opencode.ai",
     // OpenRouter (used by both OpenCode and rigor's LLM-as-judge)
     "openrouter.ai",
+    // Codex CLI's ChatGPT-auth mode routes LLM traffic through
+    // chatgpt.com/backend-api/codex (instead of api.openai.com). Add the
+    // host to the MITM allowlist so rigor sees those requests too. Note
+    // this matches the host broadly — path-level scoping to
+    // /backend-api/codex* is enforced at the router level by only
+    // registering a handler for that path.
+    "chatgpt.com",
 ];
 
 /// Decide whether a CONNECT target host should be MITM'd or blind-tunneled.
@@ -542,6 +549,18 @@ pub fn build_router(state: SharedState) -> Router {
         // OpenCode Zen provider routes (same format, prefixed path)
         .route("/zen/v1/messages", post(proxy::opencode_zen_messages_proxy))
         .route("/zen/v1/responses", post(proxy::opencode_zen_responses_proxy))
+        // Note: OpenAI Responses API (`/v1/responses`) and ChatGPT backend
+        // (`chatgpt.com/backend-api/codex`) intentionally have no explicit
+        // route here. Codex CLI upgrades those requests to WebSocket (GET
+        // + Upgrade: websocket), and registering them as POST-only would
+        // make axum return 405 on the handshake — regressing Codex
+        // support. Instead they flow through `catch_all_proxy`'s CONNECT
+        // tunnel path and get observability coverage via the
+        // `gen_ai.tunnel` span emitted in `tunnel_span()` (see proxy.rs).
+        // Handlers `openai_responses_proxy` / `chatgpt_backend_proxy`
+        // stay defined in proxy.rs so we can wire them up to a
+        // `method_routing::any()` variant later without reintroducing
+        // the 405 regression.
         // Governance API endpoints
         .route("/api/governance/constraints", get(governance::list_constraints))
         .route("/api/governance/constraints/{id}/toggle", post(governance::toggle_constraint))
