@@ -40,6 +40,7 @@
   <!-- Top-level page tabs -->
   <div id="page-tabs">
     <button class="page-tab active" data-page="live">LIVE</button>
+    <button class="page-tab" data-page="obs">OBSERVABILITY</button>
     <button class="page-tab" data-page="search">SEARCH</button>
     <button class="page-tab" data-page="eval">EVAL</button>
   </div>
@@ -183,6 +184,47 @@
     </div>
   </div>
 
+  <!-- Page: Observability -->
+  <div id="page-obs" class="page">
+    <div class="page-content">
+      <div class="obs-header">
+        <span class="obs-title">Overview</span>
+        <button id="obs-refresh" class="obs-btn">Refresh</button>
+      </div>
+
+      <!-- KPI tiles, fed by live WebSocket stats + /api/cost -->
+      <div id="obs-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+        <div class="obs-kpi"><div class="obs-kpi-label">Requests</div><div class="obs-kpi-value" id="kpi-requests">0</div></div>
+        <div class="obs-kpi"><div class="obs-kpi-label">Claims</div><div class="obs-kpi-value" id="kpi-claims">0</div></div>
+        <div class="obs-kpi"><div class="obs-kpi-label">Violations</div><div class="obs-kpi-value" id="kpi-violations">0</div></div>
+        <div class="obs-kpi"><div class="obs-kpi-label">Blocks</div><div class="obs-kpi-value" id="kpi-blocks">0</div></div>
+        <div class="obs-kpi"><div class="obs-kpi-label">Retries</div><div class="obs-kpi-value" id="kpi-retries">0</div></div>
+        <div class="obs-kpi"><div class="obs-kpi-label">Tokens (in/out)</div><div class="obs-kpi-value" id="kpi-tokens">0 / 0</div></div>
+        <div class="obs-kpi"><div class="obs-kpi-label">Cost (USD)</div><div class="obs-kpi-value" id="kpi-cost">$0.00</div></div>
+        <div class="obs-kpi"><div class="obs-kpi-label">PII findings</div><div class="obs-kpi-value" id="kpi-pii">0</div></div>
+      </div>
+
+      <div class="obs-header"><span class="obs-title">Recent Violations</span></div>
+      <div id="obs-recent-violations"><div class="empty-hint">No violations yet</div></div>
+
+      <div class="obs-header" style="margin-top:24px;"><span class="obs-title">External OTel Export</span></div>
+      <div id="obs-otel-info" style="font-size:12px;color:var(--muted,#888);line-height:1.6;">
+        <p>Rigor emits OpenTelemetry GenAI-semconv spans on every proxied LLM request.
+          Set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> in the daemon's environment and
+          spans flow to any OTLP-compatible backend:</p>
+        <ul style="margin:8px 0 8px 20px;padding:0;">
+          <li><a href="https://langfuse.com" target="_blank" rel="noopener">Langfuse</a> (OSS)</li>
+          <li><a href="https://phoenix.arize.com" target="_blank" rel="noopener">Arize Phoenix</a> (OSS)</li>
+          <li><a href="https://www.helicone.ai" target="_blank" rel="noopener">Helicone</a></li>
+          <li>Datadog / Honeycomb / New Relic / any OTLP collector</li>
+        </ul>
+        <p>Attributes per span: <code>gen_ai.system</code>, <code>gen_ai.request.model</code>,
+          <code>gen_ai.usage.input_tokens</code>, <code>gen_ai.usage.output_tokens</code>,
+          <code>rigor.tool</code>, <code>rigor.decision</code>.</p>
+      </div>
+    </div>
+  </div>
+
   <script src="/assets/3d-force-graph.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
@@ -217,6 +259,7 @@
         if (page) page.classList.add('active');
         var pg = btn.getAttribute('data-page');
         if (pg === 'eval') { loadEval(); if (typeof loadCost === 'function') loadCost(); }
+        if (pg === 'obs') { if (typeof loadObs === 'function') loadObs(); }
       });
     });
 
@@ -1773,6 +1816,40 @@
       }).catch(function(){ document.getElementById('cost-models').innerHTML = '<div class="empty-hint">Failed to load cost data</div>'; });
     }
     document.getElementById('cost-refresh').addEventListener('click', loadCost);
+
+    // ── Observability overview ────────────────────────────────
+    function loadObs() {
+      // KPI tiles from live `stats` object + /api/cost for USD
+      document.getElementById('kpi-requests').textContent = stats.requests;
+      document.getElementById('kpi-claims').textContent = stats.claims;
+      document.getElementById('kpi-violations').textContent = stats.violations;
+      document.getElementById('kpi-blocks').textContent = stats.blocks;
+      document.getElementById('kpi-retries').textContent = stats.retries;
+      document.getElementById('kpi-pii').textContent = stats.pii;
+      document.getElementById('kpi-tokens').textContent =
+        formatTokens(stats.totalInput) + ' / ' + formatTokens(stats.totalOutput);
+      fetch('/api/cost').then(function(r){return r.json();}).then(function(data){
+        document.getElementById('kpi-cost').textContent = '$' + (data.total_cost_usd || 0).toFixed(4);
+      }).catch(function(){});
+
+      // Recent violations from /api/violations
+      fetch('/api/violations?limit=10').then(function(r){return r.json();}).then(function(rows){
+        var el = document.getElementById('obs-recent-violations');
+        if (!rows || !rows.length) { el.innerHTML = '<div class="empty-hint">No violations yet</div>'; return; }
+        var html = '<table class="obs-table"><thead><tr><th>Constraint</th><th>Severity</th><th>Claim</th><th>When</th></tr></thead><tbody>';
+        rows.forEach(function(v){
+          var sevClass = v.severity === 'block' ? 'obs-sev-block' : (v.severity === 'warn' ? 'obs-sev-warn' : '');
+          var when = v.session && v.session.started_at ? v.session.started_at.substring(11,19) : '-';
+          var text = (v.claim_text || '').substring(0, 80);
+          html += '<tr><td class="obs-name">' + (v.constraint_id || '-') + '</td><td class="' + sevClass + '">' + (v.severity || '-') + '</td><td>' + text + '</td><td>' + when + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      }).catch(function(){
+        document.getElementById('obs-recent-violations').innerHTML = '<div class="empty-hint">Failed to load</div>';
+      });
+    }
+    document.getElementById('obs-refresh').addEventListener('click', loadObs);
 
     initGraph();
     loadInitialGraph();

@@ -7,7 +7,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 use http::header;
-
+use tracing::{info_span, Instrument};
 
 use crate::claim::{ClaimExtractor, HeuristicExtractor};
 use crate::claim::transcript::TranscriptMessage;
@@ -267,13 +267,45 @@ pub fn prettify_kind(kind: &str) -> String {
     }
 }
 
+/// Build an OpenTelemetry GenAI-semconv root span that wraps a proxied LLM
+/// request. External backends (Langfuse, Arize Phoenix, Datadog, Honeycomb,
+/// Helicone, any OTel-GenAI consumer) look for exactly these attribute keys
+/// per the stabilized spec — emit them here and the whole ecosystem works.
+///
+/// Attrs populated up-front:
+///   - `gen_ai.system`     — provider identifier ("anthropic", "openai", ...)
+///   - `rigor.tool`        — the grounded client (opencode, claude, ...)
+///
+/// Attrs populated later via `Span::current().record(...)` from inside
+/// `proxy_request` as data becomes available:
+///   - `gen_ai.request.model`
+///   - `gen_ai.response.model`
+///   - `gen_ai.usage.input_tokens`
+///   - `gen_ai.usage.output_tokens`
+///   - `rigor.decision` / `rigor.session_id`
+fn gen_ai_span(system: &'static str) -> tracing::Span {
+    info_span!(
+        "gen_ai.llm.request",
+        "gen_ai.system" = system,
+        "gen_ai.request.model" = tracing::field::Empty,
+        "gen_ai.response.model" = tracing::field::Empty,
+        "gen_ai.usage.input_tokens" = tracing::field::Empty,
+        "gen_ai.usage.output_tokens" = tracing::field::Empty,
+        "rigor.tool" = %super::ws::grounded_client().as_str(),
+        "rigor.session_id" = tracing::field::Empty,
+        "rigor.decision" = tracing::field::Empty,
+    )
+}
+
 /// Proxy Anthropic API requests: inject epistemic context, forward, stream back.
 pub async fn anthropic_proxy(
     State(state): State<SharedState>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    proxy_request(state, headers, body, "/v1/messages").await
+    proxy_request(state, headers, body, "/v1/messages")
+        .instrument(gen_ai_span("anthropic"))
+        .await
 }
 
 /// Proxy OpenAI API requests: inject epistemic context, forward, stream back.
@@ -282,7 +314,9 @@ pub async fn openai_proxy(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    proxy_request(state, headers, body, "/v1/chat/completions").await
+    proxy_request(state, headers, body, "/v1/chat/completions")
+        .instrument(gen_ai_span("openai"))
+        .await
 }
 
 /// Proxy OpenCode Zen Anthropic-format requests (same lifecycle as anthropic_proxy).
@@ -291,7 +325,9 @@ pub async fn opencode_zen_messages_proxy(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    proxy_request(state, headers, body, "/zen/v1/messages").await
+    proxy_request(state, headers, body, "/zen/v1/messages")
+        .instrument(gen_ai_span("opencode_zen"))
+        .await
 }
 
 /// Proxy OpenCode Zen OpenAI-format requests (same lifecycle as openai_proxy).
@@ -300,7 +336,9 @@ pub async fn opencode_zen_responses_proxy(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    proxy_request(state, headers, body, "/zen/v1/responses").await
+    proxy_request(state, headers, body, "/zen/v1/responses")
+        .instrument(gen_ai_span("opencode_zen"))
+        .await
 }
 
 /// Catch-all proxy: forward ANY request to its original destination.

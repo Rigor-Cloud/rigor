@@ -337,6 +337,14 @@ html,body { height:100%; overflow:hidden; background:var(--bg); font-family:var(
 .obs-sev-warn { background:rgba(255,217,61,0.15); color:var(--yellow); }
 .obs-sev-allow { background:rgba(81,207,102,0.15); color:var(--green); }
 
+/* Observability KPI tiles */
+.obs-kpi { background:var(--panel); border:1px solid var(--border); border-radius:4px; padding:12px 14px; }
+.obs-kpi-label { font-size:9px; text-transform:uppercase; letter-spacing:0.8px; color:var(--dim); margin-bottom:6px; }
+.obs-kpi-value { font-family:var(--mono); font-size:22px; color:var(--bright); font-weight:700; }
+#obs-otel-info code { font-family:var(--mono); font-size:11px; background:var(--panel); border:1px solid var(--border); padding:1px 5px; border-radius:3px; color:var(--bright); }
+#obs-otel-info a { color:var(--blue); text-decoration:none; }
+#obs-otel-info a:hover { text-decoration:underline; }
+
 /* Violation search cards */
 .obs-violation-card { padding:8px 10px; border-bottom:1px solid var(--border); }
 .obs-viol-header { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
