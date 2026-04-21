@@ -10,8 +10,13 @@
 //!
 //! Both are persisted in `~/.rigor/memory.json`.
 
+pub mod content_store;
 pub mod episodic;
 
+pub use content_store::{
+    hash_bytes, hash_hex, Category, ContentStoreBackend, Hash, InMemoryBackend, SearchResult,
+    StoredContent,
+};
 pub use episodic::{
     EpisodicMemory, MemoryStore, ModelPattern, PathPattern, SemanticMemory, SessionEpisode,
 };

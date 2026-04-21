@@ -77,17 +77,17 @@ pub fn register_session(entry: &SessionEntry) -> Result<()> {
         fs::create_dir_all(&log_dir)?;
     }
 
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(&path)?;
     let json = serde_json::to_string(entry)?;
     writeln!(file, "{}", json)?;
     Ok(())
 }
 
 /// Update a session entry (rewrite the line in the registry).
-pub fn update_session(session_id: &str, mut update_fn: impl FnMut(&mut SessionEntry)) -> Result<()> {
+pub fn update_session(
+    session_id: &str,
+    mut update_fn: impl FnMut(&mut SessionEntry),
+) -> Result<()> {
     let path = registry_path().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
     if !path.exists() {
         return Ok(());

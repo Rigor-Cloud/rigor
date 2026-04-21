@@ -153,7 +153,9 @@ impl MemoryStore {
                         path: p.clone(),
                         ..Default::default()
                     });
-                *pp.constraint_hits.entry(e.constraint_id.clone()).or_insert(0) += 1;
+                *pp.constraint_hits
+                    .entry(e.constraint_id.clone())
+                    .or_insert(0) += 1;
                 pp.total_hits += 1;
             }
 
@@ -171,7 +173,9 @@ impl MemoryStore {
                     model: model_key,
                     ..Default::default()
                 });
-            *mp.constraint_hits.entry(e.constraint_id.clone()).or_insert(0) += 1;
+            *mp.constraint_hits
+                .entry(e.constraint_id.clone())
+                .or_insert(0) += 1;
             match e.false_positive {
                 Some(true) => mp.false_positives += 1,
                 Some(false) => mp.true_positives += 1,
