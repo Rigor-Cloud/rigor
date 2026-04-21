@@ -137,7 +137,7 @@ fn build_regex_hint(examples: &[String]) -> String {
         }
     }
     let mut words: Vec<(String, usize)> = freq.into_iter().collect();
-    words.sort_by(|a, b| b.1.cmp(&a.1));
+    words.sort_by_key(|w| std::cmp::Reverse(w.1));
     let top: Vec<String> = words.into_iter().take(3).map(|(w, _)| w).collect();
     if top.is_empty() {
         r"(?i)(test|example|mock)".to_string()

@@ -237,7 +237,7 @@ pub async fn eval_stats() -> Response {
             last_fired: last,
         })
         .collect();
-    constraints.sort_by(|a, b| b.hits.cmp(&a.hits));
+    constraints.sort_by_key(|c| std::cmp::Reverse(c.hits));
 
     Json(EvalStats {
         total_violations: total,

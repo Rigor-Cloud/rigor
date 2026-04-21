@@ -225,7 +225,7 @@ impl MemoryStore {
             }
         }
         let mut v: Vec<(String, usize)> = counts.into_iter().collect();
-        v.sort_by(|a, b| b.1.cmp(&a.1));
+        v.sort_by_key(|x| std::cmp::Reverse(x.1));
         v.truncate(n);
         v
     }

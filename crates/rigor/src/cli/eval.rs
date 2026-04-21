@@ -98,7 +98,7 @@ pub fn compute_metrics(entries: &[ViolationLogEntry]) -> EvalMetrics {
     }
 
     let mut per_constraint: Vec<ConstraintMetric> = per_constraint_map.into_values().collect();
-    per_constraint.sort_by(|a, b| b.hits.cmp(&a.hits));
+    per_constraint.sort_by_key(|c| std::cmp::Reverse(c.hits));
 
     // Build a per-session trend (chronologically ordered by first-seen timestamp)
     let mut session_order: Vec<(String, String)> = Vec::new();
