@@ -156,6 +156,7 @@ mod tests {
             claim_type: ClaimType::Assertion,
             source_line: None,
             source: None,
+            knowledge_type: None,
         }
     }
 
@@ -179,6 +180,13 @@ violation contains v if {
             domain: None,
             references: vec![],
             source: vec![],
+            knowledge_type: None,
+            base_strength_override: None,
+            last_verified: None,
+            verification_count: 0,
+            verified_at_commit: None,
+            credibility_weight: None,
+            cluster_id: None,
         }]);
 
         let engine = PolicyEngine::new(&config).unwrap();
@@ -199,6 +207,13 @@ violation contains v if {
             domain: None,
             references: vec![],
             source: vec![],
+            knowledge_type: None,
+            base_strength_override: None,
+            last_verified: None,
+            verification_count: 0,
+            verified_at_commit: None,
+            credibility_weight: None,
+            cluster_id: None,
         }]);
 
         let engine = PolicyEngine::new(&config).unwrap();
@@ -225,6 +240,13 @@ violation contains v if {
             domain: None,
             references: vec![],
             source: vec![],
+            knowledge_type: None,
+            base_strength_override: None,
+            last_verified: None,
+            verification_count: 0,
+            verified_at_commit: None,
+            credibility_weight: None,
+            cluster_id: None,
         }]);
 
         let mut engine = PolicyEngine::new(&config).unwrap();
@@ -261,6 +283,13 @@ violation contains v if {
             domain: None,
             references: vec![],
             source: vec![],
+            knowledge_type: None,
+            base_strength_override: None,
+            last_verified: None,
+            verification_count: 0,
+            verified_at_commit: None,
+            credibility_weight: None,
+            cluster_id: None,
         }]);
 
         let mut engine = PolicyEngine::new(&config).unwrap();
@@ -292,6 +321,13 @@ violation contains v if {
             domain: None,
             references: vec![],
             source: vec![],
+            knowledge_type: None,
+            base_strength_override: None,
+            last_verified: None,
+            verification_count: 0,
+            verified_at_commit: None,
+            credibility_weight: None,
+            cluster_id: None,
         }]);
 
         let engine = PolicyEngine::new(&config).unwrap();

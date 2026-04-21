@@ -65,6 +65,13 @@ mod tests {
             domain: None,
             references: vec![],
             source: vec![],
+            knowledge_type: None,
+            base_strength_override: None,
+            last_verified: None,
+            verification_count: 0,
+            verified_at_commit: None,
+            credibility_weight: None,
+            cluster_id: None,
         }
     }
 
@@ -90,6 +97,8 @@ mod tests {
                 from: "b1".to_string(),
                 to: "b2".to_string(),
                 relation_type: RelationType::Supports,
+                confidence: 1.0,
+                extraction_method: None,
             }],
         );
         assert!(ConstraintValidator::validate(&config).is_ok());
@@ -116,6 +125,8 @@ mod tests {
                 from: "b1".to_string(),
                 to: "nonexistent".to_string(),
                 relation_type: RelationType::Attacks,
+                confidence: 1.0,
+                extraction_method: None,
             }],
         );
         let err = ConstraintValidator::validate(&config).unwrap_err();
@@ -132,6 +143,8 @@ mod tests {
                 from: "b1".to_string(),
                 to: "b1".to_string(),
                 relation_type: RelationType::Supports,
+                confidence: 1.0,
+                extraction_method: None,
             }],
         );
         let err = ConstraintValidator::validate(&config).unwrap_err();

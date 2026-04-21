@@ -220,6 +220,7 @@ mod tests {
             claim_type: ClaimType::Assertion,
             source_line: None,
             source: None,
+            knowledge_type: None,
         }
     }
 

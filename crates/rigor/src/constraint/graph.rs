@@ -213,6 +213,8 @@ mod tests {
             from: "a".to_string(),
             to: "b".to_string(),
             relation_type: RelationType::Supports,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
@@ -228,6 +230,8 @@ mod tests {
             from: "a".to_string(),
             to: "b".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
@@ -245,12 +249,16 @@ mod tests {
             from: "b".to_string(),
             to: "c".to_string(),
             relation_type: RelationType::Supports,
+            confidence: 1.0,
+            extraction_method: None,
         });
         // A undercuts B->C (treated as attack on C for v0.1)
         graph.add_relation(Relation {
             from: "a".to_string(),
             to: "c".to_string(),
             relation_type: RelationType::Undercuts,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
@@ -272,11 +280,15 @@ mod tests {
             from: "a".to_string(),
             to: "b".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.add_relation(Relation {
             from: "b".to_string(),
             to: "a".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         // Must not panic or error
         graph.compute_strengths().unwrap();
@@ -305,22 +317,30 @@ mod tests {
             from: "a".to_string(),
             to: "c".to_string(),
             relation_type: RelationType::Supports,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.add_relation(Relation {
             from: "b".to_string(),
             to: "c".to_string(),
             relation_type: RelationType::Supports,
+            confidence: 1.0,
+            extraction_method: None,
         });
         // Multiple attacks to push low
         graph.add_relation(Relation {
             from: "a".to_string(),
             to: "b".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.add_relation(Relation {
             from: "c".to_string(),
             to: "b".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
 
         graph.compute_strengths().unwrap();
@@ -360,6 +380,8 @@ mod tests {
             from: "defeater".to_string(),
             to: "belief".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
@@ -388,6 +410,8 @@ mod tests {
             from: "justification".to_string(),
             to: "belief".to_string(),
             relation_type: RelationType::Supports,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
@@ -418,11 +442,15 @@ mod tests {
             from: "justification".to_string(),
             to: "belief".to_string(),
             relation_type: RelationType::Supports,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.add_relation(Relation {
             from: "defeater".to_string(),
             to: "belief".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
@@ -460,11 +488,15 @@ mod tests {
             from: "d1".to_string(),
             to: "belief".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.add_relation(Relation {
             from: "d2".to_string(),
             to: "belief".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
@@ -491,11 +523,15 @@ mod tests {
             from: "a".to_string(),
             to: "b".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.add_relation(Relation {
             from: "b".to_string(),
             to: "a".to_string(),
             relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
         });
         graph.compute_strengths().unwrap();
 
