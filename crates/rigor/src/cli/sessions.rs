@@ -15,10 +15,20 @@ pub fn run_sessions(active_only: bool, last: Option<usize>) -> Result<()> {
     }
 
     let filtered: Vec<&SessionEntry> = if active_only {
-        sessions.iter().filter(|s| session_registry::is_session_alive(s)).collect()
+        sessions
+            .iter()
+            .filter(|s| session_registry::is_session_alive(s))
+            .collect()
     } else {
         let n = last.unwrap_or(10);
-        sessions.iter().rev().take(n).collect::<Vec<_>>().into_iter().rev().collect()
+        sessions
+            .iter()
+            .rev()
+            .take(n)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect()
     };
 
     if filtered.is_empty() {
@@ -49,11 +59,11 @@ pub fn run_sessions(active_only: bool, last: Option<usize>) -> Result<()> {
             }
         } else if entry.exit_code == Some(0) {
             "  done".to_string()
-        } else if entry.exit_code.is_some() {
+        } else if let Some(code) = entry.exit_code {
             if use_colors {
-                format!("\x1b[31m  exit {}\x1b[0m", entry.exit_code.unwrap())
+                format!("\x1b[31m  exit {code}\x1b[0m")
             } else {
-                format!("  exit {}", entry.exit_code.unwrap())
+                format!("  exit {code}")
             }
         } else {
             "  ended".to_string()
@@ -65,8 +75,14 @@ pub fn run_sessions(active_only: bool, last: Option<usize>) -> Result<()> {
             entry.started_at[..16].to_string()
         };
 
-        let reqs = entry.requests.map(|r| r.to_string()).unwrap_or_else(|| "-".to_string());
-        let viols = entry.violations.map(|v| v.to_string()).unwrap_or_else(|| "-".to_string());
+        let reqs = entry
+            .requests
+            .map(|r| r.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        let viols = entry
+            .violations
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "-".to_string());
 
         println!(
             "{:<24} {:<12} {:<10} {:<20} {:>6} {:>6}",

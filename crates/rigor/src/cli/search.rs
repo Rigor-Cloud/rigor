@@ -110,9 +110,7 @@ fn parse_since(s: &str) -> Result<chrono::DateTime<chrono::Utc>> {
     }
     // Try YYYY-MM-DD → assume UTC midnight.
     if let Ok(d) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        let ndt = d
-            .and_hms_opt(0, 0, 0)
-            .context("Invalid date")?;
+        let ndt = d.and_hms_opt(0, 0, 0).context("Invalid date")?;
         return Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
             ndt,
             chrono::Utc,

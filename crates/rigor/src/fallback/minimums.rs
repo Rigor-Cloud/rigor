@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use anyhow::{bail, Result};
 use super::types::{FailureCategory, Policy};
+use anyhow::{bail, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Per-category policy floor for a named minimum group.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -17,10 +17,7 @@ impl ConstraintValidator {
             // Semantic-tagged constraints are evaluated by the LLM-as-judge
             // path (SemanticEvaluator) and don't require a Rego snippet —
             // their verdicts come from the daemon's relevance cache.
-            let is_semantic = c
-                .tags
-                .iter()
-                .any(|t| t.eq_ignore_ascii_case("semantic"));
+            let is_semantic = c.tags.iter().any(|t| t.eq_ignore_ascii_case("semantic"));
             if c.rego.is_empty() && !is_semantic {
                 bail!(
                     "Constraint '{}' has an empty rego snippet (tag it `semantic` to use the LLM-as-judge path)",

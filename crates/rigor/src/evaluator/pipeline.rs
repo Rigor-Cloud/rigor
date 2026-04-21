@@ -132,7 +132,9 @@ impl ClaimEvaluator for RegexEvaluator {
             Ok(raw) => {
                 // Only surface violations for the constraint we're asking
                 // about — the engine evaluates all loaded rules in one pass.
-                if let Some(v) = raw.iter().find(|v| v.constraint_id == constraint.id && v.violated)
+                if let Some(v) = raw
+                    .iter()
+                    .find(|v| v.constraint_id == constraint.id && v.violated)
                 {
                     EvalResult::violation(v.reason.clone(), claim.confidence)
                 } else {

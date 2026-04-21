@@ -323,11 +323,8 @@ relations: []
     fs::write(temp.path().join("rigor.yaml"), yaml).unwrap();
 
     let input = default_input(temp.path());
-    let (stdout, _stderr, exit_code) = run_rigor_in_dir_with_env(
-        temp.path(),
-        &input,
-        &[("RIGOR_TEST_CLAIMS", "[]")],
-    );
+    let (stdout, _stderr, exit_code) =
+        run_rigor_in_dir_with_env(temp.path(), &input, &[("RIGOR_TEST_CLAIMS", "[]")]);
 
     assert_eq!(exit_code, 0);
     let response = parse_response(&stdout);

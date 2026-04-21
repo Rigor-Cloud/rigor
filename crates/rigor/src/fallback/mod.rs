@@ -16,11 +16,7 @@ impl FallbackConfig {
     /// On failure, the policy for `(component, category)` determines behavior:
     /// terminal policies apply immediately; retry policies re-invoke `op`
     /// up to `attempts` additional times with backoff delays.
-    pub async fn execute<T, F, Fut>(
-        &self,
-        component: &str,
-        op: F,
-    ) -> FallbackOutcome<T>
+    pub async fn execute<T, F, Fut>(&self, component: &str, op: F) -> FallbackOutcome<T>
     where
         F: Fn() -> Fut,
         Fut: Future<Output = Result<T, (FailureCategory, String)>>,
@@ -29,11 +25,12 @@ impl FallbackConfig {
         match op().await {
             Ok(val) => {
                 info!(component = component, "operation succeeded");
-                return FallbackOutcome::Ok(val);
+                FallbackOutcome::Ok(val)
             }
             Err((cat, reason)) => {
                 let policy = self.policy_for(component, cat);
-                self.apply_policy(component, cat, &reason, policy, &op).await
+                self.apply_policy(component, cat, &reason, policy, &op)
+                    .await
             }
         }
     }
@@ -59,10 +56,7 @@ impl FallbackConfig {
                     reason = reason,
                     "operation blocked by policy"
                 );
-                FallbackOutcome::Blocked(format!(
-                    "{}: {:?} — {}",
-                    component, cat, reason
-                ))
+                FallbackOutcome::Blocked(format!("{}: {:?} — {}", component, cat, reason))
             }
             Policy::FailOpen | Policy::DegradeWithWarn => {
                 warn!(
@@ -73,54 +67,57 @@ impl FallbackConfig {
                 );
                 FallbackOutcome::Skipped
             }
-            Policy::RetryThenFailClosed { attempts, backoff_ms } => {
-                match Self::retry_loop(component, cat, attempts, &backoff_ms, op).await {
-                    Some(outcome) => outcome,
-                    None => {
-                        error!(
-                            component = component,
-                            category = ?cat,
-                            reason = reason,
-                            attempts = attempts,
-                            "retries exhausted, blocking"
-                        );
-                        FallbackOutcome::Blocked(format!(
-                            "{}: retries exhausted ({} attempts) — {}",
-                            component, attempts, reason
-                        ))
-                    }
+            Policy::RetryThenFailClosed {
+                attempts,
+                backoff_ms,
+            } => match Self::retry_loop(component, cat, attempts, &backoff_ms, op).await {
+                Some(outcome) => outcome,
+                None => {
+                    error!(
+                        component = component,
+                        category = ?cat,
+                        reason = reason,
+                        attempts = attempts,
+                        "retries exhausted, blocking"
+                    );
+                    FallbackOutcome::Blocked(format!(
+                        "{}: retries exhausted ({} attempts) — {}",
+                        component, attempts, reason
+                    ))
                 }
-            }
-            Policy::RetryThenFailOpen { attempts, backoff_ms } => {
-                match Self::retry_loop(component, cat, attempts, &backoff_ms, op).await {
-                    Some(outcome) => outcome,
-                    None => {
-                        warn!(
-                            component = component,
-                            category = ?cat,
-                            reason = reason,
-                            attempts = attempts,
-                            "retries exhausted, skipping"
-                        );
-                        FallbackOutcome::Skipped
-                    }
+            },
+            Policy::RetryThenFailOpen {
+                attempts,
+                backoff_ms,
+            } => match Self::retry_loop(component, cat, attempts, &backoff_ms, op).await {
+                Some(outcome) => outcome,
+                None => {
+                    warn!(
+                        component = component,
+                        category = ?cat,
+                        reason = reason,
+                        attempts = attempts,
+                        "retries exhausted, skipping"
+                    );
+                    FallbackOutcome::Skipped
                 }
-            }
-            Policy::RetryThenDegrade { attempts, backoff_ms } => {
-                match Self::retry_loop(component, cat, attempts, &backoff_ms, op).await {
-                    Some(outcome) => outcome,
-                    None => {
-                        warn!(
-                            component = component,
-                            category = ?cat,
-                            reason = reason,
-                            attempts = attempts,
-                            "retries exhausted, degrading"
-                        );
-                        FallbackOutcome::Skipped
-                    }
+            },
+            Policy::RetryThenDegrade {
+                attempts,
+                backoff_ms,
+            } => match Self::retry_loop(component, cat, attempts, &backoff_ms, op).await {
+                Some(outcome) => outcome,
+                None => {
+                    warn!(
+                        component = component,
+                        category = ?cat,
+                        reason = reason,
+                        attempts = attempts,
+                        "retries exhausted, degrading"
+                    );
+                    FallbackOutcome::Skipped
                 }
-            }
+            },
         }
     }
 
@@ -172,9 +169,9 @@ impl FallbackConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
-    use std::collections::HashMap;
 
     /// Helper: build a FallbackConfig with the given default on_persistent_error policy.
     fn config_with_persistent(policy: Policy) -> FallbackConfig {
@@ -233,10 +230,7 @@ mod tests {
 
         match result {
             FallbackOutcome::Ok(v) => assert_eq!(v, 42),
-            other => panic!(
-                "expected Ok(42), got {:?}",
-                std::mem::discriminant(&other)
-            ),
+            other => panic!("expected Ok(42), got {:?}", std::mem::discriminant(&other)),
         }
     }
 
@@ -261,10 +255,7 @@ mod tests {
                     msg
                 );
             }
-            other => panic!(
-                "expected Blocked, got {:?}",
-                std::mem::discriminant(&other)
-            ),
+            other => panic!("expected Blocked, got {:?}", std::mem::discriminant(&other)),
         }
     }
 
@@ -300,10 +291,7 @@ mod tests {
 
         match result {
             FallbackOutcome::Ok(v) => assert_eq!(v, 99),
-            other => panic!(
-                "expected Ok(99), got {:?}",
-                std::mem::discriminant(&other)
-            ),
+            other => panic!("expected Ok(99), got {:?}", std::mem::discriminant(&other)),
         }
         assert_eq!(
             call_count.load(Ordering::SeqCst),
@@ -330,10 +318,7 @@ mod tests {
                 let cc = cc.clone();
                 async move {
                     cc.fetch_add(1, Ordering::SeqCst);
-                    Err::<i32, _>((
-                        FailureCategory::TransientError,
-                        "still failing".to_string(),
-                    ))
+                    Err::<i32, _>((FailureCategory::TransientError, "still failing".to_string()))
                 }
             })
             .await;
@@ -346,10 +331,7 @@ mod tests {
                     msg
                 );
             }
-            other => panic!(
-                "expected Blocked, got {:?}",
-                std::mem::discriminant(&other)
-            ),
+            other => panic!("expected Blocked, got {:?}", std::mem::discriminant(&other)),
         }
         assert_eq!(
             call_count.load(Ordering::SeqCst),
@@ -364,19 +346,13 @@ mod tests {
         let cfg = config_with_persistent(Policy::FailOpen);
         let result = cfg
             .execute("open_comp", || async {
-                Err::<i32, _>((
-                    FailureCategory::PersistentError,
-                    "not critical".to_string(),
-                ))
+                Err::<i32, _>((FailureCategory::PersistentError, "not critical".to_string()))
             })
             .await;
 
         match result {
             FallbackOutcome::Skipped => {} // expected
-            other => panic!(
-                "expected Skipped, got {:?}",
-                std::mem::discriminant(&other)
-            ),
+            other => panic!("expected Skipped, got {:?}", std::mem::discriminant(&other)),
         }
     }
 
@@ -386,19 +362,13 @@ mod tests {
         let cfg = config_with_persistent(Policy::DegradeWithWarn);
         let result = cfg
             .execute("degrade_comp", || async {
-                Err::<i32, _>((
-                    FailureCategory::PersistentError,
-                    "degraded".to_string(),
-                ))
+                Err::<i32, _>((FailureCategory::PersistentError, "degraded".to_string()))
             })
             .await;
 
         match result {
             FallbackOutcome::Skipped => {} // expected
-            other => panic!(
-                "expected Skipped, got {:?}",
-                std::mem::discriminant(&other)
-            ),
+            other => panic!("expected Skipped, got {:?}", std::mem::discriminant(&other)),
         }
     }
 }

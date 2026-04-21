@@ -56,24 +56,24 @@ pub fn run_scan(
 fn run_check(file: Option<String>, block: bool, json: bool, smart: bool) -> Result<()> {
     let text = match file {
         Some(path) if path == "-" => read_stdin()?,
-        Some(path) => std::fs::read_to_string(&path)
-            .with_context(|| format!("reading {path}"))?,
+        Some(path) => std::fs::read_to_string(&path).with_context(|| format!("reading {path}"))?,
         None => read_stdin()?,
     };
 
     let findings = detect_pii(&text);
     let findings: Vec<_> = if smart {
-        findings.into_iter()
+        findings
+            .into_iter()
             .filter(|(_, m)| is_likely_real_secret(&text, m))
             .collect()
-    } else { findings };
+    } else {
+        findings
+    };
 
     if json {
         let arr: Vec<serde_json::Value> = findings
             .iter()
-            .map(|(kind, matched)| {
-                serde_json::json!({ "kind": kind, "matched": matched })
-            })
+            .map(|(kind, matched)| serde_json::json!({ "kind": kind, "matched": matched }))
             .collect();
         let out = serde_json::json!({
             "count": findings.len(),
@@ -124,10 +124,13 @@ fn run_hook_mode(smart: bool) -> Result<()> {
 
     let findings = detect_pii(&input.prompt);
     let findings: Vec<(String, String)> = if smart {
-        findings.into_iter()
+        findings
+            .into_iter()
             .filter(|(_, m)| is_likely_real_secret(&input.prompt, m))
             .collect()
-    } else { findings };
+    } else {
+        findings
+    };
     if findings.is_empty() {
         // Empty JSON = "no decision, just continue" in Claude Code's hook
         // model. Keeps logs clean — only flagged prompts produce output.
@@ -166,9 +169,7 @@ fn run_hook_mode(smart: bool) -> Result<()> {
     lines.push("Redacted version (safe to resubmit):".to_string());
     lines.push(format!("  {redacted_prompt}"));
     lines.push(String::new());
-    lines.push(
-        "To disable this safeguard: `rigor scan --uninstall`.".to_string(),
-    );
+    lines.push("To disable this safeguard: `rigor scan --uninstall`.".to_string());
 
     let resp = serde_json::json!({
         "decision": "block",
@@ -205,7 +206,11 @@ fn install_hook() -> Result<()> {
     let path = claude_settings_path()?;
     let mut settings = load_settings(&path);
 
-    if !settings.get("hooks").map(|h| h.is_object()).unwrap_or(false) {
+    if !settings
+        .get("hooks")
+        .map(|h| h.is_object())
+        .unwrap_or(false)
+    {
         settings["hooks"] = serde_json::json!({});
     }
     let hooks = settings["hooks"].as_object_mut().unwrap();
@@ -260,10 +265,7 @@ fn uninstall_hook() -> Result<()> {
     };
 
     let mut removed = 0usize;
-    if let Some(arr) = hooks
-        .get_mut(HOOK_EVENT)
-        .and_then(|v| v.as_array_mut())
-    {
+    if let Some(arr) = hooks.get_mut(HOOK_EVENT).and_then(|v| v.as_array_mut()) {
         let before = arr.len();
         arr.retain(|entry| {
             let has_rigor = entry

@@ -79,10 +79,7 @@ pub async fn toggle_block_next(State(state): State<SharedState>) -> impl IntoRes
     let block = st.block_next;
     let _ = st.event_tx.send(DaemonEvent::GovernanceState {
         action: "block_next".to_string(),
-        detail: format!(
-            "block_next {}",
-            if block { "armed" } else { "disarmed" }
-        ),
+        detail: format!("block_next {}", if block { "armed" } else { "disarmed" }),
     });
     Json(serde_json::json!({"ok": true, "block_next": block}))
 }

@@ -71,4 +71,4 @@ jobs:
         run: cargo build --release
 
       - name: Run Rigor on itself
-        run: ./target/release/rigor validate rigor.yaml
+        run: ./target/release/rigor validate --path rigor.yaml

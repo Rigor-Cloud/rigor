@@ -40,7 +40,8 @@ fn find_real_binary(tool: &str) -> Result<String> {
 
     anyhow::bail!(
         "'{}' not found in PATH. Install it first, then run: rigor trust {}",
-        tool, tool
+        tool,
+        tool
     )
 }
 
@@ -199,7 +200,10 @@ exec {real_binary} "$@"
                     .append(true)
                     .open(&profile)?;
                 use std::io::Write;
-                writeln!(file, "\n# rigor — route AI tools through epistemic constraint proxy")?;
+                writeln!(
+                    file,
+                    "\n# rigor — route AI tools through epistemic constraint proxy"
+                )?;
                 writeln!(file, "{}", export_line)?;
                 println!("  Added to {}", profile.display());
                 println!("  Run: source {}", profile.display());
@@ -210,7 +214,10 @@ exec {real_binary} "$@"
     }
 
     println!();
-    println!("Now run '{}' normally — traffic routes through rigor.", tool);
+    println!(
+        "Now run '{}' normally — traffic routes through rigor.",
+        tool
+    );
     println!("Make sure rigor is running: rigor serve --background");
 
     Ok(())

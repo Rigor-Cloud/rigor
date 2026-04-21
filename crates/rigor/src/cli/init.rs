@@ -93,7 +93,13 @@ fn detect_python_deps(dir: &Path) -> Vec<String> {
             .unwrap_or_default()
             .lines()
             .filter(|l| !l.starts_with('#') && !l.is_empty())
-            .map(|l| l.split(&['=', '>', '<', '~', '!', '['][..]).next().unwrap_or(l).trim().to_string())
+            .map(|l| {
+                l.split(&['=', '>', '<', '~', '!', '['][..])
+                    .next()
+                    .unwrap_or(l)
+                    .trim()
+                    .to_string()
+            })
             .filter(|s| !s.is_empty())
             .collect();
     }
@@ -127,7 +133,7 @@ fn detect_go_deps(dir: &Path) -> Vec<String> {
     content
         .lines()
         .filter(|l| l.starts_with('\t') || l.starts_with("require "))
-        .map(|l| l.trim().split_whitespace().next().unwrap_or("").to_string())
+        .map(|l| l.split_whitespace().next().unwrap_or("").to_string())
         .filter(|s| !s.is_empty() && s != "require" && s != "(")
         .collect()
 }
@@ -169,13 +175,15 @@ pub fn generate_rigor_yaml(project_type: &ProjectType, deps: &[String]) -> Strin
     }
 
     // ── Tier 3: Project constraints placeholder ──
-    yaml.push_str(r#"
+    yaml.push_str(
+        r#"
     # ── Project Constraints ─────────────────────────────────────────
     # Run /rigor:map in Claude Code to generate code-anchored constraints
     # specific to YOUR project. These are the most valuable constraints —
     # they protect facts that only exist in your codebase.
 
-"#);
+"#,
+    );
 
     // ── Relations ──
     // Language constraints support each other
@@ -189,7 +197,10 @@ pub fn generate_rigor_yaml(project_type: &ProjectType, deps: &[String]) -> Strin
         _ => 0,
     };
 
-    eprintln!("rigor: {} language defaults, {} dependency constraints", lang_count, dep_count);
+    eprintln!(
+        "rigor: {} language defaults, {} dependency constraints",
+        lang_count, dep_count
+    );
     eprintln!("rigor: run /rigor:map to add project-specific constraints");
 
     yaml
@@ -258,9 +269,15 @@ fn gather_project_context(dir: &Path, project_type: &ProjectType, deps: &[String
     // Directory tree (depth 2)
     if let Ok(output) = std::process::Command::new("find")
         .args([dir.to_str().unwrap_or("."), "-maxdepth", "2", "-type", "f"])
-        .arg("-not").arg("-path").arg("*/target/*")
-        .arg("-not").arg("-path").arg("*/node_modules/*")
-        .arg("-not").arg("-path").arg("*/.git/*")
+        .arg("-not")
+        .arg("-path")
+        .arg("*/target/*")
+        .arg("-not")
+        .arg("-path")
+        .arg("*/node_modules/*")
+        .arg("-not")
+        .arg("-path")
+        .arg("*/.git/*")
         .output()
     {
         let tree = String::from_utf8_lossy(&output.stdout);
@@ -275,7 +292,8 @@ fn gather_project_context(dir: &Path, project_type: &ProjectType, deps: &[String
 
 /// Build the AI prompt for constraint generation.
 fn build_ai_prompt(context: &str) -> String {
-    format!(r#"You are analyzing a software project to generate epistemic constraints for "rigor", a tool that enforces claim quality in AI-assisted development.
+    format!(
+        r#"You are analyzing a software project to generate epistemic constraints for "rigor", a tool that enforces claim quality in AI-assisted development.
 
 Rigor validates claims that AI assistants make about code. Each constraint is a Rego policy that checks claims extracted from AI output.
 
@@ -310,7 +328,8 @@ For each constraint, write valid Rego using OPA v1 syntax:
 
 Output ONLY valid rigor.yaml content. No markdown fences. No explanation. Start with `constraints:`.
 
-Make constraints SPECIFIC to this project — not generic templates. Reference actual dependency names, actual API patterns, actual architectural decisions found in the context above."#)
+Make constraints SPECIFIC to this project — not generic templates. Reference actual dependency names, actual API patterns, actual architectural decisions found in the context above."#
+    )
 }
 
 /// Extract valid rigor.yaml YAML from an AI response that may contain markdown fences or explanation text.
@@ -343,7 +362,10 @@ fn extract_yaml_from_response(response: &str) -> Result<String> {
     if let Some(start) = trimmed.find("```") {
         let after_fence = &trimmed[start + 3..];
         // Skip the optional language tag on the same line
-        let after_newline = after_fence.find('\n').map(|i| &after_fence[i + 1..]).unwrap_or(after_fence);
+        let after_newline = after_fence
+            .find('\n')
+            .map(|i| &after_fence[i + 1..])
+            .unwrap_or(after_fence);
         if let Some(end) = after_newline.find("```") {
             let yaml = after_newline[..end].trim();
             if yaml.contains("constraints:") {
@@ -364,7 +386,10 @@ fn extract_yaml_from_response(response: &str) -> Result<String> {
         return Ok(yaml.trim().to_string());
     }
 
-    anyhow::bail!("AI response did not contain valid rigor.yaml content. Response preview: {}...", &trimmed.chars().take(200).collect::<String>())
+    anyhow::bail!(
+        "AI response did not contain valid rigor.yaml content. Response preview: {}...",
+        &trimmed.chars().take(200).collect::<String>()
+    )
 }
 
 /// Run AI-powered init by shelling out to claude CLI.
@@ -379,9 +404,12 @@ fn run_ai_init(dir: &Path, project_type: &ProjectType, deps: &[String]) -> Resul
     let output = std::process::Command::new("claude")
         .args([
             "--print",
-            "--output-format", "text",
-            "--disallowed-tools", "Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch",
-            "-p", &prompt,
+            "--output-format",
+            "text",
+            "--disallowed-tools",
+            "Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch",
+            "-p",
+            &prompt,
         ])
         .current_dir(dir)
         .output();
@@ -413,7 +441,10 @@ pub fn run_init(path: Option<PathBuf>, ai: bool) -> Result<()> {
     let yaml_path = dir.join("rigor.yaml");
 
     if yaml_path.exists() {
-        eprintln!("rigor: rigor.yaml already exists at {}", yaml_path.display());
+        eprintln!(
+            "rigor: rigor.yaml already exists at {}",
+            yaml_path.display()
+        );
         // Always install/update the skill even if yaml exists
         if let Err(e) = install_rigor_skill(&dir) {
             eprintln!("rigor: failed to install skill: {}", e);
@@ -430,10 +461,7 @@ pub fn run_init(path: Option<PathBuf>, ai: bool) -> Result<()> {
 
     eprintln!("rigor: detected project type: {}", project_type);
     if !deps.is_empty() {
-        eprintln!(
-            "rigor: detected {} dependencies",
-            deps.len()
-        );
+        eprintln!("rigor: detected {} dependencies", deps.len());
     }
 
     let yaml = if ai {
@@ -482,7 +510,7 @@ pub fn run_init(path: Option<PathBuf>, ai: bool) -> Result<()> {
     eprintln!("  rigor graph --web       # explore the constraint graph");
 
     match crate::cli::gate::install_hook() {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => eprintln!("rigor init: warning — failed to install gate hook: {}", e),
     }
 
@@ -497,7 +525,10 @@ fn install_rigor_skill(project_dir: &Path) -> Result<()> {
 
     let skill_path = skill_dir.join("rigor-map.md");
     std::fs::write(&skill_path, RIGOR_MAP_SKILL)?;
-    eprintln!("rigor: installed /rigor:map skill at {}", skill_path.display());
+    eprintln!(
+        "rigor: installed /rigor:map skill at {}",
+        skill_path.display()
+    );
     Ok(())
 }
 
@@ -650,7 +681,14 @@ mod tests {
 
     #[test]
     fn test_generate_yaml_has_registered_dep_constraints() {
-        let yaml = generate_rigor_yaml(&ProjectType::Rust, &["regorus".to_string(), "axum".to_string(), "tokio".to_string()]);
+        let yaml = generate_rigor_yaml(
+            &ProjectType::Rust,
+            &[
+                "regorus".to_string(),
+                "axum".to_string(),
+                "tokio".to_string(),
+            ],
+        );
         assert!(yaml.contains("regorus-capabilities"));
         assert!(yaml.contains("axum-is-tower-based"));
         assert!(yaml.contains("tokio-is-async-runtime"));
@@ -658,7 +696,10 @@ mod tests {
 
     #[test]
     fn test_generate_yaml_skips_unknown_deps() {
-        let yaml = generate_rigor_yaml(&ProjectType::Rust, &["serde".to_string(), "some-unknown-crate".to_string()]);
+        let yaml = generate_rigor_yaml(
+            &ProjectType::Rust,
+            &["serde".to_string(), "some-unknown-crate".to_string()],
+        );
         // serde has no registered constraints, should not appear
         assert!(!yaml.contains("serde-capabilities"));
     }
@@ -666,7 +707,11 @@ mod tests {
     #[test]
     fn test_init_creates_file() {
         let tmp = TempDir::new().unwrap();
-        std::fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"\n[dependencies]\ntokio = \"1\"").unwrap();
+        std::fs::write(
+            tmp.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\n[dependencies]\ntokio = \"1\"",
+        )
+        .unwrap();
         run_init(Some(tmp.path().to_path_buf()), false).unwrap();
         assert!(tmp.path().join("rigor.yaml").exists());
         let content = std::fs::read_to_string(tmp.path().join("rigor.yaml")).unwrap();

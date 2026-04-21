@@ -85,7 +85,10 @@ fn stop_serve() -> Result<()> {
     };
 
     if !is_pid_alive(pid) {
-        println!("rigor serve: stale PID file (pid {} not alive), cleaning up", pid);
+        println!(
+            "rigor serve: stale PID file (pid {} not alive), cleaning up",
+            pid
+        );
         remove_serve_pid();
         return Ok(());
     }
@@ -206,7 +209,12 @@ impl ExecReplaceSelf for std::process::Command {
 }
 
 /// Foreground mode: start the daemon, register the session, block until signal.
-fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>, max_cost: Option<f64>) -> Result<()> {
+fn run_foreground(
+    path: Option<PathBuf>,
+    port: u16,
+    session_name: Option<String>,
+    max_cost: Option<f64>,
+) -> Result<()> {
     // rigor serve is a global daemon — no project context at startup.
     // Constraints are loaded per-session when traffic arrives (via plugin headers).
     // If --path is given explicitly, load those constraints as defaults.
@@ -250,7 +258,10 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
         ended_at: None,
         pid: std::process::id(),
         constraints: constraint_count,
-        config_path: path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "(global)".to_string()),
+        config_path: path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "(global)".to_string()),
         cwd: std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
@@ -266,10 +277,16 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
     // Write both the shared daemon pid file (so hooks find us) and the
     // serve-specific pid file (so `rigor serve stop` finds us).
     if let Err(e) = daemon::write_pid_file() {
-        eprintln!("rigor serve: warning: could not write daemon pid file: {}", e);
+        eprintln!(
+            "rigor serve: warning: could not write daemon pid file: {}",
+            e
+        );
     }
     if let Err(e) = write_serve_pid(std::process::id()) {
-        eprintln!("rigor serve: warning: could not write serve pid file: {}", e);
+        eprintln!(
+            "rigor serve: warning: could not write serve pid file: {}",
+            e
+        );
     }
 
     // Banner: only print to terminal in foreground mode. In background mode
@@ -282,9 +299,15 @@ fn run_foreground(path: Option<PathBuf>, port: u16, session_name: Option<String>
     if constraint_count > 0 {
         eprintln!("rigor serve: {} constraints loaded", constraint_count);
     } else {
-        eprintln!("rigor serve: global mode — constraints loaded per-session from connecting projects");
+        eprintln!(
+            "rigor serve: global mode — constraints loaded per-session from connecting projects"
+        );
     }
-    eprintln!("rigor serve: session '{}' ({})", entry_name, &session_id[..8]);
+    eprintln!(
+        "rigor serve: session '{}' ({})",
+        entry_name,
+        &session_id[..8]
+    );
 
     let shared = Arc::new(Mutex::new(state));
 

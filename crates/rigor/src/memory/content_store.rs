@@ -254,7 +254,7 @@ impl ContentStoreBackend for InMemoryBackend {
 
         let mut results = Vec::new();
 
-        let want = |c: Category| category.map_or(true, |filter| filter == c);
+        let want = |c: Category| category.is_none_or(|filter| filter == c);
 
         if want(Category::Audit) {
             for entry in self.audit.iter() {

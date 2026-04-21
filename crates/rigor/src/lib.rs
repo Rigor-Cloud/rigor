@@ -1,3 +1,10 @@
+// Pre-existing clippy warnings in code predating the epistemic-expansion
+// plan. Allowed here to keep CI green while the underlying cleanup lands as
+// separate PRs. Track under `.planning/roadmap/epistemic-expansion-plan.md`
+// (out-of-scope entries).
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::type_complexity)]
+
 pub mod alerting;
 pub mod claim;
 pub mod cli;
@@ -7,6 +14,7 @@ pub mod cost;
 pub mod daemon;
 pub mod defaults;
 pub mod evaluator;
+pub mod fallback;
 pub mod hook;
 pub mod logging;
 pub mod lsp;
@@ -14,7 +22,6 @@ pub mod memory;
 pub mod observability;
 pub mod policy;
 pub mod violation;
-pub mod fallback;
 
 use anyhow::Result;
 use std::path::Path;
@@ -50,11 +57,18 @@ fn run_hook() -> Result<()> {
     let span = info_span!("rigor_hook");
     let _guard = span.enter();
 
-    // No-op if no rigor daemon is running. Without rigor-personal active,
-    // claim extraction's LLM-as-judge path has no captured API key, no
-    // dashboard to stream to, and nothing to do. Return allow silently so
-    // the session behaves exactly as if rigor weren't installed at all.
-    if !daemon::daemon_alive() {
+    // No-op if no rigor daemon is running AND no rigor.yaml is present in
+    // the tree. Without either, the session hasn't opted into rigor — no
+    // captured API key, no dashboard, no constraints. Return allow silently
+    // so the session behaves exactly as if rigor weren't installed at all.
+    //
+    // If rigor.yaml IS present, the user has opted in and we evaluate
+    // regardless of daemon state. This keeps integration tests and offline
+    // stop-hook runs working. `RIGOR_TEST_CLAIMS` forces evaluation in
+    // test mode even without a rigor.yaml lookup, for belt-and-suspenders.
+    let in_test_mode = std::env::var("RIGOR_TEST_CLAIMS").is_ok();
+    let has_config = config::find_rigor_yaml().is_some();
+    if !in_test_mode && !has_config && !daemon::daemon_alive() {
         // Still drain stdin (Claude Code expects the hook to consume its
         // input) and emit the allow response. Nothing else runs.
         let _ = StopHookInput::from_stdin();
@@ -305,13 +319,14 @@ fn evaluate_constraints(yaml_path: &Path, transcript_path: &str) -> Result<()> {
                         .and_then(|cid| claims.iter().find(|c| &c.id == cid));
 
                     let claim_confidence = source_claim.map(|c| c.confidence);
-                    let claim_type_str = source_claim.map(|c| format!("{:?}", c.claim_type).to_lowercase());
-                    let claim_source = source_claim
-                        .and_then(|c| c.source.as_ref())
-                        .map(|s| logging::ClaimSource {
+                    let claim_type_str =
+                        source_claim.map(|c| format!("{:?}", c.claim_type).to_lowercase());
+                    let claim_source = source_claim.and_then(|c| c.source.as_ref()).map(|s| {
+                        logging::ClaimSource {
                             message_index: s.message_index,
                             sentence_index: s.sentence_index,
-                        });
+                        }
+                    });
 
                     let entry = logging::ViolationLogEntry {
                         session: session.clone(),

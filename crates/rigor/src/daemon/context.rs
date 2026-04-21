@@ -15,7 +15,9 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
     ctx.push_str("Do not state falsehoods even as examples, tests, quotes, or demonstrations.\n\n");
 
     // Teach the truths grouped by epistemic type
-    let beliefs: Vec<_> = config.all_constraints().into_iter()
+    let beliefs: Vec<_> = config
+        .all_constraints()
+        .into_iter()
         .filter(|c| c.epistemic_type == EpistemicType::Belief)
         .collect();
 
@@ -23,13 +25,18 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
         ctx.push_str("VERIFIED TRUTHS:\n");
         for c in &beliefs {
             let strength = graph.get_strength(&c.id).unwrap_or(0.0);
-            ctx.push_str(&format!("• {} — {} [strength: {:.2}]\n", c.name, c.description, strength));
+            ctx.push_str(&format!(
+                "• {} — {} [strength: {:.2}]\n",
+                c.name, c.description, strength
+            ));
         }
-        ctx.push_str("\n");
+        ctx.push('\n');
     }
 
     // Justifications as evidence requirements
-    let justifications: Vec<_> = config.all_constraints().into_iter()
+    let justifications: Vec<_> = config
+        .all_constraints()
+        .into_iter()
         .filter(|c| c.epistemic_type == EpistemicType::Justification)
         .collect();
 
@@ -38,11 +45,13 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
         for c in &justifications {
             ctx.push_str(&format!("• {} — {}\n", c.name, c.description));
         }
-        ctx.push_str("\n");
+        ctx.push('\n');
     }
 
     // Defeaters as known contradictions
-    let defeaters: Vec<_> = config.all_constraints().into_iter()
+    let defeaters: Vec<_> = config
+        .all_constraints()
+        .into_iter()
         .filter(|c| c.epistemic_type == EpistemicType::Defeater)
         .collect();
 
@@ -51,7 +60,7 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
         for c in &defeaters {
             ctx.push_str(&format!("• {} — {}\n", c.name, c.description));
         }
-        ctx.push_str("\n");
+        ctx.push('\n');
     }
 
     // Recent violations — teach from past mistakes in this session
@@ -67,7 +76,7 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
                         entry.message
                     ));
                 }
-                ctx.push_str("\n");
+                ctx.push('\n');
             }
         }
     }
@@ -82,7 +91,9 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
             .filter(|e| e.outcome != "false_positive_dominant")
             .collect();
         if !non_fp.is_empty() {
-            ctx.push_str("RELEVANT PAST EPISODES (from previous sessions — do not repeat these errors):\n");
+            ctx.push_str(
+                "RELEVANT PAST EPISODES (from previous sessions — do not repeat these errors):\n",
+            );
             for ep in non_fp.iter().take(3) {
                 let sid_short = &ep.session_id[..ep.session_id.len().min(8)];
                 ctx.push_str(&format!(
@@ -96,7 +107,7 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
                     ctx.push_str(&format!("   - flagged claim: \"{}\"\n", s));
                 }
             }
-            ctx.push_str("\n");
+            ctx.push('\n');
         }
 
         let warnings = memory.model_warnings();
@@ -105,16 +116,18 @@ pub fn build_epistemic_context(config: &RigorConfig, graph: &ArgumentationGraph)
             for w in &warnings {
                 ctx.push_str(&format!("• {}\n", w));
             }
-            ctx.push_str("\n");
+            ctx.push('\n');
         }
 
         let top = memory.top_relevant_constraints(5);
         if !top.is_empty() {
-            ctx.push_str("HIGH-RISK CONSTRAINT CATEGORIES (most frequently triggered historically):\n");
+            ctx.push_str(
+                "HIGH-RISK CONSTRAINT CATEGORIES (most frequently triggered historically):\n",
+            );
             for (cid, n) in &top {
                 ctx.push_str(&format!("• {} — fired in {} prior session(s)\n", cid, n));
             }
-            ctx.push_str("\n");
+            ctx.push('\n');
         }
     }
 

@@ -89,19 +89,19 @@ pub enum DaemonEvent {
     ClaimRelevance {
         claim_id: String,
         constraint_id: String,
-        relevance: String,  // "high" | "medium" | "low"
+        relevance: String, // "high" | "medium" | "low"
         reason: String,
     },
     /// LLM-as-judge activity — shows when the judge is working and how long it took
     JudgeActivity {
         request_id: String,
-        action: String,   // "relevance_start" | "relevance_done" | "retry_verify_start" | "retry_verify_done"
+        action: String, // "relevance_start" | "relevance_done" | "retry_verify_start" | "retry_verify_done"
         duration_ms: Option<u64>,
         detail: String,
     },
     /// Full judge evaluation details — prompt, response, claims, constraints
     JudgeEvaluation {
-        eval_type: String,    // "relevance" | "retry_verify" | "semantic_eval"
+        eval_type: String, // "relevance" | "retry_verify" | "semantic_eval"
         #[serde(skip_serializing_if = "Option::is_none")]
         prompt: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,10 +117,7 @@ pub enum DaemonEvent {
     },
     /// Accumulated streamed response text — sent periodically so dashboard
     /// can show the actual text that's being evaluated.
-    StreamText {
-        request_id: String,
-        text: String,
-    },
+    StreamText { request_id: String, text: String },
     /// Detailed proxy log entry — shows full HTTP request/response flowing through rigor
     ProxyLog {
         id: String,
@@ -141,13 +138,13 @@ pub enum DaemonEvent {
     /// Low-level daemon log — any internal event (TLS accept, handshake, errors, etc.)
     DaemonLog {
         timestamp: String,
-        level: String,  // "info" | "warn" | "error" | "debug"
+        level: String,    // "info" | "warn" | "error" | "debug"
         category: String, // "tls" | "proxy" | "claim" | "policy" | "layer" | "net"
         message: String,
     },
     /// Governance state change — broadcast to all dashboard clients
     GovernanceState {
-        action: String,   // "toggle_constraint" | "pause" | "block_next"
+        action: String, // "toggle_constraint" | "pause" | "block_next"
         detail: String,
     },
     /// Chat response — from dashboard chat
@@ -159,8 +156,8 @@ pub enum DaemonEvent {
     /// AI coding agent activity — mirrored for dashboard (Claude Code, OpenCode, etc.)
     AgentEvent {
         request_id: String,
-        agent_type: String,  // "claude_code" | "opencode"
-        event_type: String,  // "tool_use" | "text" | "thinking" | "session_start" | "session_end"
+        agent_type: String, // "claude_code" | "opencode"
+        event_type: String, // "tool_use" | "text" | "thinking" | "session_start" | "session_end"
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         tool_name: Option<String>,
@@ -170,7 +167,7 @@ pub enum DaemonEvent {
     /// Claude Code activity — mirrored for dashboard (legacy, kept for compatibility)
     ClaudeCodeEvent {
         request_id: String,
-        event_type: String,  // "tool_use" | "text" | "thinking"
+        event_type: String, // "tool_use" | "text" | "thinking"
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         tool_name: Option<String>,
@@ -179,7 +176,7 @@ pub enum DaemonEvent {
     ActionGate {
         request_id: String,
         gate_id: String,
-        gate_type: String,  // "realtime" | "retroactive"
+        gate_type: String, // "realtime" | "retroactive"
         action_text: String,
         user_message: String,
         reason: String,
@@ -310,10 +307,7 @@ pub fn create_event_channel() -> (EventSender, broadcast::Receiver<DaemonEvent>)
 
 /// WebSocket upgrade handler. Subscribes to the event broadcast channel
 /// and forwards serialized events to the connected client.
-pub async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(tx): State<EventSender>,
-) -> Response {
+pub async fn ws_handler(ws: WebSocketUpgrade, State(tx): State<EventSender>) -> Response {
     let rx = tx.subscribe();
     ws.on_upgrade(|socket| handle_socket(socket, rx))
 }

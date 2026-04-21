@@ -54,18 +54,17 @@ impl RigorCA {
 
         let (ca_key, ca_cert_signed) = if cert_path.exists() && key_path.exists() {
             // Load existing CA
-            let key_pem = std::fs::read_to_string(&key_path)
-                .context("Failed to read CA key")?;
-            let cert_pem = std::fs::read_to_string(&cert_path)
-                .context("Failed to read CA cert")?;
+            let key_pem = std::fs::read_to_string(&key_path).context("Failed to read CA key")?;
+            let cert_pem = std::fs::read_to_string(&cert_path).context("Failed to read CA cert")?;
 
-            let ca_key = rcgen::KeyPair::from_pem(&key_pem)
-                .context("Failed to parse CA key PEM")?;
+            let ca_key =
+                rcgen::KeyPair::from_pem(&key_pem).context("Failed to parse CA key PEM")?;
 
             let ca_params = rcgen::CertificateParams::from_ca_cert_pem(&cert_pem)
                 .context("Failed to parse CA cert PEM")?;
 
-            let ca_cert_signed = ca_params.self_signed(&ca_key)
+            let ca_cert_signed = ca_params
+                .self_signed(&ca_key)
                 .context("Failed to re-sign CA cert")?;
 
             crate::info_println!("rigor CA: loaded from {}", cert_path.display());
@@ -85,10 +84,10 @@ impl RigorCA {
                 rcgen::KeyUsagePurpose::CrlSign,
             ];
 
-            let ca_key = rcgen::KeyPair::generate()
-                .context("Failed to generate CA key")?;
+            let ca_key = rcgen::KeyPair::generate().context("Failed to generate CA key")?;
 
-            let ca_cert_signed = ca_params.self_signed(&ca_key)
+            let ca_cert_signed = ca_params
+                .self_signed(&ca_key)
                 .context("Failed to self-sign CA cert")?;
 
             // Persist
@@ -102,7 +101,9 @@ impl RigorCA {
             }
 
             crate::info_println!("rigor CA: generated new CA at {}", cert_path.display());
-            eprintln!("rigor CA: run `rigor trust` to install in macOS keychain for universal trust");
+            eprintln!(
+                "rigor CA: run `rigor trust` to install in macOS keychain for universal trust"
+            );
 
             (ca_key, ca_cert_signed)
         };
@@ -134,10 +135,10 @@ impl RigorCA {
             .distinguished_name
             .push(rcgen::DnType::OrganizationName, "rigor".to_string());
 
-        let host_key = rcgen::KeyPair::generate()
-            .context("Failed to generate host key")?;
+        let host_key = rcgen::KeyPair::generate().context("Failed to generate host key")?;
 
-        let host_cert = params.signed_by(&host_key, &self.ca_cert_signed, &self.ca_key)
+        let host_cert = params
+            .signed_by(&host_key, &self.ca_cert_signed, &self.ca_key)
             .context("Failed to sign host cert with CA")?;
 
         let host_cert_der = host_cert.der().clone();
@@ -190,9 +191,13 @@ pub fn install_ca_trust() -> Result<()> {
         .args([
             "add-trusted-cert",
             "-d",
-            "-r", "trustRoot",
-            "-k", &format!("{}/Library/Keychains/login.keychain-db",
-                dirs::home_dir().unwrap_or_default().display()),
+            "-r",
+            "trustRoot",
+            "-k",
+            &format!(
+                "{}/Library/Keychains/login.keychain-db",
+                dirs::home_dir().unwrap_or_default().display()
+            ),
             &cert_path.to_string_lossy(),
         ])
         .output()?;
@@ -216,11 +221,7 @@ pub fn remove_ca_trust() -> Result<()> {
     }
 
     let output = std::process::Command::new("security")
-        .args([
-            "remove-trusted-cert",
-            "-d",
-            &cert_path.to_string_lossy(),
-        ])
+        .args(["remove-trusted-cert", "-d", &cert_path.to_string_lossy()])
         .output()?;
 
     if output.status.success() {
@@ -238,9 +239,8 @@ pub fn remove_ca_trust() -> Result<()> {
 /// Used by the dedicated TLS listener (non-MITM mode).
 pub fn generate_tls_config(hosts: &[&str]) -> Result<ServerConfig> {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let mut params = rcgen::CertificateParams::new(
-        hosts.iter().map(|h| h.to_string()).collect::<Vec<_>>(),
-    )?;
+    let mut params =
+        rcgen::CertificateParams::new(hosts.iter().map(|h| h.to_string()).collect::<Vec<_>>())?;
     params
         .distinguished_name
         .push(rcgen::DnType::CommonName, hosts[0].to_string());

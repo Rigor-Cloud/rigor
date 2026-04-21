@@ -53,7 +53,9 @@ fn patch_sip_binary(binary_path: &str) -> Result<PathBuf> {
         // This is the mirrord approach — keep the binary structurally intact,
         // just add the entitlement and re-sign ad-hoc.
         let entitlements_path = patch_dir.join("entitlements.plist");
-        std::fs::write(&entitlements_path, r#"<?xml version="1.0" encoding="UTF-8"?>
+        std::fs::write(
+            &entitlements_path,
+            r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -67,7 +69,8 @@ fn patch_sip_binary(binary_path: &str) -> Result<PathBuf> {
     <true/>
 </dict>
 </plist>
-"#)?;
+"#,
+        )?;
 
         // Re-sign ad-hoc with the new entitlements.
         // --force overwrites existing signature, -s - means ad-hoc,
@@ -75,8 +78,10 @@ fn patch_sip_binary(binary_path: &str) -> Result<PathBuf> {
         let output = Command::new("codesign")
             .args([
                 "--force",
-                "--sign", "-",
-                "--entitlements", &entitlements_path.to_string_lossy(),
+                "--sign",
+                "-",
+                "--entitlements",
+                &entitlements_path.to_string_lossy(),
                 &patched.to_string_lossy(),
             ])
             .output();
@@ -177,7 +182,7 @@ fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16, com
             cmd.env("OPENAI_BASE_URL", &base_url);
 
             // For Vertex AI: set the endpoint override
-            cmd.env("CLOUD_ML_API_ENDPOINT", &format!("127.0.0.1:{}", port));
+            cmd.env("CLOUD_ML_API_ENDPOINT", format!("127.0.0.1:{}", port));
 
             info_println!("rigor: proxy mode (ANTHROPIC_BASE_URL={})", base_url);
         }
@@ -237,7 +242,7 @@ fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16, com
     if matches!(mode, InterceptionMode::HttpProxy) {
         cmd.env("ANTHROPIC_BASE_URL", &base_url);
         cmd.env("OPENAI_BASE_URL", &base_url);
-        cmd.env("CLOUD_ML_API_ENDPOINT", &format!("127.0.0.1:{}", port));
+        cmd.env("CLOUD_ML_API_ENDPOINT", format!("127.0.0.1:{}", port));
     }
 
     // OpenCode-specific env vars
@@ -276,9 +281,18 @@ fn apply_interception(cmd: &mut Command, mode: &InterceptionMode, port: u16, com
 /// Interception strategy (tries in order):
 /// 1. LD_PRELOAD (if layer built) — hooks connect() at libc level
 /// 2. HTTP_PROXY + ANTHROPIC_BASE_URL — env var based redirection
-pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, transparent: bool, session_name: Option<String>, max_cost: Option<f64>, command: Vec<String>) -> Result<()> {
-    use std::os::unix::io::{AsRawFd, FromRawFd};
+pub fn run_ground(
+    path: Option<PathBuf>,
+    port: u16,
+    quiet: bool,
+    mitm: bool,
+    transparent: bool,
+    session_name: Option<String>,
+    max_cost: Option<f64>,
+    command: Vec<String>,
+) -> Result<()> {
     use crate::logging::session_registry::{self, SessionEntry};
+    use std::os::unix::io::{AsRawFd, FromRawFd};
 
     // Generate session ID early so we can use it for log paths
     let session_id = uuid::Uuid::new_v4().to_string();
@@ -342,12 +356,16 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
     crate::daemon::ws::set_transparent(transparent);
 
     if transparent {
-        info_println!("rigor: transparent mode — layer redirects all :443 to daemon (no HTTPS_PROXY)");
+        info_println!(
+            "rigor: transparent mode — layer redirects all :443 to daemon (no HTTPS_PROXY)"
+        );
     }
     if mitm {
         info_println!("rigor: MITM mode enabled — LLM endpoints will be inspected (may break OAuth/cert pinning)");
     } else if !transparent {
-        info_println!("rigor: blind tunnel mode (default) — all CONNECT tunnels preserve end-to-end TLS");
+        info_println!(
+            "rigor: blind tunnel mode (default) — all CONNECT tunnels preserve end-to-end TLS"
+        );
         info_println!("rigor: pass --mitm to enable LLM body inspection and constraint injection");
     }
 
@@ -390,7 +408,8 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
 
     // Register session in the session registry
     let agent_str = daemon::ws::grounded_client().as_str();
-    let session_entry_name = session_name.unwrap_or_else(|| SessionEntry::auto_name(agent_str, &session_id));
+    let session_entry_name =
+        session_name.unwrap_or_else(|| SessionEntry::auto_name(agent_str, &session_id));
     let session_entry = SessionEntry {
         id: session_id.clone(),
         name: session_entry_name.clone(),
@@ -400,7 +419,9 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
         pid: std::process::id(),
         constraints: constraint_count,
         config_path: yaml_path.display().to_string(),
-        cwd: std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+        cwd: std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
         requests: None,
         violations: None,
         total_tokens: None,
@@ -409,12 +430,13 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
     if let Err(e) = session_registry::register_session(&session_entry) {
         info_println!("rigor: warning: failed to register session: {}", e);
     }
-    info_println!("rigor: session '{}' ({})", session_entry_name, &session_id[..8]);
+    info_println!(
+        "rigor: session '{}' ({})",
+        session_entry_name,
+        &session_id[..8]
+    );
 
-    let event_tx_for_server = {
-        let st = state.event_tx.clone();
-        st
-    };
+    let event_tx_for_server = { state.event_tx.clone() };
 
     let shared = std::sync::Arc::new(std::sync::Mutex::new(state));
     let shared_for_server = shared.clone();
@@ -468,41 +490,63 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
                     let tls_config = match daemon::tls::generate_tls_config(daemon::MITM_HOSTS) {
                         Ok(c) => c,
                         Err(e) => {
-                            daemon::ws::emit_log(&tls_event_tx, "error", "tls",
-                                format!("TLS setup failed: {} — LD_PRELOAD won't work", e));
+                            daemon::ws::emit_log(
+                                &tls_event_tx,
+                                "error",
+                                "tls",
+                                format!("TLS setup failed: {} — LD_PRELOAD won't work", e),
+                            );
                             return;
                         }
                     };
 
-                    let tls_acceptor = tokio_rustls::TlsAcceptor::from(
-                        std::sync::Arc::new(tls_config),
-                    );
-                    let listener = match tokio::net::TcpListener::bind(
-                        format!("127.0.0.1:{}", tls_port),
-                    ).await {
+                    let tls_acceptor =
+                        tokio_rustls::TlsAcceptor::from(std::sync::Arc::new(tls_config));
+                    let listener = match tokio::net::TcpListener::bind(format!(
+                        "127.0.0.1:{}",
+                        tls_port
+                    ))
+                    .await
+                    {
                         Ok(l) => l,
                         Err(e) => {
-                            daemon::ws::emit_log(&tls_event_tx, "error", "tls",
-                                format!("Failed to bind TLS port {}: {}", tls_port, e));
+                            daemon::ws::emit_log(
+                                &tls_event_tx,
+                                "error",
+                                "tls",
+                                format!("Failed to bind TLS port {}: {}", tls_port, e),
+                            );
                             return;
                         }
                     };
 
-                    daemon::ws::emit_log(&tls_event_tx, "info", "tls",
-                        format!("TLS listener ready on 127.0.0.1:{}", tls_port));
+                    daemon::ws::emit_log(
+                        &tls_event_tx,
+                        "info",
+                        "tls",
+                        format!("TLS listener ready on 127.0.0.1:{}", tls_port),
+                    );
 
                     loop {
                         let (stream, addr) = match listener.accept().await {
                             Ok(conn) => conn,
                             Err(e) => {
-                                daemon::ws::emit_log(&tls_event_tx, "warn", "net",
-                                    format!("TCP accept error: {}", e));
+                                daemon::ws::emit_log(
+                                    &tls_event_tx,
+                                    "warn",
+                                    "net",
+                                    format!("TCP accept error: {}", e),
+                                );
                                 continue;
                             }
                         };
 
-                        daemon::ws::emit_log(&tls_event_tx, "info", "net",
-                            format!("TCP accept from {}", addr));
+                        daemon::ws::emit_log(
+                            &tls_event_tx,
+                            "info",
+                            "net",
+                            format!("TCP accept from {}", addr),
+                        );
 
                         let acceptor = tls_acceptor.clone();
                         let app = tls_app.clone();
@@ -513,73 +557,126 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
                             // whether to MITM or blind-tunnel. This is the mirrord pattern:
                             // the layer redirects all :443 here, and we route based on SNI.
                             let mut stream = stream;
-                            let (peeked, sni_opt) = match daemon::sni::peek_client_hello(&mut stream).await {
-                                Ok(v) => v,
-                                Err(e) => {
-                                    // Connection reset / aborted before TLS started — usually a probe
-                                    // or connection pool init that the client immediately closed.
-                                    let msg = e.to_string();
-                                    let level = if msg.contains("reset") || msg.contains("aborted")
-                                        || msg.contains("unexpected end") {
-                                        "debug"
-                                    } else {
-                                        "warn"
-                                    };
-                                    daemon::ws::emit_log(&conn_event_tx, level, "tls",
-                                        format!("SNI peek aborted for {}: {}", addr, e));
-                                    return;
-                                }
-                            };
+                            let (peeked, sni_opt) =
+                                match daemon::sni::peek_client_hello(&mut stream).await {
+                                    Ok(v) => v,
+                                    Err(e) => {
+                                        // Connection reset / aborted before TLS started — usually a probe
+                                        // or connection pool init that the client immediately closed.
+                                        let msg = e.to_string();
+                                        let level = if msg.contains("reset")
+                                            || msg.contains("aborted")
+                                            || msg.contains("unexpected end")
+                                        {
+                                            "debug"
+                                        } else {
+                                            "warn"
+                                        };
+                                        daemon::ws::emit_log(
+                                            &conn_event_tx,
+                                            level,
+                                            "tls",
+                                            format!("SNI peek aborted for {}: {}", addr, e),
+                                        );
+                                        return;
+                                    }
+                                };
 
-                            let sni_host = sni_opt.clone().unwrap_or_else(|| "<no-sni>".to_string());
-                            daemon::ws::emit_log(&conn_event_tx, "info", "tls",
-                                format!("SNI peeked from {}: {}", addr, sni_host));
+                            let sni_host =
+                                sni_opt.clone().unwrap_or_else(|| "<no-sni>".to_string());
+                            daemon::ws::emit_log(
+                                &conn_event_tx,
+                                "info",
+                                "tls",
+                                format!("SNI peeked from {}: {}", addr, sni_host),
+                            );
 
                             // Decide MITM or blind tunnel based on SNI hostname
-                            let should_mitm = sni_opt.as_ref()
+                            let should_mitm = sni_opt
+                                .as_ref()
                                 .map(|h| daemon::should_mitm_target(&format!("{}:443", h)))
                                 .unwrap_or(false);
 
                             if !should_mitm {
                                 // BLIND TUNNEL: open new TCP to the real upstream and pipe bytes,
                                 // including the buffered ClientHello we already read.
-                                let upstream_target = sni_opt.as_deref()
+                                let upstream_target = sni_opt
+                                    .as_deref()
                                     .map(|h| format!("{}:443", h))
                                     .unwrap_or_else(|| "127.0.0.1:443".to_string());
 
-                                daemon::ws::emit_log(&conn_event_tx, "info", "proxy",
-                                    format!("Blind tunneling SNI={} → {}", sni_host, upstream_target));
+                                daemon::ws::emit_log(
+                                    &conn_event_tx,
+                                    "info",
+                                    "proxy",
+                                    format!(
+                                        "Blind tunneling SNI={} → {}",
+                                        sni_host, upstream_target
+                                    ),
+                                );
 
-                                let mut upstream = match tokio::net::TcpStream::connect(&upstream_target).await {
-                                    Ok(u) => u,
-                                    Err(e) => {
-                                        daemon::ws::emit_log(&conn_event_tx, "error", "net",
-                                            format!("Blind tunnel upstream connect failed for {}: {}", upstream_target, e));
-                                        return;
-                                    }
-                                };
+                                let mut upstream =
+                                    match tokio::net::TcpStream::connect(&upstream_target).await {
+                                        Ok(u) => u,
+                                        Err(e) => {
+                                            daemon::ws::emit_log(
+                                                &conn_event_tx,
+                                                "error",
+                                                "net",
+                                                format!(
+                                                "Blind tunnel upstream connect failed for {}: {}",
+                                                upstream_target, e
+                                            ),
+                                            );
+                                            return;
+                                        }
+                                    };
 
                                 // Forward the buffered ClientHello bytes first
                                 use tokio::io::AsyncWriteExt;
                                 if let Err(e) = upstream.write_all(&peeked).await {
-                                    daemon::ws::emit_log(&conn_event_tx, "warn", "proxy",
-                                        format!("Failed to forward ClientHello to {}: {}", upstream_target, e));
+                                    daemon::ws::emit_log(
+                                        &conn_event_tx,
+                                        "warn",
+                                        "proxy",
+                                        format!(
+                                            "Failed to forward ClientHello to {}: {}",
+                                            upstream_target, e
+                                        ),
+                                    );
                                     return;
                                 }
 
                                 // Now pipe bytes both ways
                                 let mut prepended = stream;
-                                match tokio::io::copy_bidirectional(&mut prepended, &mut upstream).await {
+                                match tokio::io::copy_bidirectional(&mut prepended, &mut upstream)
+                                    .await
+                                {
                                     Ok((from_client, from_upstream)) => {
-                                        daemon::ws::emit_log(&conn_event_tx, "info", "proxy",
-                                            format!("Blind tunnel closed: {} ({}B out, {}B in)",
-                                                upstream_target, from_client, from_upstream));
+                                        daemon::ws::emit_log(
+                                            &conn_event_tx,
+                                            "info",
+                                            "proxy",
+                                            format!(
+                                                "Blind tunnel closed: {} ({}B out, {}B in)",
+                                                upstream_target, from_client, from_upstream
+                                            ),
+                                        );
                                     }
                                     Err(e) => {
                                         let msg = e.to_string();
-                                        if !msg.contains("connection reset") && !msg.contains("broken pipe") {
-                                            daemon::ws::emit_log(&conn_event_tx, "warn", "proxy",
-                                                format!("Blind tunnel copy error for {}: {}", upstream_target, e));
+                                        if !msg.contains("connection reset")
+                                            && !msg.contains("broken pipe")
+                                        {
+                                            daemon::ws::emit_log(
+                                                &conn_event_tx,
+                                                "warn",
+                                                "proxy",
+                                                format!(
+                                                    "Blind tunnel copy error for {}: {}",
+                                                    upstream_target, e
+                                                ),
+                                            );
                                         }
                                     }
                                 }
@@ -590,28 +687,44 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
                             let prepended = daemon::sni::PrependedStream::new(peeked, stream);
                             match acceptor.accept(prepended).await {
                                 Ok(tls_stream) => {
-                                    daemon::ws::emit_log(&conn_event_tx, "info", "tls",
-                                        format!("MITM TLS handshake OK from {} (SNI={})", addr, sni_host));
+                                    daemon::ws::emit_log(
+                                        &conn_event_tx,
+                                        "info",
+                                        "tls",
+                                        format!(
+                                            "MITM TLS handshake OK from {} (SNI={})",
+                                            addr, sni_host
+                                        ),
+                                    );
                                     let io = hyper_util::rt::TokioIo::new(tls_stream);
                                     let tower_service = app.clone();
                                     let req_event_tx = conn_event_tx.clone();
-                                    let service = hyper::service::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
-                                        let mut router = tower_service.clone();
-                                        let log_tx = req_event_tx.clone();
-                                        let method = req.method().to_string();
-                                        let path = req.uri().path().to_string();
-                                        async move {
-                                            daemon::ws::emit_log(&log_tx, "info", "proxy",
-                                                format!("HTTP request received: {} {}", method, path));
-                                            use tower::Service;
-                                            let (parts, body) = req.into_parts();
-                                            let body = axum::body::Body::new(body);
-                                            let req = hyper::Request::from_parts(parts, body);
-                                            router.call(req).await.map_err(|e| {
-                                                std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                                            })
-                                        }
-                                    });
+                                    let service = hyper::service::service_fn(
+                                        move |req: hyper::Request<hyper::body::Incoming>| {
+                                            let mut router = tower_service.clone();
+                                            let log_tx = req_event_tx.clone();
+                                            let method = req.method().to_string();
+                                            let path = req.uri().path().to_string();
+                                            async move {
+                                                daemon::ws::emit_log(
+                                                    &log_tx,
+                                                    "info",
+                                                    "proxy",
+                                                    format!(
+                                                        "HTTP request received: {} {}",
+                                                        method, path
+                                                    ),
+                                                );
+                                                use tower::Service;
+                                                let (parts, body) = req.into_parts();
+                                                let body = axum::body::Body::new(body);
+                                                let req = hyper::Request::from_parts(parts, body);
+                                                router.call(req).await.map_err(|e| {
+                                                    std::io::Error::other(e.to_string())
+                                                })
+                                            }
+                                        },
+                                    );
                                     if let Err(e) = hyper_util::server::conn::auto::Builder::new(
                                         hyper_util::rt::TokioExecutor::new(),
                                     )
@@ -619,15 +732,28 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
                                     .await
                                     {
                                         let msg = e.to_string();
-                                        if !msg.contains("connection closed") && !msg.contains("broken pipe") {
-                                            daemon::ws::emit_log(&conn_event_tx, "warn", "proxy",
-                                                format!("HTTP service error from {}: {}", addr, msg));
+                                        if !msg.contains("connection closed")
+                                            && !msg.contains("broken pipe")
+                                        {
+                                            daemon::ws::emit_log(
+                                                &conn_event_tx,
+                                                "warn",
+                                                "proxy",
+                                                format!(
+                                                    "HTTP service error from {}: {}",
+                                                    addr, msg
+                                                ),
+                                            );
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    daemon::ws::emit_log(&conn_event_tx, "error", "tls",
-                                        format!("TLS handshake FAILED from {}: {}", addr, e));
+                                    daemon::ws::emit_log(
+                                        &conn_event_tx,
+                                        "error",
+                                        "tls",
+                                        format!("TLS handshake FAILED from {}: {}", addr, e),
+                                    );
                                 }
                             }
                         });
@@ -658,7 +784,11 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
         request_id: uuid::Uuid::new_v4().to_string(),
         agent_type: grounded.as_str().to_string(),
         event_type: "session_start".to_string(),
-        content: format!("Grounding {} with {} constraints", grounded.as_str(), constraint_count),
+        content: format!(
+            "Grounding {} with {} constraints",
+            grounded.as_str(),
+            constraint_count
+        ),
         tool_name: None,
         session_id: if is_opencode_command(&command) {
             // Will be set on the child; generate same one for correlation
@@ -668,17 +798,20 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
         },
     });
 
-    info_println!("rigor: session started — agent={}, constraints={}", grounded.as_str(), constraint_count);
+    info_println!(
+        "rigor: session started — agent={}, constraints={}",
+        grounded.as_str(),
+        constraint_count
+    );
 
     // Open dashboard
-    let _ = open::that(&format!("http://rigor.local:{}", port));
+    let _ = open::that(format!("http://rigor.local:{}", port));
 
     // Spawn the target command
     // If the first arg is an existing binary, exec it directly.
     // Otherwise, spawn via the user's shell so aliases/functions work.
     let program = &command[0];
-    let is_binary = std::path::Path::new(program).exists()
-        || which_exists(program);
+    let is_binary = std::path::Path::new(program).exists() || which_exists(program);
 
     let mut cmd;
     let actual_mode;
@@ -687,20 +820,24 @@ pub fn run_ground(path: Option<PathBuf>, port: u16, quiet: bool, mitm: bool, tra
         // Direct binary — can use LD_PRELOAD
         // On macOS, check if binary has hardened runtime (strips DYLD_INSERT_LIBRARIES)
         // If so, patch it (copy + strip signature + re-sign ad-hoc) like mirrord does
-        let effective_program = if cfg!(target_os = "macos") && matches!(mode, InterceptionMode::LdPreload(_)) {
-            match patch_sip_binary(program) {
-                Ok(patched) => {
-                    info_println!("rigor: patched hardened runtime binary → {}", patched.display());
-                    patched.to_string_lossy().to_string()
+        let effective_program =
+            if cfg!(target_os = "macos") && matches!(mode, InterceptionMode::LdPreload(_)) {
+                match patch_sip_binary(program) {
+                    Ok(patched) => {
+                        info_println!(
+                            "rigor: patched hardened runtime binary → {}",
+                            patched.display()
+                        );
+                        patched.to_string_lossy().to_string()
+                    }
+                    Err(e) => {
+                        eprintln!("rigor: binary patch failed ({}), using original", e);
+                        program.clone()
+                    }
                 }
-                Err(e) => {
-                    eprintln!("rigor: binary patch failed ({}), using original", e);
-                    program.clone()
-                }
-            }
-        } else {
-            program.clone()
-        };
+            } else {
+                program.clone()
+            };
 
         cmd = Command::new(&effective_program);
         cmd.args(&command[1..]);

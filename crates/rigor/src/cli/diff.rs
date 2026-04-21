@@ -71,12 +71,9 @@ fn resolve_sessions(
         ));
     }
 
-    let a = a.ok_or_else(|| {
-        anyhow::anyhow!("Provide two session identifiers or use --last 2")
-    })?;
-    let b = b.ok_or_else(|| {
-        anyhow::anyhow!("Second session identifier missing (or pass --last 2)")
-    })?;
+    let a = a.ok_or_else(|| anyhow::anyhow!("Provide two session identifiers or use --last 2"))?;
+    let b =
+        b.ok_or_else(|| anyhow::anyhow!("Second session identifier missing (or pass --last 2)"))?;
 
     Ok((ResolvedSession::lookup(&a)?, ResolvedSession::lookup(&b)?))
 }
@@ -121,9 +118,7 @@ fn summarize(s: &ResolvedSession, entries: &[ViolationLogEntry]) -> SessionSumma
     let mut violation_count = 0usize;
 
     for e in entries {
-        if e.session.session_id != s.match_id
-            && !e.session.session_id.starts_with(&s.match_id)
-        {
+        if e.session.session_id != s.match_id && !e.session.session_id.starts_with(&s.match_id) {
             continue;
         }
         if started_at.is_empty() {

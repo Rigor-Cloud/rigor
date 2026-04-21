@@ -69,20 +69,11 @@ fn write_transcript(dir: &std::path::Path, assistant_messages: &[&str]) {
             .replace('\\', "\\\\")
             .replace('"', "\\\"")
             .replace('\n', "\\n");
-        writeln!(
-            file,
-            r#"{{"role":"assistant","content":"{}"}}"#,
-            escaped
-        )
-        .unwrap();
+        writeln!(file, r#"{{"role":"assistant","content":"{}"}}"#, escaped).unwrap();
 
         // Add a user follow-up between assistant messages (except the last)
         if i < assistant_messages.len() - 1 {
-            writeln!(
-                file,
-                r#"{{"role":"user","content":"Tell me more."}}"#
-            )
-            .unwrap();
+            writeln!(file, r#"{{"role":"user","content":"Tell me more."}}"#).unwrap();
         }
     }
 
@@ -408,7 +399,10 @@ fn test_e2e_production_config_with_realistic_transcript() {
     let response = parse_response(&stdout);
     // The heuristic extractor should pick up this claim, and no-fabricated-apis should fire
     let decision = response["decision"].as_str();
-    let reason = response.get("reason").and_then(|r| r.as_str()).unwrap_or("");
+    let reason = response
+        .get("reason")
+        .and_then(|r| r.as_str())
+        .unwrap_or("");
     assert!(
         decision == Some("block") || reason.contains("rigor warning"),
         "Production config should detect fabricated regorus capability in real transcript. Response: {}",

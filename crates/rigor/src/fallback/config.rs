@@ -129,10 +129,7 @@ impl FallbackConfig {
             self.minimums
                 .enforce("default", None, *cat, policy)
                 .with_context(|| {
-                    format!(
-                        "default policy for {:?} violates global minimums",
-                        cat
-                    )
+                    format!("default policy for {:?} violates global minimums", cat)
                 })?;
         }
 
@@ -177,14 +174,20 @@ impl FallbackConfig {
     /// Validate that a retry-bearing Policy has valid retry parameters.
     fn validate_policy_retry(policy: &Policy, label: &str) -> Result<()> {
         match policy {
-            Policy::RetryThenFailClosed { attempts, backoff_ms }
-            | Policy::RetryThenFailOpen { attempts, backoff_ms }
-            | Policy::RetryThenDegrade { attempts, backoff_ms } => {
+            Policy::RetryThenFailClosed {
+                attempts,
+                backoff_ms,
+            }
+            | Policy::RetryThenFailOpen {
+                attempts,
+                backoff_ms,
+            }
+            | Policy::RetryThenDegrade {
+                attempts,
+                backoff_ms,
+            } => {
                 if *attempts == 0 {
-                    bail!(
-                        "{}: retry policy has attempts=0, must be > 0",
-                        label
-                    );
+                    bail!("{}: retry policy has attempts=0, must be > 0", label);
                 }
                 if backoff_ms.is_empty() {
                     bail!(
@@ -279,7 +282,10 @@ mod tests {
         assert_eq!(cfg.default.on_dependency_missing, Policy::FailStartup);
         assert_eq!(cfg.default.on_persistent_error, Policy::FailClosed);
         match &cfg.default.on_transient_error {
-            Policy::RetryThenFailClosed { attempts, backoff_ms } => {
+            Policy::RetryThenFailClosed {
+                attempts,
+                backoff_ms,
+            } => {
                 assert_eq!(*attempts, 3);
                 assert_eq!(*backoff_ms, vec![500, 2000, 8000]);
             }
@@ -309,7 +315,10 @@ mod tests {
         let judge = &cfg.components["judge_api"];
         assert_eq!(judge.category.as_deref(), Some("best_effort"));
         match judge.on_transient_error.as_ref().unwrap() {
-            Policy::RetryThenDegrade { attempts, backoff_ms } => {
+            Policy::RetryThenDegrade {
+                attempts,
+                backoff_ms,
+            } => {
                 assert_eq!(*attempts, 2);
                 assert_eq!(*backoff_ms, vec![1000, 5000]);
             }
@@ -336,7 +345,10 @@ mod tests {
 
         // judge_api overrides on_transient_error.
         match cfg.policy_for("judge_api", FailureCategory::TransientError) {
-            Policy::RetryThenDegrade { attempts, backoff_ms } => {
+            Policy::RetryThenDegrade {
+                attempts,
+                backoff_ms,
+            } => {
                 assert_eq!(attempts, 2);
                 assert_eq!(backoff_ms, vec![1000, 5000]);
             }
@@ -358,7 +370,10 @@ mod tests {
             Policy::FailClosed,
         );
         match cfg.policy_for("nonexistent_component", FailureCategory::TransientError) {
-            Policy::RetryThenFailClosed { attempts, backoff_ms } => {
+            Policy::RetryThenFailClosed {
+                attempts,
+                backoff_ms,
+            } => {
                 assert_eq!(attempts, 3);
                 assert_eq!(backoff_ms, vec![500, 2000, 8000]);
             }
@@ -396,7 +411,10 @@ mod tests {
         let f = write_yaml_to_tempfile(yaml);
         let cfg = FallbackConfig::from_yaml(f.path()).expect("should parse");
         let result = cfg.validate();
-        assert!(result.is_err(), "should reject FailOpen for privacy_sensitive persistent_error");
+        assert!(
+            result.is_err(),
+            "should reject FailOpen for privacy_sensitive persistent_error"
+        );
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("pseudonymize"),

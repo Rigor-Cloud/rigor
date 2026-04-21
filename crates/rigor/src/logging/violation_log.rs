@@ -10,13 +10,11 @@ pub struct ViolationLogger {
 }
 
 impl ViolationLogger {
-    /// Create a new ViolationLogger.
-    ///
-    /// This will:
-    /// - Resolve the home directory
-    /// - Create ~/.rigor/ if it doesn't exist
-    /// - Set the log path to ~/.rigor/violations.jsonl
     /// Create a ViolationLogger with a custom log path (for testing).
+    ///
+    /// The production constructor [`ViolationLogger::new`] resolves the home
+    /// directory, ensures `~/.rigor/` exists, and pins the log to
+    /// `~/.rigor/violations.jsonl`.
     pub fn with_path(log_path: PathBuf) -> Self {
         Self { log_path }
     }

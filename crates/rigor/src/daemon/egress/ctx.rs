@@ -129,11 +129,17 @@ mod tests {
         assert_eq!(session.0, "sess-42");
 
         let fp = ConversationId::from_fingerprint("abc123");
-        assert!(fp.0.starts_with("fp:"), "fingerprint id should start with 'fp:'");
+        assert!(
+            fp.0.starts_with("fp:"),
+            "fingerprint id should start with 'fp:'"
+        );
         assert_eq!(fp.0, "fp:abc123");
 
         let anon = ConversationId::anonymous();
-        assert!(anon.0.starts_with("anon:"), "anonymous id should start with 'anon:'");
+        assert!(
+            anon.0.starts_with("anon:"),
+            "anonymous id should start with 'anon:'"
+        );
         // Each anonymous id must be unique.
         let anon2 = ConversationId::anonymous();
         assert_ne!(anon, anon2);
