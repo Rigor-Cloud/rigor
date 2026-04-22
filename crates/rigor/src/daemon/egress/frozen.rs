@@ -10,6 +10,8 @@
 //! `verify_frozen_prefix` is a no-op (returns `Ok(())`).
 
 use serde_json::Value as Json;
+use std::hash::Hasher;
+use twox_hash::XxHash64;
 
 use super::chain::FilterError;
 use super::ctx::ConversationCtx;
@@ -22,30 +24,81 @@ pub struct FrozenPrefix {
 }
 
 /// xxhash64 of canonical JSON bytes for each message, concatenated in order.
-pub fn compute_checksum(_messages: &[Json]) -> u64 {
-    todo!("compute_checksum not yet implemented (RED phase)")
+///
+/// Deterministic across runs: `serde_json::to_vec` is stable for a given
+/// `Value` (maps use their internal BTreeMap/preserve-order iteration, and
+/// values are not reordered within this function). A `0u8` separator is
+/// written between messages so `["ab", "c"]` and `["a", "bc"]` do not
+/// hash-collide.
+///
+/// Non-cryptographic: this is a speed-optimised checksum for detecting
+/// accidental mutation of the frozen prefix. It MUST NOT be used anywhere a
+/// cryptographic hash is required — content-addressing uses `sha2::Sha256`.
+pub fn compute_checksum(messages: &[Json]) -> u64 {
+    let mut hasher = XxHash64::with_seed(0);
+    for msg in messages {
+        match serde_json::to_vec(msg) {
+            Ok(bytes) => hasher.write(&bytes),
+            Err(_) => hasher.write(b"<unserializable>"),
+        }
+        // Separator so "ab" || "c" != "a" || "bc".
+        hasher.write(&[0u8]);
+    }
+    hasher.finish()
 }
 
 /// Seal the first `freeze_count` messages into the context scratch.
-pub fn set_frozen_prefix(
-    _ctx: &mut ConversationCtx,
-    _messages: &[Json],
-    _freeze_count: usize,
-) {
-    todo!("set_frozen_prefix not yet implemented (RED phase)")
+///
+/// `freeze_count` is clamped to `messages.len()` so callers cannot
+/// accidentally seal a range larger than the slice they provide.
+/// Overwrites any previous `FrozenPrefix`.
+pub fn set_frozen_prefix(ctx: &mut ConversationCtx, messages: &[Json], freeze_count: usize) {
+    let effective = freeze_count.min(messages.len());
+    let checksum = compute_checksum(&messages[..effective]);
+    ctx.scratch_set(FrozenPrefix {
+        message_count: effective,
+        byte_checksum: checksum,
+    });
 }
 
 /// Post-chain verifier. Called from `FilterChain::apply_request` after all
 /// request filters have run.
-pub fn verify_frozen_prefix(
-    _ctx: &ConversationCtx,
-    _messages: &[Json],
-) -> Result<(), FilterError> {
-    todo!("verify_frozen_prefix not yet implemented (RED phase)")
+///
+/// Returns:
+/// - `Ok(())` if no `FrozenPrefix` is sealed (backward compat no-op).
+/// - `Ok(())` if the checksum over `messages[0..message_count]` matches.
+/// - `Err(FilterError::Internal)` if `messages` is shorter than the sealed
+///   count, or if the recomputed checksum diverges from the sealed one.
+pub fn verify_frozen_prefix(ctx: &ConversationCtx, messages: &[Json]) -> Result<(), FilterError> {
+    let Some(frozen) = ctx.scratch_get::<FrozenPrefix>() else {
+        return Ok(());
+    };
+    if messages.len() < frozen.message_count {
+        return Err(FilterError::Internal {
+            filter: "frozen_prefix".into(),
+            reason: format!(
+                "messages shorter than frozen count ({} < {})",
+                messages.len(),
+                frozen.message_count
+            ),
+        });
+    }
+    let actual = compute_checksum(&messages[..frozen.message_count]);
+    if actual == frozen.byte_checksum {
+        Ok(())
+    } else {
+        Err(FilterError::Internal {
+            filter: "frozen_prefix".into(),
+            reason: format!(
+                "frozen-prefix checksum mismatch: expected {:#x}, got {:#x} (first {} messages)",
+                frozen.byte_checksum, actual, frozen.message_count
+            ),
+        })
+    }
 }
 
 // ===========================================================================
-// Tests (RED phase — these MUST fail before implementation)
+// Tests
 // ===========================================================================
 
 #[cfg(test)]
@@ -92,8 +145,8 @@ mod tests {
 
         let mut tampered = messages.clone();
         tampered[0]["content"] = json!("MUTATED");
-        let err = verify_frozen_prefix(&ctx, &tampered)
-            .expect_err("tampered frozen range must fail");
+        let err =
+            verify_frozen_prefix(&ctx, &tampered).expect_err("tampered frozen range must fail");
         match err {
             FilterError::Internal { filter, reason } => {
                 assert_eq!(filter, "frozen_prefix");
