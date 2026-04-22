@@ -1,3 +1,11 @@
 target/
 *.bak
 .worktrees/
+
+# Graphify build artifacts (regenerable via /gsd-graphify build)
+.planning/graphs/
+graphify-out/
+
+# GSD runtime state (local, changes per session)
+.planning/active-workstream
+.claude/scheduled_tasks.lock
