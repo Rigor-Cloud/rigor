@@ -1,0 +1,1 @@
+{"text":"reqwest is used to send HTTP requests to upstream services","expected_decision":"none","notes":"control claim in same domain that must not trigger reqwest-is-http-client"}

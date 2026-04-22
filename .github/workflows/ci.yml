@@ -3,11 +3,23 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+# -----------------------------------------------------------------------------
+# Every job binds to the `ci-approval` environment. That environment must be
+# configured in repo Settings → Environments → New environment → `ci-approval`
+# with "Required reviewers" enabled. Once set, GitHub pauses every job's first
+# step and waits for a reviewer to approve before running.
+#
+# Secrets scoped to this environment (e.g. OPENROUTER_API_KEY) flow through
+# normally once approval is granted.
+# -----------------------------------------------------------------------------
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    environment: ci-approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,11 +31,17 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests
+        env:
+          # Exposed after approval so the E1 real-LLM proof-of-life test
+          # exercises OpenRouter. The test auto-skips when this is absent
+          # (e.g. on forks without the secret configured).
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: cargo test --all-features
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    environment: ci-approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,6 +60,7 @@ jobs:
   rustfmt:
     name: Format Check
     runs-on: ubuntu-latest
+    environment: ci-approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,6 +76,7 @@ jobs:
   rigor-validate:
     name: Rigor Self-Validation
     runs-on: ubuntu-latest
+    environment: ci-approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

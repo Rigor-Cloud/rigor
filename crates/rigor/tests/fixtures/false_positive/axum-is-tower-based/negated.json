@@ -1,0 +1,1 @@
+{"text":"axum is not built on actix; it uses tower middleware and hyper under the hood.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip axum-is-tower-based"}

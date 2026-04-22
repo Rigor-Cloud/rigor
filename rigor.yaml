@@ -50,8 +50,8 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(garbage.collect|gc|tracing.gc|mark.sweep|reference.count)`, c.text)
-          not regex.match(`(?i)(no gc|no garbage|doesn.t have|lacks|without)`, c.text)
+          regex.match(`(?i)rust.*(garbage.collect|\bgc\b|tracing.gc|mark.sweep|reference.count)`, c.text)
+          not regex.match(`(?i)(no gc|no garbage|doesn.t have|does not have|lacks|without|should not claim|wrong to (say|claim)|not true)`, c.text)
           v := {
             "constraint_id": "rust-no-gc",
             "violated": true,
@@ -78,8 +78,8 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(null pointer|null reference|nil|nullptr|NullPointerException)`, c.text)
-          not regex.match(`(?i)(no null|doesn.t have null|Option|None)`, c.text)
+          regex.match(`(?i)rust.*(null pointer|null reference|nil\b|nullptr|NullPointerException)`, c.text)
+          not regex.match(`(?i)(no null|doesn.t have null|does not have null|Option|None|pre.1\.0|before 1\.0|in rust.s history|historically|removed before)`, c.text)
           v := {
             "constraint_id": "rust-no-null",
             "violated": true,
@@ -107,7 +107,7 @@ constraints:
         violation contains v if {
           some c in input.claims
           regex.match(`(?i)rust.*(try.catch|throw|exception|except|catch.block)`, c.text)
-          not regex.match(`(?i)(no exception|doesn.t have|Result|panic)`, c.text)
+          not regex.match(`(?i)(no exception|doesn.t have|does not (have|use)|Result|panic|should not claim|wrong to (say|claim)|would be wrong|not true)`, c.text)
           v := {
             "constraint_id": "rust-no-exceptions",
             "violated": true,
@@ -134,8 +134,8 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(class|inherit|extends|superclass|subclass|override method)`, c.text)
-          not regex.match(`(?i)(no class|no inherit|trait|doesn.t have|composition)`, c.text)
+          regex.match(`(?i)rust.*(class inheritance|class.*inherit|extends|superclass|subclass|override method)`, c.text)
+          not regex.match(`(?i)(no class|no inherit|trait|doesn.t have|does not (have|support)|composition|do not claim|should not claim|wrong to (say|claim)|not true that)`, c.text)
           v := {
             "constraint_id": "rust-no-inheritance",
             "violated": true,
@@ -254,6 +254,7 @@ constraints:
           some c in input.claims
           regex.match(`(?i)axum.*(actix|rocket|warp|tide)`, c.text)
           regex.match(`(?i)(uses|built.on|based.on|wraps|powered.by)`, c.text)
+          not regex.match(`(?i)(not built on|not based on|unlike|tower|hyper|is not)`, c.text)
           v := {
             "constraint_id": "axum-is-tower-based",
             "violated": true,
@@ -588,7 +589,8 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)RIGOR_FAIL_CLOSED.*(default|always on|required|automatic)`, c.text)
+          regex.match(`(?i)RIGOR_FAIL_CLOSED.*(is the default|always on|required|automatic|enabled by default)`, c.text)
+          not regex.match(`(?i)(fail.open is the default|opt.in|must be.*set|not the default)`, c.text)
           v := {
             "constraint_id": "rigor-env-vars-semantics",
             "violated": true,
@@ -884,6 +886,7 @@ constraints:
         violation contains v if {
           some c in input.claims
           regex.match(`(?i)rigor.*(daemon|proxy).*port.*(8080|9000|443 on|public)`, c.text)
+          not regex.match(`(?i)(does not bind|doesn.t bind|not.*port 8080|not.*public|127\.0\.0\.1:8787|loopback)`, c.text)
           v := {
             "constraint_id": "rigor-proxy-topology",
             "violated": true,
@@ -1071,7 +1074,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)content.store.*(compression|verdict).*(1.hour|hour|permanent|no.ttl)`, c.text)
+          regex.match(`(?i)(compression|verdict)(.store)?.*(1.hour|one.hour|permanent|no.ttl|never.expir|persistent|forever)`, c.text)
           v := {
             "constraint_id": "content-store-categories-ttl",
             "violated": true,
@@ -1167,8 +1170,8 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*retr(y|ies).*(2|3|5|10|N|unbound|multiple|infinite)`, c.text)
-          not regex.match(`(?i)(max 1|exactly one|only one)`, c.text)
+          regex.match(`(?i)rigor.*retr(y|ies).*\b(2|3|5|10|unbound|multiple|infinite|cascading|several)\b`, c.text)
+          not regex.match(`(?i)(max 1|at most once|exactly one|only one|capped at 1|never retr)`, c.text)
           v := {
             "constraint_id": "auto-retry-max-one",
             "violated": true,

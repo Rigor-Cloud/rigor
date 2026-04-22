@@ -1,0 +1,1 @@
+{"text":"Rust has no exceptions; Result<T, E> is the idiomatic error-handling type.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip rust-no-exceptions"}

@@ -1,0 +1,1 @@
+{"text":"Rust uses try/catch blocks to handle errors like Java or Python","expected_decision":"block","notes":"positive probe — claim violates rust-no-exceptions pattern"}

@@ -1,0 +1,1 @@
+{"text":"Rust uses a mark-and-sweep garbage collector for memory management","expected_decision":"block","notes":"positive probe — claim violates rust-no-gc pattern"}

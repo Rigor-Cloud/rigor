@@ -1,0 +1,1 @@
+{"text":"RIGOR_FAIL_CLOSED is always on by default and cannot be disabled","expected_decision":"block","notes":"positive probe — claim violates rigor-env-vars-semantics pattern"}

@@ -1,0 +1,1 @@
+{"text":"Rust has null pointers just like C and can throw NullPointerException","expected_decision":"block","notes":"positive probe — claim violates rust-no-null pattern"}

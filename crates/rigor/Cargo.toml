@@ -82,3 +82,7 @@ harness = false
 [[bench]]
 name = "evaluation_only"
 harness = false
+
+[[bench]]
+name = "dfquad_scaling"
+harness = false

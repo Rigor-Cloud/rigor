@@ -1,0 +1,1 @@
+{"text":"rigor uses hyper 0.14 legacy for its proxy server","expected_decision":"block","notes":"positive probe — claim violates hyper-v1-http1-http2 pattern"}

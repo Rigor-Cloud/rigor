@@ -1,0 +1,1 @@
+{"text":"The rigor daemon binds 127.0.0.1:8787 and performs TLS MITM interception","expected_decision":"none","notes":"control claim in same domain that must not trigger rigor-proxy-topology"}

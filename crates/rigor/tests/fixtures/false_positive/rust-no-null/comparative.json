@@ -1,0 +1,1 @@
+{"text":"Unlike Java which has NullPointerException, Rust lacks null entirely.","expected_decision":"none","notes":"false-positive probe — comparative scenario must not trip rust-no-null"}

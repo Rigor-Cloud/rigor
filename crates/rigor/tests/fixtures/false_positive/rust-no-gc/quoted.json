@@ -1,0 +1,1 @@
+{"text":"The Go documentation says Go uses a tracing garbage collector.","expected_decision":"none","notes":"false-positive probe — quoted scenario must not trip rust-no-gc"}

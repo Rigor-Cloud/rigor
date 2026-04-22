@@ -1,0 +1,1 @@
+{"text":"RIGOR_FAIL_CLOSED must be opt-in; fail-open is the default posture","expected_decision":"none","notes":"control claim in same domain that must not trigger rigor-env-vars-semantics"}

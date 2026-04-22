@@ -1,0 +1,1 @@
+{"text":"Rust allows shared ownership explicitly via Rc or Arc; the default is exclusive ownership.","expected_decision":"none","notes":"false-positive probe — qualified scenario must not trip rust-ownership"}

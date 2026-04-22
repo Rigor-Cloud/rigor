@@ -1,0 +1,1 @@
+{"text":"Rust uses traits and composition to share behavior between types","expected_decision":"none","notes":"control claim in same domain that must not trigger rust-no-inheritance"}

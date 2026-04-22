@@ -1,0 +1,1 @@
+{"text":"Rust uses ownership and borrowing with compile-time lifetime checks","expected_decision":"none","notes":"control claim in same domain that must not trigger rust-no-gc"}

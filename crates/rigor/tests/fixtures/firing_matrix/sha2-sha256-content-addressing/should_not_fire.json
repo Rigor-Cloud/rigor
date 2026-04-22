@@ -1,0 +1,1 @@
+{"text":"rigor's content store addresses entries by SHA-256 hash of the payload","expected_decision":"none","notes":"control claim in same domain that must not trigger sha2-sha256-content-addressing"}

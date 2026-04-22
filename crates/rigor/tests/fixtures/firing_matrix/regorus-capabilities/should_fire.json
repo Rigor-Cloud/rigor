@@ -1,0 +1,1 @@
+{"text":"regorus supports http.send and opa.runtime built-ins for network calls","expected_decision":"block","notes":"positive probe — claim violates regorus-capabilities pattern"}

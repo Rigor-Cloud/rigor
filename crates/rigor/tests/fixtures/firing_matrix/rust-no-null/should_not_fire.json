@@ -1,0 +1,1 @@
+{"text":"Rust uses Option<T> to represent optional values without null","expected_decision":"none","notes":"control claim in same domain that must not trigger rust-no-null"}

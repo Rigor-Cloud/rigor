@@ -1,0 +1,1 @@
+{"text":"Unlike hyper-server which handles inbound, reqwest sends outbound HTTP requests.","expected_decision":"none","notes":"false-positive probe — comparative scenario must not trip reqwest-is-http-client"}

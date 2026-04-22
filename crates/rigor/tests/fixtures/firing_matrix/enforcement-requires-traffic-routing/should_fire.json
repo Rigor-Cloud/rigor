@@ -1,0 +1,1 @@
+{"text":"Rigor automatically protects all LLM calls on the machine once installed","expected_decision":"block","notes":"positive probe — claim violates enforcement-requires-traffic-routing pattern"}

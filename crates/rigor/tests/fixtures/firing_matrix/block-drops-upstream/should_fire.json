@@ -1,0 +1,1 @@
+{"text":"Rigor will let the block stream finish gracefully before returning the error to the client","expected_decision":"block","notes":"positive probe — claim violates block-drops-upstream pattern (rigor drops upstream, does not let it finish)"}

@@ -1,0 +1,1 @@
+{"text":"Unlike goroutines which are green threads, tokio tasks are cooperative futures.","expected_decision":"none","notes":"false-positive probe — comparative scenario must not trip tokio-is-async-runtime"}

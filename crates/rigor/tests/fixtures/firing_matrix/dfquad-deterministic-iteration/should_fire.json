@@ -1,0 +1,1 @@
+{"text":"rigor's argumentation graph iterates with a HashMap for random iteration order","expected_decision":"block","notes":"positive probe — claim violates dfquad-deterministic-iteration pattern"}

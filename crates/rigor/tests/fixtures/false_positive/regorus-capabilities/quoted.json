@@ -1,0 +1,1 @@
+{"text":"Full OPA supports http.send and opa.runtime for dynamic policy loading.","expected_decision":"none","notes":"false-positive probe — quoted scenario must not trip regorus-capabilities"}

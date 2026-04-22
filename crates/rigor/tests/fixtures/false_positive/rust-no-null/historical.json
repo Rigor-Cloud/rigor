@@ -1,0 +1,1 @@
+{"text":"In the earliest pre-1.0 Rust, there was indeed a null pointer, but it was removed before 1.0.","expected_decision":"none","notes":"false-positive probe — historical scenario must not trip rust-no-null"}
