@@ -390,7 +390,7 @@ fn test_e2e_production_config_with_realistic_transcript() {
     // The Rego rule requires confidence > 0.8, so we must include a definitive marker.
     write_transcript(
         temp.path(),
-        &["regorus is capable of streaming evaluation and async processing for large policy sets."],
+        &["regorus is capable of http.send for outbound network calls from Rego policies."],
     );
 
     let (stdout, stderr, exit_code) = run_rigor_e2e(temp.path());
