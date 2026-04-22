@@ -4,15 +4,17 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Gated by the same `ci-approval` environment used elsewhere. A reviewer must
-# approve before the scan runs — this prevents untrusted PRs from burning
-# OpenRouter credits or exercising the LLM-judge path unsupervised.
+# Runs unconditionally on every PR — the regex-layer scan is deterministic
+# and the LLM-judge step self-skips when `OPENROUTER_API_KEY` is unavailable
+# (which GitHub already enforces for fork PRs). Previously this workflow was
+# gated behind the `ci-approval` environment, but that defeated the purpose
+# of an automatic injection scan — it should run on every PR for fast
+# detection, not wait for reviewer approval. Closes #11 / #27.
 
 jobs:
   inject-scan:
     name: Prompt-Injection Scan
     runs-on: ubuntu-latest
-    environment: ci-approval
     permissions:
       contents: read
       pull-requests: read

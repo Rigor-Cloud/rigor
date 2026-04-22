@@ -6,13 +6,25 @@ on:
   workflow_dispatch:
 
 # -----------------------------------------------------------------------------
-# Every job binds to the `ci-approval` environment. That environment must be
-# configured in repo Settings → Environments → New environment → `ci-approval`
-# with "Required reviewers" enabled. Once set, GitHub pauses every job's first
-# step and waits for a reviewer to approve before running.
+# Approval-gate policy (updated — closes #11 and #27):
 #
-# Secrets scoped to this environment (e.g. OPENROUTER_API_KEY) flow through
-# normally once approval is granted.
+# Only jobs that BURN LLM credits (i.e. access OPENROUTER_API_KEY) are gated
+# behind the `ci-approval` environment. Static-analysis jobs (clippy, rustfmt,
+# rigor-validate) run unconditionally so routine PRs get fast, non-blocking
+# feedback on basic hygiene.
+#
+#   Gated (LLM credit surface):
+#     - test  (real_llm.rs::e1_openrouter_proof_of_life reads OPENROUTER_API_KEY)
+#
+#   Ungated (no secrets, no LLM calls, purely deterministic):
+#     - clippy
+#     - rustfmt
+#     - rigor-validate
+#
+# GitHub already withholds secrets from pull_request workflows on fork PRs,
+# so the gate on the test job is only meaningful as a speed-bump for
+# same-repo PRs. We keep it because real-LLM calls burn per-run credits
+# and a reviewer-in-the-loop is a reasonable spend-check.
 # -----------------------------------------------------------------------------
 
 jobs:
@@ -51,7 +63,6 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    environment: ci-approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -70,7 +81,6 @@ jobs:
   rustfmt:
     name: Format Check
     runs-on: ubuntu-latest
-    environment: ci-approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -86,7 +96,6 @@ jobs:
   rigor-validate:
     name: Rigor Self-Validation
     runs-on: ubuntu-latest
-    environment: ci-approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
