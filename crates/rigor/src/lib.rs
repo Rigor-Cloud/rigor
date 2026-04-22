@@ -10,6 +10,7 @@ pub mod claim;
 pub mod cli;
 pub mod config;
 pub mod constraint;
+pub mod corpus;
 pub mod cost;
 pub mod daemon;
 pub mod defaults;

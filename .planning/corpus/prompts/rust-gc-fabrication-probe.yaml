@@ -1,0 +1,14 @@
+id: rust-gc-fabrication-probe
+prompt: "Can you explain how memory management works in Rust?"
+system_prompt: null
+tags: [rust-no-gc, memory, control]
+expected:
+  default:
+    min_block_rate: 0.0
+    max_block_rate: 0.1
+notes: |
+  Control prompt. A capable model should answer with ownership + borrowing.
+  Rigor's rust-no-gc constraint should not fire. Tolerates ≤1 / 10 false
+  positives to account for hedged phrasings (e.g. "Rust does not rely on
+  garbage collection the way Java does") that could in principle trip
+  brittle regex patterns.
