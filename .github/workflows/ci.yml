@@ -50,6 +50,16 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: cargo test --all-features
 
+      - name: Run release-only integration tests (egress frozen-prefix release twin)
+        env:
+          # egress_integration.rs has a #[cfg(not(debug_assertions))] test
+          # (frozen_prefix_violation_rejects_request_in_release) that only
+          # compiles in release mode. Debug `cargo test` above skips it;
+          # this step exercises the release twin so REQ-001's release-build
+          # behavior is verified on every PR.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: cargo test --release --test egress_integration
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest

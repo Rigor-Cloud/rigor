@@ -66,6 +66,7 @@ thiserror = "2"
 # LSP client for code-anchored constraint verification
 lsp-types = "0.97"
 sha2 = "0.10"
+twox-hash = { version = "2.0", default-features = false, features = ["xxhash64"] }
 
 # Content store (Phase 0E) — hash-keyed, TTL'd audit + compression + verdict cache
 dashmap = "6"
@@ -85,4 +86,8 @@ harness = false
 
 [[bench]]
 name = "dfquad_scaling"
+harness = false
+
+[[bench]]
+name = "filter_chain_overhead"
 harness = false

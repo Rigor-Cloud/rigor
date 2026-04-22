@@ -1349,6 +1349,8 @@ async fn proxy_request(
     use super::egress;
     let claim_filter =
         egress::ClaimInjectionFilter::new(epistemic_context.clone(), path.to_string());
+    // Shared by request + response path. FilterChain is Clone (cheap — inner
+    // Vec<Arc<dyn EgressFilter>>). Reused in the response-side tokio::spawn below.
     let request_chain = egress::FilterChain::new(vec![std::sync::Arc::new(claim_filter)]);
 
     let modified_body = {
@@ -1549,6 +1551,7 @@ async fn proxy_request(
         let http_client_bg = http_client.clone();
         let user_message_bg = user_message.clone();
         let session_id_bg = session_id.clone();
+        let response_chain_bg = request_chain.clone();
 
         // Build constraint keywords from config for cheap pre-filter
         let constraint_keywords: Vec<String> = {
@@ -1625,6 +1628,26 @@ async fn proxy_request(
                                                      // Track SSE parse position for incremental parsing
             let mut sse_parse_offset: usize = 0;
 
+            // Response-side FilterChain state (§5.7 "0G").
+            // We build one ConversationCtx per stream and run the chain in an
+            // OTel span so that downstream filters (CCR, annotation, audit —
+            // Phase 1/3) emit under `rigor.daemon.proxy.response_chain`.
+            //
+            // NOTE: response_ctx is FRESH per stream — it is NOT the same ctx
+            // the request-side chain used (which lives in a separate tokio
+            // task and would require Arc<Mutex<_>> to cross the await boundary).
+            // Cross-side correlation must go through the OTel `request_id` tag
+            // or the content_store keyed by request_id. Phase 1B CCR and
+            // Phase 3A annotation authors: if you need to read state that
+            // request-side filters wrote, store it in content_store first,
+            // not in ConversationCtx::scratch.
+            let mut response_ctx = egress::ConversationCtx::new_anonymous();
+            let response_chain_span = tracing::info_span!(
+                "rigor.daemon.proxy.response_chain",
+                request_id = %request_id_bg,
+                filter_count = response_chain_bg.len(),
+            );
+
             while let Some(chunk_result) = upstream.next().await {
                 let bytes = match chunk_result {
                     Ok(b) => b,
@@ -1681,8 +1704,58 @@ async fn proxy_request(
                     }
                 }
 
+                // Invoke the response-side FilterChain on this chunk.
+                // Per CONTEXT.md §decisions (Claude's Discretion, SSE granularity):
+                // we hand the raw bytes to the chain as a single SseChunk.
+                // FilterChain::apply_response_chunk is already best-effort
+                // (chain.rs:126-141) — it logs errors via tracing::warn! and
+                // continues. We therefore NEVER drop the chunk on error.
+                //
+                // Fast path: skip the allocation + invocation entirely when no
+                // filters are registered. Saves the String::from_utf8_lossy +
+                // SseChunk + async future cost per chunk (~220 ns × chunk
+                // count on SSE-heavy responses; see bench filter_chain_overhead).
+                // Finding #2 from PR #29 review.
+                //
+                // NOTE on from_utf8_lossy: invalid UTF-8 bytes are replaced
+                // with U+FFFD. SSE chunks from Anthropic/OpenAI are always
+                // UTF-8-encoded JSON so this does not hit in production —
+                // but the fast-path equality check at `chunk_wrap.data.as_bytes()
+                // == bytes.as_ref()` below would incorrectly detect "mutation"
+                // on non-UTF-8 input, causing the lossy-converted bytes to be
+                // forwarded. Acceptable for today's LLM providers; flag for
+                // revisit if rigor ever forwards binary SSE payloads.
+                let forwarded_bytes = if response_chain_bg.is_empty() {
+                    bytes.clone()
+                } else {
+                    let raw = String::from_utf8_lossy(&bytes).to_string();
+                    let mut chunk_wrap = egress::SseChunk { data: raw };
+                    let _entered = response_chain_span.enter();
+                    let chain_result = response_chain_bg
+                        .apply_response_chunk(&mut chunk_wrap, &mut response_ctx)
+                        .await;
+                    drop(_entered);
+                    if let Err(e) = chain_result {
+                        // FilterChain::apply_response_chunk only returns Err if
+                        // the chain itself propagated one past its best-effort
+                        // loop (today it never does). Log and continue.
+                        tracing::warn!(
+                            error = %e,
+                            request_id = %request_id_bg,
+                            "response_chain apply_response_chunk surfaced error — forwarding original bytes"
+                        );
+                        bytes.clone()
+                    } else if chunk_wrap.data.as_bytes() == bytes.as_ref() {
+                        // Fast path: no filter mutated the chunk.
+                        bytes.clone()
+                    } else {
+                        // A filter mutated the chunk — forward the mutated bytes.
+                        Bytes::from(chunk_wrap.data.into_bytes())
+                    }
+                };
+
                 // Forward chunk to client FIRST (don't block on evaluation)
-                if client_tx.send(Ok(bytes)).await.is_err() {
+                if client_tx.send(Ok(forwarded_bytes)).await.is_err() {
                     break; // client disconnected
                 }
 
@@ -2532,6 +2605,39 @@ async fn proxy_request(
                             }
                         }
                     } // end else (not already retried)
+                }
+            }
+
+            // §5.7 "0G" — finalize the response chain once the upstream stream
+            // has ended. Any extra SseChunks the chain returns are forwarded
+            // verbatim to the client (per CONTEXT.md §decisions: "forward
+            // verbatim; filter owns framing"). FilterChain::finalize_response
+            // is best-effort internally — per-filter errors are already logged
+            // via tracing::warn! at chain.rs:154-160 and do NOT propagate.
+            {
+                let _entered = response_chain_span.enter();
+                match response_chain_bg.finalize_response(&mut response_ctx).await {
+                    Ok(extra_chunks) => {
+                        for chunk in extra_chunks {
+                            if client_tx
+                                .send(Ok(Bytes::from(chunk.data.into_bytes())))
+                                .await
+                                .is_err()
+                            {
+                                // Client gone — stop forwarding extras.
+                                break;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // Today FilterChain::finalize_response returns Ok
+                        // unconditionally (chain.rs:146-164). Handle future-proof.
+                        tracing::warn!(
+                            error = %e,
+                            request_id = %request_id_bg,
+                            "response_chain finalize_response surfaced error — ignoring"
+                        );
+                    }
                 }
             }
 
