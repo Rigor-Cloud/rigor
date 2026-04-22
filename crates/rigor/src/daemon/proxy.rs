@@ -1701,7 +1701,15 @@ async fn proxy_request(
                 // FilterChain::apply_response_chunk is already best-effort
                 // (chain.rs:126-141) — it logs errors via tracing::warn! and
                 // continues. We therefore NEVER drop the chunk on error.
-                let forwarded_bytes = {
+                //
+                // Fast path: skip the allocation + invocation entirely when no
+                // filters are registered. Saves the String::from_utf8_lossy +
+                // SseChunk + async future cost per chunk (~220 ns × chunk
+                // count on SSE-heavy responses; see bench filter_chain_overhead).
+                // Finding #2 from PR #29 review.
+                let forwarded_bytes = if response_chain_bg.is_empty() {
+                    bytes.clone()
+                } else {
                     let raw = String::from_utf8_lossy(&bytes).to_string();
                     let mut chunk_wrap = egress::SseChunk { data: raw };
                     let _entered = response_chain_span.enter();
