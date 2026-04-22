@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use serde_json::Value as Json;
 
 use super::ctx::ConversationCtx;
+use super::frozen;
 
 // ---------------------------------------------------------------------------
 // SseChunk
@@ -117,6 +118,37 @@ impl FilterChain {
         for f in &self.filters {
             f.apply_request(body, ctx).await?;
         }
+
+        // Post-chain frozen-prefix verifier (§5.6 "0F").
+        //
+        // Backward compat: if no FrozenPrefix is sealed in scratch, this is a
+        // no-op. Once sealed, any filter that mutated messages[0..message_count]
+        // without calling `set_frozen_prefix` again is the source of the
+        // violation.
+        //
+        // Debug build: panic loudly so the offending filter is caught in CI.
+        // Release build: log + reject the request (fail-closed, matches the
+        // chain's existing request-side posture — first filter error aborts).
+        let messages_slice: &[Json] = body
+            .get("messages")
+            .and_then(|v| v.as_array())
+            .map(|a| a.as_slice())
+            .unwrap_or(&[]);
+        if let Err(e) = frozen::verify_frozen_prefix(ctx, messages_slice) {
+            #[cfg(debug_assertions)]
+            {
+                panic!("frozen-prefix invariant violated: {e}");
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                tracing::warn!(
+                    error = %e,
+                    "frozen-prefix invariant violated — rejecting request"
+                );
+                return Err(e);
+            }
+        }
+
         Ok(())
     }
 
