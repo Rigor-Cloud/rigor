@@ -1,0 +1,12 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:scaffold-placeholder-002",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-22T18:00:02Z",
+  "temperature": 0.7,
+  "response_text": "Rust does not have a garbage collector. Instead it uses an ownership model with compile-time borrow checking. Values have a single owner by default; shared ownership is opt-in via Rc (single-threaded reference counting) or Arc (thread-safe). Lifetimes tie references to the scope of the value they point into, so the compiler rejects code that would otherwise produce a dangling reference.",
+  "tokens": {"prompt": 11, "completion": 82},
+  "cost_usd": null,
+  "openrouter_response_id": null
+}
