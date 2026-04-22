@@ -18,9 +18,9 @@ status: active
 **Workstream mapping:**
 - `phase-0-close` — Phases 1–3 (unblocks Phase 1 CCR + GEPA + Modal training)
 - `corpus-cli` — Phases 4–6 (PR-2.7 Tier 2)
-- `coverage` — Phases 7–12 (PR-2.7 Tier 3 + unit/E2E gaps)
-- `test-infra` — Phases 13–15 (foundation for coverage work)
-- `ci-hardening` — Phases 16–23 (CI + release)
+- `test-infra` — Phases 7–8 (foundation for coverage work)
+- `coverage` — Phases 9–14 (PR-2.7 Tier 3 + unit/E2E gaps)
+- `ci-hardening` — Phases 15–21 (CI + release)
 
 ---
 

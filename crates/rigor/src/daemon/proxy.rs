@@ -1632,6 +1632,15 @@ async fn proxy_request(
             // We build one ConversationCtx per stream and run the chain in an
             // OTel span so that downstream filters (CCR, annotation, audit —
             // Phase 1/3) emit under `rigor.daemon.proxy.response_chain`.
+            //
+            // NOTE: response_ctx is FRESH per stream — it is NOT the same ctx
+            // the request-side chain used (which lives in a separate tokio
+            // task and would require Arc<Mutex<_>> to cross the await boundary).
+            // Cross-side correlation must go through the OTel `request_id` tag
+            // or the content_store keyed by request_id. Phase 1B CCR and
+            // Phase 3A annotation authors: if you need to read state that
+            // request-side filters wrote, store it in content_store first,
+            // not in ConversationCtx::scratch.
             let mut response_ctx = egress::ConversationCtx::new_anonymous();
             let response_chain_span = tracing::info_span!(
                 "rigor.daemon.proxy.response_chain",
@@ -1707,6 +1716,15 @@ async fn proxy_request(
                 // SseChunk + async future cost per chunk (~220 ns × chunk
                 // count on SSE-heavy responses; see bench filter_chain_overhead).
                 // Finding #2 from PR #29 review.
+                //
+                // NOTE on from_utf8_lossy: invalid UTF-8 bytes are replaced
+                // with U+FFFD. SSE chunks from Anthropic/OpenAI are always
+                // UTF-8-encoded JSON so this does not hit in production —
+                // but the fast-path equality check at `chunk_wrap.data.as_bytes()
+                // == bytes.as_ref()` below would incorrectly detect "mutation"
+                // on non-UTF-8 input, causing the lossy-converted bytes to be
+                // forwarded. Acceptable for today's LLM providers; flag for
+                // revisit if rigor ever forwards binary SSE payloads.
                 let forwarded_bytes = if response_chain_bg.is_empty() {
                     bytes.clone()
                 } else {

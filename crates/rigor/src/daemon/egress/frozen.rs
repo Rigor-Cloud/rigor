@@ -31,6 +31,15 @@ pub struct FrozenPrefix {
 /// written between messages so `["ab", "c"]` and `["a", "bc"]` do not
 /// hash-collide.
 ///
+/// **Stability caveat**: filters that mutate `Value` in place (the common
+/// case, e.g. `messages[i].insert(...)`) keep serialization stable. Filters
+/// that round-trip a `Value` through a different serializer or through
+/// `Value → String → Value` may produce different byte output for objects
+/// with the same logical content (`preserve_order` feature flag, JSON key
+/// order, whitespace). If a filter MUST mutate the frozen range, it MUST
+/// call `set_frozen_prefix` again with the new baseline to reseal —
+/// never assume the prior checksum still holds after any round-trip.
+///
 /// Non-cryptographic: this is a speed-optimised checksum for detecting
 /// accidental mutation of the frozen prefix. It MUST NOT be used anywhere a
 /// cryptographic hash is required — content-addressing uses `sha2::Sha256`.
