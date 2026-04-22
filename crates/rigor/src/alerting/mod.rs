@@ -194,7 +194,10 @@ pub fn rule_matches(rule: &AlertRule, batch: &[ViolationLogEntry]) -> bool {
 }
 
 /// Build a payload for a rule + batch.
-pub fn build_payload<'a>(rule: &'a AlertRule, batch: &'a [ViolationLogEntry]) -> WebhookPayload<'a> {
+pub fn build_payload<'a>(
+    rule: &'a AlertRule,
+    batch: &'a [ViolationLogEntry],
+) -> WebhookPayload<'a> {
     let first = &batch[0];
     let matching: Vec<&ViolationLogEntry> = batch
         .iter()
@@ -254,11 +257,7 @@ pub async fn fire_for_violations(batch: &[ViolationLogEntry]) -> Result<()> {
         match client.post(&rule.webhook).json(&payload).send().await {
             Ok(r) => {
                 if !r.status().is_success() {
-                    eprintln!(
-                        "rigor alert: {} webhook returned {}",
-                        rule.id,
-                        r.status()
-                    );
+                    eprintln!("rigor alert: {} webhook returned {}", rule.id, r.status());
                 }
             }
             Err(e) => {

@@ -340,7 +340,9 @@ mod tests {
 
     #[tokio::test]
     async fn request_error_stops_chain() {
-        let mutator = Arc::new(BodyMutator { label: "should_not_run" });
+        let mutator = Arc::new(BodyMutator {
+            label: "should_not_run",
+        });
 
         let chain = FilterChain::new(vec![
             Arc::new(BlockingFilter) as Arc<dyn EgressFilter>,
@@ -388,6 +390,9 @@ mod tests {
         let mut ctx = ConversationCtx::new_anonymous();
 
         chain.apply_request(&mut body, &mut ctx).await.unwrap();
-        assert_eq!(body, original, "body should be unchanged through empty chain");
+        assert_eq!(
+            body, original,
+            "body should be unchanged through empty chain"
+        );
     }
 }

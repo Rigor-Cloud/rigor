@@ -11,14 +11,26 @@ use std::path::PathBuf;
 
 use crate::lsp::{self, AnchorStatus};
 
-pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, deep: bool) -> Result<()> {
+pub fn run_map(
+    path: Option<PathBuf>,
+    codebase: Option<PathBuf>,
+    check: bool,
+    deep: bool,
+) -> Result<()> {
     let yaml_path = super::find_rigor_yaml(path)?;
-    let project_root = codebase
-        .unwrap_or_else(|| yaml_path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf());
+    let project_root = codebase.unwrap_or_else(|| {
+        yaml_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_path_buf()
+    });
 
     let config = crate::constraint::loader::load_rigor_config(&yaml_path)?;
 
-    let has_anchors = config.all_constraints().iter().any(|c| !c.source.is_empty());
+    let has_anchors = config
+        .all_constraints()
+        .iter()
+        .any(|c| !c.source.is_empty());
 
     if !has_anchors {
         eprintln!("rigor map: no source anchors found in rigor.yaml");
@@ -40,13 +52,18 @@ pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, de
                 match lsp::client::verify_anchors_lsp(&project_root, &server, &config) {
                     Ok(r) => r,
                     Err(e) => {
-                        eprintln!("rigor map: LSP verification failed: {} (falling back to grep)", e);
+                        eprintln!(
+                            "rigor map: LSP verification failed: {} (falling back to grep)",
+                            e
+                        );
                         lsp::verify_anchors_grep(&project_root, &config)
                     }
                 }
             }
             None => {
-                eprintln!("rigor map: no LSP server detected for this project (falling back to grep)");
+                eprintln!(
+                    "rigor map: no LSP server detected for this project (falling back to grep)"
+                );
                 lsp::verify_anchors_grep(&project_root, &config)
             }
         }
@@ -63,13 +80,28 @@ pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, de
 
     for result in &results {
         let status_icon = match &result.status {
-            AnchorStatus::Stable => { stable += 1; "\x1b[32m✓\x1b[0m" }
-            AnchorStatus::Drifted { .. } => { drifted += 1; "\x1b[33m~\x1b[0m" }
-            AnchorStatus::Gone => { gone += 1; "\x1b[31m✗\x1b[0m" }
-            AnchorStatus::FileNotFound => { not_found += 1; "\x1b[31m!\x1b[0m" }
+            AnchorStatus::Stable => {
+                stable += 1;
+                "\x1b[32m✓\x1b[0m"
+            }
+            AnchorStatus::Drifted { .. } => {
+                drifted += 1;
+                "\x1b[33m~\x1b[0m"
+            }
+            AnchorStatus::Gone => {
+                gone += 1;
+                "\x1b[31m✗\x1b[0m"
+            }
+            AnchorStatus::FileNotFound => {
+                not_found += 1;
+                "\x1b[31m!\x1b[0m"
+            }
         };
 
-        eprintln!("  {} {} :: {}", status_icon, result.constraint_id, result.anchor_path);
+        eprintln!(
+            "  {} {} :: {}",
+            status_icon, result.constraint_id, result.anchor_path
+        );
 
         match &result.status {
             AnchorStatus::Stable => {
@@ -77,8 +109,14 @@ pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, de
                     eprintln!("    anchor: \"{}\"", truncate(text, 60));
                 }
             }
-            AnchorStatus::Drifted { expected_line, actual_line } => {
-                eprintln!("    \x1b[33mDRIFTED: expected line {}, found at line {}\x1b[0m", expected_line, actual_line);
+            AnchorStatus::Drifted {
+                expected_line,
+                actual_line,
+            } => {
+                eprintln!(
+                    "    \x1b[33mDRIFTED: expected line {}, found at line {}\x1b[0m",
+                    expected_line, actual_line
+                );
                 if let Some(ref text) = result.anchor_text {
                     eprintln!("    anchor: \"{}\"", truncate(text, 60));
                 }
@@ -88,7 +126,9 @@ pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, de
                 if let Some(ref text) = result.anchor_text {
                     eprintln!("    was: \"{}\"", truncate(text, 60));
                 }
-                eprintln!("    \x1b[31m⚠ The truth behind this constraint may have changed!\x1b[0m");
+                eprintln!(
+                    "    \x1b[31m⚠ The truth behind this constraint may have changed!\x1b[0m"
+                );
             }
             AnchorStatus::FileNotFound => {
                 eprintln!("    \x1b[31mFILE NOT FOUND: {}\x1b[0m", result.anchor_path);
@@ -100,7 +140,11 @@ pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, de
         if !result.references.is_empty() {
             eprintln!("    references: {} found", result.references.len());
             for r in result.references.iter().take(5) {
-                let ctx = if r.context.is_empty() { String::new() } else { format!(" — {}", truncate(&r.context, 50)) };
+                let ctx = if r.context.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {}", truncate(&r.context, 50))
+                };
                 eprintln!("      {}:{}{}", r.file, r.line, ctx);
             }
             if result.references.len() > 5 {
@@ -122,10 +166,27 @@ pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, de
     let mode = if deep { "LSP" } else { "grep" };
     eprintln!("rigor map --check ({}): {} anchors checked", mode, total);
 
-    if stable > 0 { eprintln!("  \x1b[32m✓ {} stable\x1b[0m", stable); }
-    if drifted > 0 { eprintln!("  \x1b[33m~ {} drifted (update line numbers in rigor.yaml)\x1b[0m", drifted); }
-    if gone > 0 { eprintln!("  \x1b[31m✗ {} gone (truth may have changed — review constraints!)\x1b[0m", gone); }
-    if not_found > 0 { eprintln!("  \x1b[31m! {} files not found (deleted or moved)\x1b[0m", not_found); }
+    if stable > 0 {
+        eprintln!("  \x1b[32m✓ {} stable\x1b[0m", stable);
+    }
+    if drifted > 0 {
+        eprintln!(
+            "  \x1b[33m~ {} drifted (update line numbers in rigor.yaml)\x1b[0m",
+            drifted
+        );
+    }
+    if gone > 0 {
+        eprintln!(
+            "  \x1b[31m✗ {} gone (truth may have changed — review constraints!)\x1b[0m",
+            gone
+        );
+    }
+    if not_found > 0 {
+        eprintln!(
+            "  \x1b[31m! {} files not found (deleted or moved)\x1b[0m",
+            not_found
+        );
+    }
 
     if gone > 0 || not_found > 0 {
         eprintln!();
@@ -137,5 +198,9 @@ pub fn run_map(path: Option<PathBuf>, codebase: Option<PathBuf>, check: bool, de
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() > max { format!("{}...", &s[..max]) } else { s.to_string() }
+    if s.len() > max {
+        format!("{}...", &s[..max])
+    } else {
+        s.to_string()
+    }
 }

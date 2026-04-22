@@ -25,13 +25,16 @@ pub fn detect_language_server(project_root: &Path) -> Option<LanguageServer> {
             command: "rust-analyzer".to_string(),
             args: vec![],
         })
-    } else if project_root.join("tsconfig.json").exists() || project_root.join("package.json").exists() {
+    } else if project_root.join("tsconfig.json").exists()
+        || project_root.join("package.json").exists()
+    {
         Some(LanguageServer {
             language: "typescript".to_string(),
             command: "typescript-language-server".to_string(),
             args: vec!["--stdio".to_string()],
         })
-    } else if project_root.join("pyproject.toml").exists() || project_root.join("setup.py").exists() {
+    } else if project_root.join("pyproject.toml").exists() || project_root.join("setup.py").exists()
+    {
         Some(LanguageServer {
             language: "python".to_string(),
             command: "pyright-langserver".to_string(),
@@ -65,7 +68,10 @@ pub enum AnchorStatus {
     /// Anchor text found at expected location
     Stable,
     /// Anchor text found but at a different line
-    Drifted { expected_line: u32, actual_line: u32 },
+    Drifted {
+        expected_line: u32,
+        actual_line: u32,
+    },
     /// Anchor text not found in file
     Gone,
     /// File itself doesn't exist
@@ -152,7 +158,11 @@ pub fn verify_anchors_grep(
 }
 
 /// Check if anchor text exists in file at expected lines.
-fn verify_anchor_text(file_path: &Path, anchor_text: &str, expected_lines: &[u32]) -> Result<AnchorStatus> {
+fn verify_anchor_text(
+    file_path: &Path,
+    anchor_text: &str,
+    expected_lines: &[u32],
+) -> Result<AnchorStatus> {
     let content = std::fs::read_to_string(file_path)
         .with_context(|| format!("Failed to read {}", file_path.display()))?;
 
@@ -186,7 +196,21 @@ fn extract_identifier(anchor: &str) -> Option<String> {
         let w = word.trim();
         if w.len() > 3 && w.chars().all(|c| c.is_alphanumeric() || c == '_') {
             // Skip common keywords and values
-            if !matches!(w, "true" | "false" | "self" | "None" | "Some" | "impl" | "pub" | "fn" | "let" | "mut" | "const" | "struct") {
+            if !matches!(
+                w,
+                "true"
+                    | "false"
+                    | "self"
+                    | "None"
+                    | "Some"
+                    | "impl"
+                    | "pub"
+                    | "fn"
+                    | "let"
+                    | "mut"
+                    | "const"
+                    | "struct"
+            ) {
                 return Some(w.to_string());
             }
         }
@@ -195,10 +219,21 @@ fn extract_identifier(anchor: &str) -> Option<String> {
 }
 
 /// Find references to an identifier across the project using grep.
-fn find_references_grep(project_root: &Path, identifier: &str, source_file: &str) -> Vec<ReferenceInfo> {
+fn find_references_grep(
+    project_root: &Path,
+    identifier: &str,
+    source_file: &str,
+) -> Vec<ReferenceInfo> {
     let output = std::process::Command::new("grep")
-        .args(["-rn", "--include=*.rs", "--include=*.ts", "--include=*.py", "--include=*.go",
-               identifier, project_root.to_str().unwrap_or(".")])
+        .args([
+            "-rn",
+            "--include=*.rs",
+            "--include=*.ts",
+            "--include=*.py",
+            "--include=*.go",
+            identifier,
+            project_root.to_str().unwrap_or("."),
+        ])
         .output();
 
     let output = match output {

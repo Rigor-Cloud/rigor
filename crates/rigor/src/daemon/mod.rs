@@ -1,5 +1,6 @@
 pub mod chat;
 pub mod context;
+pub mod egress;
 pub mod gate;
 pub mod gate_api;
 pub mod governance;
@@ -8,7 +9,6 @@ pub mod proxy;
 pub mod sni;
 pub mod tls;
 pub mod ws;
-pub mod egress;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -56,9 +56,15 @@ pub fn remove_pid_file() {
 /// can't definitively tell a stale-but-recycled PID from a live daemon just
 /// from `kill(0)`. For that, Phase 2 adds session registration checks.
 pub fn daemon_alive() -> bool {
-    let Some(path) = daemon_pid_file() else { return false };
-    let Ok(contents) = std::fs::read_to_string(&path) else { return false };
-    let Ok(pid) = contents.trim().parse::<i32>() else { return false };
+    let Some(path) = daemon_pid_file() else {
+        return false;
+    };
+    let Ok(contents) = std::fs::read_to_string(&path) else {
+        return false;
+    };
+    let Ok(pid) = contents.trim().parse::<i32>() else {
+        return false;
+    };
     // kill(pid, 0) returns 0 if the process exists (we can signal it),
     // or -1 with errno set otherwise. We just need to know it exists.
     unsafe { libc::kill(pid, 0) == 0 }
@@ -118,7 +124,9 @@ pub fn should_mitm_target(target: &str) -> bool {
         return false;
     }
     let host = target.split(':').next().unwrap_or(target);
-    MITM_HOSTS.iter().any(|&h| host == h || host.ends_with(&format!(".{}", h)))
+    MITM_HOSTS
+        .iter()
+        .any(|&h| host == h || host.ends_with(&format!(".{}", h)))
 }
 
 #[derive(Debug, Clone)]
@@ -211,7 +219,10 @@ impl DaemonState {
         // Pre-compile policy engine at startup (clone per request)
         let policy_engine = match PolicyEngine::new(&config) {
             Ok(engine) => {
-                info_println!("rigor daemon: pre-compiled policy engine ({} constraints)", engine.loaded_constraints().len());
+                info_println!(
+                    "rigor daemon: pre-compiled policy engine ({} constraints)",
+                    engine.loaded_constraints().len()
+                );
                 Some(engine)
             }
             Err(e) => {
@@ -224,7 +235,10 @@ impl DaemonState {
         let tls_config = match tls::generate_tls_config(MITM_HOSTS) {
             Ok(cfg) => Some(Arc::new(cfg)),
             Err(e) => {
-                eprintln!("rigor daemon: legacy TLS config failed: {} (non-critical)", e);
+                eprintln!(
+                    "rigor daemon: legacy TLS config failed: {} (non-critical)",
+                    e
+                );
                 None
             }
         };
@@ -233,7 +247,10 @@ impl DaemonState {
         let rigor_ca = match tls::RigorCA::load_or_generate() {
             Ok(ca) => Some(Arc::new(ca)),
             Err(e) => {
-                eprintln!("rigor daemon: CA setup failed: {} (MITM will use legacy self-signed certs)", e);
+                eprintln!(
+                    "rigor daemon: CA setup failed: {} (MITM will use legacy self-signed certs)",
+                    e
+                );
                 None
             }
         };
@@ -245,11 +262,13 @@ impl DaemonState {
             .unwrap_or_else(|_| reqwest::Client::new());
 
         // Load fallback config from rigor.yaml or use defaults
-        let fallback = FallbackConfig::from_yaml(&yaml_path)
-            .unwrap_or_else(|e| {
-                eprintln!("rigor daemon: fallback config error: {} (using defaults)", e);
-                FallbackConfig::default_config()
-            });
+        let fallback = FallbackConfig::from_yaml(&yaml_path).unwrap_or_else(|e| {
+            eprintln!(
+                "rigor daemon: fallback config error: {} (using defaults)",
+                e
+            );
+            FallbackConfig::default_config()
+        });
         // Validate at startup — fails the daemon if minimums are violated
         if let Err(e) = fallback.validate() {
             anyhow::bail!("fallback config validation failed: {}", e);
@@ -414,7 +433,13 @@ pub fn start_daemon(yaml_path: Option<PathBuf>, port: u16) -> Result<()> {
     );
     if std::env::var("RIGOR_DEBUG").is_ok() {
         for (id, s) in &strengths {
-            let severity = if *s >= 0.7 { "BLOCK" } else if *s >= 0.4 { "WARN" } else { "ALLOW" };
+            let severity = if *s >= 0.7 {
+                "BLOCK"
+            } else if *s >= 0.4 {
+                "WARN"
+            } else {
+                "ALLOW"
+            };
             eprintln!("  {} ({:.2}) [{}]", id, s, severity);
         }
     }
@@ -435,7 +460,10 @@ pub fn start_daemon(yaml_path: Option<PathBuf>, port: u16) -> Result<()> {
         let http_handle = tokio::spawn(async move {
             let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-            eprintln!("rigor daemon: HTTP on http://127.0.0.1:{} (dashboard + proxy)", port);
+            eprintln!(
+                "rigor daemon: HTTP on http://127.0.0.1:{} (dashboard + proxy)",
+                port
+            );
             axum::serve(listener, http_app).await.unwrap();
         });
 
@@ -451,17 +479,18 @@ pub fn start_daemon(yaml_path: Option<PathBuf>, port: u16) -> Result<()> {
             ]) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("rigor daemon: TLS config failed: {} — HTTPS proxy disabled", e);
+                    eprintln!(
+                        "rigor daemon: TLS config failed: {} — HTTPS proxy disabled",
+                        e
+                    );
                     return;
                 }
             };
 
             let tls_acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(tls_config));
-            let listener = tokio::net::TcpListener::bind(
-                format!("127.0.0.1:{}", tls_port),
-            )
-            .await
-            .unwrap();
+            let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", tls_port))
+                .await
+                .unwrap();
 
             eprintln!(
                 "rigor daemon: HTTPS on https://127.0.0.1:{} (LD_PRELOAD intercepted traffic)",
@@ -487,22 +516,24 @@ pub fn start_daemon(yaml_path: Option<PathBuf>, port: u16) -> Result<()> {
                             eprintln!("rigor daemon: TLS connection accepted");
                             let io = hyper_util::rt::TokioIo::new(tls_stream);
 
-                            let service = hyper::service::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
-                                let app = app.clone();
-                                let path = req.uri().path().to_string();
-                                let method = req.method().to_string();
-                                eprintln!("rigor daemon: TLS request: {} {}", method, path);
+                            let service = hyper::service::service_fn(
+                                move |req: hyper::Request<hyper::body::Incoming>| {
+                                    let app = app.clone();
+                                    let path = req.uri().path().to_string();
+                                    let method = req.method().to_string();
+                                    eprintln!("rigor daemon: TLS request: {} {}", method, path);
 
-                                async move {
-                                    use tower::Service;
-                                    let (parts, incoming) = req.into_parts();
-                                    let body = axum::body::Body::new(incoming);
-                                    let req = axum::http::Request::from_parts(parts, body);
-                                    let mut svc = app;
-                                    let resp = svc.call(req).await.unwrap();
-                                    Ok::<_, std::convert::Infallible>(resp)
-                                }
-                            });
+                                    async move {
+                                        use tower::Service;
+                                        let (parts, incoming) = req.into_parts();
+                                        let body = axum::body::Body::new(incoming);
+                                        let req = axum::http::Request::from_parts(parts, body);
+                                        let mut svc = app;
+                                        let resp = svc.call(req).await.unwrap();
+                                        Ok::<_, std::convert::Infallible>(resp)
+                                    }
+                                },
+                            );
 
                             if let Err(e) = hyper_util::server::conn::auto::Builder::new(
                                 hyper_util::rt::TokioExecutor::new(),
@@ -511,7 +542,9 @@ pub fn start_daemon(yaml_path: Option<PathBuf>, port: u16) -> Result<()> {
                             .await
                             {
                                 let msg = e.to_string();
-                                if !msg.contains("connection closed") && !msg.contains("broken pipe") {
+                                if !msg.contains("connection closed")
+                                    && !msg.contains("broken pipe")
+                                {
                                     eprintln!("rigor daemon: TLS error: {}", msg);
                                 }
                             }
@@ -548,7 +581,10 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/v1/chat/completions", post(proxy::openai_proxy))
         // OpenCode Zen provider routes (same format, prefixed path)
         .route("/zen/v1/messages", post(proxy::opencode_zen_messages_proxy))
-        .route("/zen/v1/responses", post(proxy::opencode_zen_responses_proxy))
+        .route(
+            "/zen/v1/responses",
+            post(proxy::opencode_zen_responses_proxy),
+        )
         // Note: OpenAI Responses API (`/v1/responses`) and ChatGPT backend
         // (`chatgpt.com/backend-api/codex`) intentionally have no explicit
         // route here. Codex CLI upgrades those requests to WebSocket (GET
@@ -562,14 +598,29 @@ pub fn build_router(state: SharedState) -> Router {
         // `method_routing::any()` variant later without reintroducing
         // the 405 regression.
         // Governance API endpoints
-        .route("/api/governance/constraints", get(governance::list_constraints))
-        .route("/api/governance/constraints/{id}/toggle", post(governance::toggle_constraint))
+        .route(
+            "/api/governance/constraints",
+            get(governance::list_constraints),
+        )
+        .route(
+            "/api/governance/constraints/{id}/toggle",
+            post(governance::toggle_constraint),
+        )
         .route("/api/governance/pause", post(governance::toggle_pause))
-        .route("/api/governance/block-next", post(governance::toggle_block_next))
+        .route(
+            "/api/governance/block-next",
+            post(governance::toggle_block_next),
+        )
         // Gate API endpoints
-        .route("/api/gate/register-snapshot", post(gate_api::register_snapshot))
+        .route(
+            "/api/gate/register-snapshot",
+            post(gate_api::register_snapshot),
+        )
         .route("/api/gate/tool-completed", post(gate_api::tool_completed))
-        .route("/api/gate/decision/{session_id}", get(gate_api::get_decision))
+        .route(
+            "/api/gate/decision/{session_id}",
+            get(gate_api::get_decision),
+        )
         .route("/api/gate/{gate_id}/approve", post(gate_api::approve_gate))
         .route("/api/gate/{gate_id}/reject", post(gate_api::reject_gate))
         // Chat endpoint — lets the dashboard send messages to Claude through rigor's proxy
@@ -579,8 +630,14 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/api/violations", get(observability_api::search_violations))
         .route("/api/eval", get(observability_api::eval_stats))
         .route("/api/cost", get(observability_api::cost_stats))
-        .route("/api/project/register", post(observability_api::register_project))
-        .route("/api/relevance/lookup", post(observability_api::relevance_lookup))
+        .route(
+            "/api/project/register",
+            post(observability_api::register_project),
+        )
+        .route(
+            "/api/relevance/lookup",
+            post(observability_api::relevance_lookup),
+        )
         // Catch-all proxy for ANY other API path (Vertex AI, Azure, etc.)
         // This handles LD_PRELOAD intercepted traffic to unknown endpoints
         .fallback(proxy::catch_all_proxy)

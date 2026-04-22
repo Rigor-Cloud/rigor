@@ -112,10 +112,11 @@ pub fn compute_refinements(entries: &[ViolationLogEntry]) -> Vec<Refinement> {
             generated_at: now.clone(),
         });
     }
-    out.sort_by(|a, b| b
-        .false_positive_rate
-        .partial_cmp(&a.false_positive_rate)
-        .unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.false_positive_rate
+            .partial_cmp(&a.false_positive_rate)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out
 }
 
@@ -136,7 +137,7 @@ fn build_regex_hint(examples: &[String]) -> String {
         }
     }
     let mut words: Vec<(String, usize)> = freq.into_iter().collect();
-    words.sort_by(|a, b| b.1.cmp(&a.1));
+    words.sort_by_key(|w| std::cmp::Reverse(w.1));
     let top: Vec<String> = words.into_iter().take(3).map(|(w, _)| w).collect();
     if top.is_empty() {
         r"(?i)(test|example|mock)".to_string()
@@ -182,10 +183,8 @@ fn apply_to_yaml(yaml_path: &PathBuf, refs: &[Refinement]) -> Result<(String, St
                 let already = i > 0 && lines[i - 1].contains("rigor-refine:");
                 if !already {
                     // Determine leading whitespace of the `- id:` line so the comment aligns.
-                    let indent: String = lines[i]
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .collect();
+                    let indent: String =
+                        lines[i].chars().take_while(|c| c.is_whitespace()).collect();
                     lines.insert(i, format!("{}{}", indent, r.yaml_note));
                     i += 1; // skip over newly inserted line
                 }
@@ -260,7 +259,11 @@ pub fn run_refine(apply: bool, dry_run: bool) -> Result<()> {
         return Ok(());
     }
 
-    println!("Refinement suggestions ({} constraint(s) above {:.0}% FP rate):", refs.len(), FP_RATE_THRESHOLD * 100.0);
+    println!(
+        "Refinement suggestions ({} constraint(s) above {:.0}% FP rate):",
+        refs.len(),
+        FP_RATE_THRESHOLD * 100.0
+    );
     println!();
     for r in &refs {
         println!(
@@ -397,7 +400,8 @@ pub fn auto_refine_if_needed(yaml_path: &Path) -> Result<Vec<String>> {
     // Apply refinements to rigor.yaml
     let yaml_pb = yaml_path.to_path_buf();
     let (new_content, _diff) = apply_to_yaml(&yaml_pb, &refinements)?;
-    fs::write(yaml_path, &new_content).context("Failed to write updated rigor.yaml during auto-refine")?;
+    fs::write(yaml_path, &new_content)
+        .context("Failed to write updated rigor.yaml during auto-refine")?;
 
     // Also update the rego blocks: add a `not regex.match(...)` exclusion line
     // for each refined constraint directly into the rego block in rigor.yaml.
@@ -424,7 +428,7 @@ fn inject_rego_exclusion(content: &str, constraint_id: &str, pattern: &str) -> S
     let mut in_rego_block = false;
     let mut exclusion_injected = false;
 
-    for (i, line) in lines.iter().enumerate() {
+    for line in lines.iter() {
         let trimmed = line.trim();
 
         // Detect the target constraint block
@@ -451,10 +455,7 @@ fn inject_rego_exclusion(content: &str, constraint_id: &str, pattern: &str) -> S
             if trimmed.starts_with("v := {") {
                 // Determine indentation of the v := line
                 let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
-                let exclusion_line = format!(
-                    "{}not regex.match(`{}`, c.text)",
-                    indent, pattern
-                );
+                let exclusion_line = format!("{}not regex.match(`{}`, c.text)", indent, pattern);
                 // Check we haven't already added this exact exclusion
                 let already_present = lines.iter().any(|l| l.trim() == exclusion_line.trim());
                 if !already_present {

@@ -1,9 +1,9 @@
 //! `rigor logs` CLI subcommand — view session logs.
 
 use anyhow::Result;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 
-use crate::logging::session_registry::{self, SessionEntry};
+use crate::logging::session_registry::{self};
 
 pub fn run_logs(session: Option<String>, follow: bool, lines: usize) -> Result<()> {
     // Resolve which session to show logs for
@@ -12,8 +12,9 @@ pub fn run_logs(session: Option<String>, follow: bool, lines: usize) -> Result<(
             .ok_or_else(|| anyhow::anyhow!("Session not found: {}", query))?
     } else {
         // Default to latest session
-        session_registry::latest_session()?
-            .ok_or_else(|| anyhow::anyhow!("No sessions recorded yet. Run: rigor ground -- opencode"))?
+        session_registry::latest_session()?.ok_or_else(|| {
+            anyhow::anyhow!("No sessions recorded yet. Run: rigor ground -- opencode")
+        })?
     };
 
     let log_path = session_registry::session_log_path(&entry.id)
@@ -26,15 +27,23 @@ pub fn run_logs(session: Option<String>, follow: bool, lines: usize) -> Result<(
             eprintln!("(Using fallback log: /tmp/rigor-ground.log)");
             return display_log(&fallback, follow, lines);
         }
-        anyhow::bail!("No log file found for session: {} ({})", entry.name, entry.id);
+        anyhow::bail!(
+            "No log file found for session: {} ({})",
+            entry.name,
+            entry.id
+        );
     }
 
     // Print session header
     let alive = session_registry::is_session_alive(&entry);
     let status = if alive { "active" } else { "ended" };
     eprintln!("Session: {} ({}) [{}]", entry.name, &entry.id[..8], status);
-    eprintln!("Agent: {} | Constraints: {} | Started: {}",
-        entry.agent, entry.constraints, &entry.started_at[..19]);
+    eprintln!(
+        "Agent: {} | Constraints: {} | Started: {}",
+        entry.agent,
+        entry.constraints,
+        &entry.started_at[..19]
+    );
     eprintln!("---");
 
     display_log(&log_path, follow, lines)
@@ -100,7 +109,10 @@ fn display_log(path: &std::path::Path, follow: bool, tail_lines: usize) -> Resul
             .filter(|line| !line.trim().is_empty())
             .filter(|line| {
                 // Filter out binary-heavy lines
-                line.chars().filter(|c| c.is_control() && *c != '\t').count() == 0
+                line.chars()
+                    .filter(|c| c.is_control() && *c != '\t')
+                    .count()
+                    == 0
             })
             .collect();
 
@@ -115,10 +127,20 @@ fn display_log(path: &std::path::Path, follow: bool, tail_lines: usize) -> Resul
 
 /// Clean non-printable characters from a log line.
 fn sanitize_line(line: &str) -> String {
-    if line.chars().any(|c| c.is_control() && c != '\n' && c != '\t') {
+    if line
+        .chars()
+        .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
         // Has binary data — try to extract printable portions
-        let clean: String = line.chars()
-            .map(|c| if c.is_control() && c != '\n' && c != '\t' { ' ' } else { c })
+        let clean: String = line
+            .chars()
+            .map(|c| {
+                if c.is_control() && c != '\n' && c != '\t' {
+                    ' '
+                } else {
+                    c
+                }
+            })
             .collect();
         // Only return if there's meaningful content
         let trimmed = clean.trim();

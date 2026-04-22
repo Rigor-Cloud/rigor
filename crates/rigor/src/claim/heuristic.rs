@@ -70,12 +70,39 @@ pub fn is_assertion(sentence: &str) -> bool {
     // Filter conversational/greeting text — these are not factual claims
     let lower = trimmed.to_lowercase();
     let conversational_starts = [
-        "hi", "hello", "hey", "sure", "ok", "okay", "got it", "let me",
-        "i can", "i'll", "i'd", "how can i", "what would you", "thanks",
-        "thank you", "you're welcome", "no problem", "great", "awesome",
-        "sounds good", "absolutely", "of course", "happy to", "glad to",
-        "here's", "here is", "let's", "shall we", "would you like",
-        "is there anything", "what can i", "how about", "feel free",
+        "hi",
+        "hello",
+        "hey",
+        "sure",
+        "ok",
+        "okay",
+        "got it",
+        "let me",
+        "i can",
+        "i'll",
+        "i'd",
+        "how can i",
+        "what would you",
+        "thanks",
+        "thank you",
+        "you're welcome",
+        "no problem",
+        "great",
+        "awesome",
+        "sounds good",
+        "absolutely",
+        "of course",
+        "happy to",
+        "glad to",
+        "here's",
+        "here is",
+        "let's",
+        "shall we",
+        "would you like",
+        "is there anything",
+        "what can i",
+        "how about",
+        "feel free",
     ];
     for prefix in &conversational_starts {
         if lower.starts_with(prefix) {
@@ -329,13 +356,19 @@ mod tests {
 
     #[test]
     fn test_is_action_intent_detects_explicit_edits() {
-        assert!(is_action_intent("Let me edit src/claim/heuristic.rs to add the filter"));
-        assert!(is_action_intent("I'll modify the proxy to handle this case"));
+        assert!(is_action_intent(
+            "Let me edit src/claim/heuristic.rs to add the filter"
+        ));
+        assert!(is_action_intent(
+            "I'll modify the proxy to handle this case"
+        ));
     }
 
     #[test]
     fn test_is_action_intent_detects_prescriptive_statements() {
-        assert!(is_action_intent("This should be changed to use the new API"));
+        assert!(is_action_intent(
+            "This should be changed to use the new API"
+        ));
         assert!(is_action_intent("We need to refactor this module"));
         assert!(is_action_intent("I should fix the null pointer bug"));
     }

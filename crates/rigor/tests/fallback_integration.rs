@@ -72,8 +72,14 @@ fallback:
     // anyhow's Display only shows the outermost context; use Debug to see the full chain
     // including the inner "Refusing to start" message from minimums enforcement.
     let msg = format!("{:?}", err);
-    assert!(msg.contains("pseudonymize"), "should name the offending component: {msg}");
-    assert!(msg.contains("Refusing to start"), "should mention refusing to start: {msg}");
+    assert!(
+        msg.contains("pseudonymize"),
+        "should name the offending component: {msg}"
+    );
+    assert!(
+        msg.contains("Refusing to start"),
+        "should mention refusing to start: {msg}"
+    );
 }
 
 #[tokio::test]
@@ -94,14 +100,18 @@ fallback:
     let config = parsed.fallback.unwrap();
 
     // judge_api with degrade_with_warn should skip, not block
-    let result: FallbackOutcome<i32> = config.execute("judge_api", || async {
-        Err((FailureCategory::PersistentError, "api down".to_string()))
-    }).await;
+    let result: FallbackOutcome<i32> = config
+        .execute("judge_api", || async {
+            Err((FailureCategory::PersistentError, "api down".to_string()))
+        })
+        .await;
     assert!(matches!(result, FallbackOutcome::Skipped));
 
     // A different component without override should block
-    let result: FallbackOutcome<i32> = config.execute("other", || async {
-        Err((FailureCategory::PersistentError, "api down".to_string()))
-    }).await;
+    let result: FallbackOutcome<i32> = config
+        .execute("other", || async {
+            Err((FailureCategory::PersistentError, "api down".to_string()))
+        })
+        .await;
     assert!(matches!(result, FallbackOutcome::Blocked(_)));
 }

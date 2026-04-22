@@ -29,9 +29,7 @@ pub enum AlertCommands {
     /// List configured alert rules.
     List,
     /// Remove a rule by id (or id prefix).
-    Remove {
-        id: String,
-    },
+    Remove { id: String },
     /// Send a synthetic test ping to all configured webhooks.
     Test,
 }

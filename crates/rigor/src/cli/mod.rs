@@ -233,9 +233,7 @@ pub enum Commands {
         deep: bool,
     },
     /// Action gate subcommands (used by Claude Code hooks)
-    Gate {
-        subcommand: String,
-    },
+    Gate { subcommand: String },
     /// Scan stdin (or a file) for PII/secrets using rigor's detector.
     /// Default: read stdin, print findings. Use `--hook` to run as a
     /// UserPromptSubmit hook (reads JSON input, emits hook response JSON).
@@ -360,9 +358,35 @@ pub fn run_cli() -> Result<()> {
             crate::run()
         }
         Some(Commands::Init { path, ai }) => init::run_init(path, ai),
-        Some(Commands::Ground { path, port, show_logs, no_mitm, transparent, name, max_cost, command }) => ground::run_ground(path, port, !show_logs, !no_mitm, transparent, name, max_cost, command),
+        Some(Commands::Ground {
+            path,
+            port,
+            show_logs,
+            no_mitm,
+            transparent,
+            name,
+            max_cost,
+            command,
+        }) => ground::run_ground(
+            path,
+            port,
+            !show_logs,
+            !no_mitm,
+            transparent,
+            name,
+            max_cost,
+            command,
+        ),
         Some(Commands::Daemon { path, port }) => crate::daemon::start_daemon(path, port),
-        Some(Commands::Serve { action, path, port, background, stop, name, max_cost }) => {
+        Some(Commands::Serve {
+            action,
+            path,
+            port,
+            background,
+            stop,
+            name,
+            max_cost,
+        }) => {
             let stop = stop || matches!(action.as_deref(), Some("stop"));
             serve::run_serve(path, port, background, stop, name, max_cost)
         }
@@ -377,33 +401,58 @@ pub fn run_cli() -> Result<()> {
         }
         Some(Commands::Log { command }) => log::run_log(command),
         Some(Commands::Sessions { active, last }) => sessions::run_sessions(active, last),
-        Some(Commands::Logs { session, follow, lines }) => logs::run_logs(session, follow, lines),
-        Some(Commands::Trust { tool }) => {
-            match tool.as_deref() {
-                Some(t) => trust::install_tool_wrapper(t),
-                None => crate::daemon::tls::install_ca_trust(),
-            }
+        Some(Commands::Logs {
+            session,
+            follow,
+            lines,
+        }) => logs::run_logs(session, follow, lines),
+        Some(Commands::Trust { tool }) => match tool.as_deref() {
+            Some(t) => trust::install_tool_wrapper(t),
+            None => crate::daemon::tls::install_ca_trust(),
+        },
+        Some(Commands::Untrust { tool }) => match tool.as_deref() {
+            Some(t) => trust::remove_tool_wrapper(t),
+            None => crate::daemon::tls::remove_ca_trust(),
+        },
+        Some(Commands::Config { action, key, value }) => {
+            config::run_config(&action, key.as_deref(), value.as_deref())
         }
-        Some(Commands::Untrust { tool }) => {
-            match tool.as_deref() {
-                Some(t) => trust::remove_tool_wrapper(t),
-                None => crate::daemon::tls::remove_ca_trust(),
-            }
-        }
-        Some(Commands::Config { action, key, value }) => config::run_config(&action, key.as_deref(), value.as_deref()),
-        Some(Commands::Map { path, codebase, check, deep }) => map::run_map(path, codebase, check, deep),
+        Some(Commands::Map {
+            path,
+            codebase,
+            check,
+            deep,
+        }) => map::run_map(path, codebase, check, deep),
         Some(Commands::Gate { subcommand }) => gate::run_gate(&subcommand),
-        Some(Commands::Scan { file, block, json, hook, install, uninstall, status, smart }) => {
-            scan::run_scan(file, block, json, hook, install, uninstall, status, smart)
-        }
-        Some(Commands::Search { query, constraint, severity, since, model, limit }) => {
-            search::run_search(query, constraint, severity, since, model, limit)
-        }
+        Some(Commands::Scan {
+            file,
+            block,
+            json,
+            hook,
+            install,
+            uninstall,
+            status,
+            smart,
+        }) => scan::run_scan(file, block, json, hook, install, uninstall, status, smart),
+        Some(Commands::Search {
+            query,
+            constraint,
+            severity,
+            since,
+            model,
+            limit,
+        }) => search::run_search(query, constraint, severity, since, model, limit),
         Some(Commands::Alert { command }) => alert::run_alert(command),
-        Some(Commands::Diff { session_a, session_b, last }) => {
-            diff::run_diff(session_a, session_b, last)
-        }
-        Some(Commands::Eval { report, baseline, compare }) => eval::run_eval(report, baseline, compare),
+        Some(Commands::Diff {
+            session_a,
+            session_b,
+            last,
+        }) => diff::run_diff(session_a, session_b, last),
+        Some(Commands::Eval {
+            report,
+            baseline,
+            compare,
+        }) => eval::run_eval(report, baseline, compare),
         Some(Commands::Refine { apply, dry_run }) => refine::run_refine(apply, dry_run),
         Some(Commands::Setup) => setup::run_setup(),
     }

@@ -210,8 +210,7 @@ fn run_post_tool() -> Result<()> {
                         .unwrap_or("pending");
                     match status {
                         "approved" => {
-                            if let Some(snap_id) =
-                                json.get("snapshot_id").and_then(|s| s.as_str())
+                            if let Some(snap_id) = json.get("snapshot_id").and_then(|s| s.as_str())
                             {
                                 drop_stash(snap_id);
                             }
@@ -250,15 +249,11 @@ fn run_post_tool() -> Result<()> {
                                     let _ = std::fs::remove_file(p);
                                 }
                             }
-                            if let Some(snap_id) =
-                                json.get("snapshot_id").and_then(|s| s.as_str())
+                            if let Some(snap_id) = json.get("snapshot_id").and_then(|s| s.as_str())
                             {
                                 drop_stash(snap_id);
                             }
-                            eprintln!(
-                                "rigor gate: rejected — reverted {} files",
-                                paths.len()
-                            );
+                            eprintln!("rigor gate: rejected — reverted {} files", paths.len());
                             return Ok(());
                         }
                         _ => {}
@@ -317,17 +312,25 @@ fn pop_stash_by_message(stash_ref: &str) {
 }
 
 fn is_git_repo() -> bool {
-    Command::new("git").args(["rev-parse", "--is-inside-work-tree"]).output()
-        .map(|o| o.status.success()).unwrap_or(false)
+    Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 pub fn install_hook() -> Result<()> {
     let settings_path = claude_settings_path()?;
     let settings_str = std::fs::read_to_string(&settings_path).unwrap_or_else(|_| "{}".to_string());
-    let mut settings: serde_json::Value = serde_json::from_str(&settings_str).unwrap_or_else(|_| serde_json::json!({}));
+    let mut settings: serde_json::Value =
+        serde_json::from_str(&settings_str).unwrap_or_else(|_| serde_json::json!({}));
 
     // Ensure settings.hooks is an object (preserve existing keys like SessionStart, Stop, etc.)
-    if !settings.get("hooks").map(|h| h.is_object()).unwrap_or(false) {
+    if !settings
+        .get("hooks")
+        .map(|h| h.is_object())
+        .unwrap_or(false)
+    {
         settings["hooks"] = serde_json::json!({});
     }
 
@@ -337,11 +340,16 @@ pub fn install_hook() -> Result<()> {
         // Remove any existing rigor gate entries to avoid duplicates/stale commands
         arr.retain(|entry| {
             let hooks = entry.get("hooks").and_then(|h| h.as_array());
-            let has_rigor = hooks.map(|hs| hs.iter().any(|h|
-                h.get("command").and_then(|c| c.as_str())
-                    .map(|s| s.starts_with("rigor gate"))
-                    .unwrap_or(false)
-            )).unwrap_or(false);
+            let has_rigor = hooks
+                .map(|hs| {
+                    hs.iter().any(|h| {
+                        h.get("command")
+                            .and_then(|c| c.as_str())
+                            .map(|s| s.starts_with("rigor gate"))
+                            .unwrap_or(false)
+                    })
+                })
+                .unwrap_or(false);
             !has_rigor
         });
         arr.push(serde_json::json!({
@@ -353,14 +361,16 @@ pub fn install_hook() -> Result<()> {
     let hooks_obj = settings["hooks"].as_object_mut().unwrap();
 
     // PreToolUse
-    let pre_arr = hooks_obj.entry("PreToolUse".to_string())
+    let pre_arr = hooks_obj
+        .entry("PreToolUse".to_string())
         .or_insert_with(|| serde_json::json!([]));
     if let Some(arr) = pre_arr.as_array_mut() {
         add_rigor_entry(arr, "Edit|Write|Bash", "rigor gate pre-tool");
     }
 
     // PostToolUse
-    let post_arr = hooks_obj.entry("PostToolUse".to_string())
+    let post_arr = hooks_obj
+        .entry("PostToolUse".to_string())
         .or_insert_with(|| serde_json::json!([]));
     if let Some(arr) = post_arr.as_array_mut() {
         add_rigor_entry(arr, "Edit|Write|Bash", "rigor gate post-tool");
@@ -370,7 +380,10 @@ pub fn install_hook() -> Result<()> {
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(&settings_path, serde_json::to_string_pretty(&settings)?)?;
-    eprintln!("rigor: installed action gate hooks in {} (merged with existing hooks)", settings_path.display());
+    eprintln!(
+        "rigor: installed action gate hooks in {} (merged with existing hooks)",
+        settings_path.display()
+    );
     Ok(())
 }
 
@@ -379,15 +392,11 @@ pub fn install_hook() -> Result<()> {
 /// etc.) are preserved. Idempotent — safe to run when no rigor hooks exist.
 pub fn uninstall_hook() -> Result<()> {
     let settings_path = claude_settings_path()?;
-    let settings_str = std::fs::read_to_string(&settings_path)
-        .unwrap_or_else(|_| "{}".to_string());
+    let settings_str = std::fs::read_to_string(&settings_path).unwrap_or_else(|_| "{}".to_string());
     let mut settings: serde_json::Value =
         serde_json::from_str(&settings_str).unwrap_or_else(|_| serde_json::json!({}));
 
-    let hooks_obj = match settings
-        .get_mut("hooks")
-        .and_then(|h| h.as_object_mut())
-    {
+    let hooks_obj = match settings.get_mut("hooks").and_then(|h| h.as_object_mut()) {
         Some(o) => o,
         None => {
             eprintln!("rigor: no hooks configured in {}", settings_path.display());
@@ -397,10 +406,7 @@ pub fn uninstall_hook() -> Result<()> {
 
     let mut removed = 0usize;
     for key in ["PreToolUse", "PostToolUse"] {
-        if let Some(arr) = hooks_obj
-            .get_mut(key)
-            .and_then(|v| v.as_array_mut())
-        {
+        if let Some(arr) = hooks_obj.get_mut(key).and_then(|v| v.as_array_mut()) {
             let before = arr.len();
             arr.retain(|entry| {
                 let hooks = entry.get("hooks").and_then(|h| h.as_array());
@@ -460,8 +466,7 @@ pub fn uninstall_hook() -> Result<()> {
 /// currently installed in the Claude Code settings file.
 pub fn hook_status() -> Result<()> {
     let settings_path = claude_settings_path()?;
-    let settings_str = std::fs::read_to_string(&settings_path)
-        .unwrap_or_else(|_| "{}".to_string());
+    let settings_str = std::fs::read_to_string(&settings_path).unwrap_or_else(|_| "{}".to_string());
     let settings: serde_json::Value =
         serde_json::from_str(&settings_str).unwrap_or_else(|_| serde_json::json!({}));
 
@@ -493,10 +498,7 @@ pub fn hook_status() -> Result<()> {
     let pre = check("PreToolUse");
     let post = check("PostToolUse");
 
-    println!(
-        "rigor action gate hooks ({}):",
-        settings_path.display()
-    );
+    println!("rigor action gate hooks ({}):", settings_path.display());
     println!(
         "  PreToolUse  (stash snapshot before Edit|Write|Bash): {}",
         if pre { "enabled" } else { "disabled" }
@@ -582,17 +584,41 @@ mod tests {
     fn setup_git_repo() -> tempfile::TempDir {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path();
-        Command::new("git").current_dir(repo).args(["init", "-q"]).output().unwrap();
-        Command::new("git").current_dir(repo).args(["config", "user.email", "test@test.com"]).output().unwrap();
-        Command::new("git").current_dir(repo).args(["config", "user.name", "Test"]).output().unwrap();
-        Command::new("git").current_dir(repo).args(["config", "commit.gpgsign", "false"]).output().unwrap();
+        Command::new("git")
+            .current_dir(repo)
+            .args(["init", "-q"])
+            .output()
+            .unwrap();
+        Command::new("git")
+            .current_dir(repo)
+            .args(["config", "user.email", "test@test.com"])
+            .output()
+            .unwrap();
+        Command::new("git")
+            .current_dir(repo)
+            .args(["config", "user.name", "Test"])
+            .output()
+            .unwrap();
+        Command::new("git")
+            .current_dir(repo)
+            .args(["config", "commit.gpgsign", "false"])
+            .output()
+            .unwrap();
         tmp
     }
 
     fn commit_file(repo: &std::path::Path, name: &str, content: &str) {
         std::fs::write(repo.join(name), content).unwrap();
-        Command::new("git").current_dir(repo).args(["add", name]).output().unwrap();
-        Command::new("git").current_dir(repo).args(["commit", "-q", "-m", "fixture"]).output().unwrap();
+        Command::new("git")
+            .current_dir(repo)
+            .args(["add", name])
+            .output()
+            .unwrap();
+        Command::new("git")
+            .current_dir(repo)
+            .args(["commit", "-q", "-m", "fixture"])
+            .output()
+            .unwrap();
     }
 
     // ---- Fix 1: env var opt-in ----
@@ -605,7 +631,11 @@ mod tests {
     #[test]
     fn gate_enabled_when_env_var_is_one() {
         assert!(is_gate_session_enabled_from(|k| {
-            if k == "RIGOR_GATE_ENABLED" { Some("1".to_string()) } else { None }
+            if k == "RIGOR_GATE_ENABLED" {
+                Some("1".to_string())
+            } else {
+                None
+            }
         }));
     }
 
@@ -615,9 +645,14 @@ mod tests {
             let v = (*val).to_string();
             assert!(
                 !is_gate_session_enabled_from(|k| {
-                    if k == "RIGOR_GATE_ENABLED" { Some(v.clone()) } else { None }
+                    if k == "RIGOR_GATE_ENABLED" {
+                        Some(v.clone())
+                    } else {
+                        None
+                    }
                 }),
-                "should be disabled for value {:?}", val
+                "should be disabled for value {:?}",
+                val
             );
         }
     }

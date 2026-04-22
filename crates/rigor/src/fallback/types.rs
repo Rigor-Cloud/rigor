@@ -1,6 +1,6 @@
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use serde::de::{self, Visitor, MapAccess};
 
 /// What kind of failure occurred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -23,23 +23,19 @@ pub enum Policy {
     FailClosed,
     FailOpen,
     DegradeWithWarn,
-    RetryThenFailClosed {
-        attempts: u32,
-        backoff_ms: Vec<u64>,
-    },
-    RetryThenFailOpen {
-        attempts: u32,
-        backoff_ms: Vec<u64>,
-    },
-    RetryThenDegrade {
-        attempts: u32,
-        backoff_ms: Vec<u64>,
-    },
+    RetryThenFailClosed { attempts: u32, backoff_ms: Vec<u64> },
+    RetryThenFailOpen { attempts: u32, backoff_ms: Vec<u64> },
+    RetryThenDegrade { attempts: u32, backoff_ms: Vec<u64> },
 }
 
 const POLICY_VARIANTS: &[&str] = &[
-    "fail_startup", "fail_closed", "fail_open", "degrade_with_warn",
-    "retry_then_fail_closed", "retry_then_fail_open", "retry_then_degrade",
+    "fail_startup",
+    "fail_closed",
+    "fail_open",
+    "degrade_with_warn",
+    "retry_then_fail_closed",
+    "retry_then_fail_open",
+    "retry_then_degrade",
 ];
 
 #[derive(Deserialize)]
@@ -56,19 +52,46 @@ impl Serialize for Policy {
             Policy::FailClosed => serializer.serialize_str("fail_closed"),
             Policy::FailOpen => serializer.serialize_str("fail_open"),
             Policy::DegradeWithWarn => serializer.serialize_str("degrade_with_warn"),
-            Policy::RetryThenFailClosed { attempts, backoff_ms } => {
+            Policy::RetryThenFailClosed {
+                attempts,
+                backoff_ms,
+            } => {
                 let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("retry_then_fail_closed", &RetryFieldsRef { attempts: *attempts, backoff_ms })?;
+                map.serialize_entry(
+                    "retry_then_fail_closed",
+                    &RetryFieldsRef {
+                        attempts: *attempts,
+                        backoff_ms,
+                    },
+                )?;
                 map.end()
             }
-            Policy::RetryThenFailOpen { attempts, backoff_ms } => {
+            Policy::RetryThenFailOpen {
+                attempts,
+                backoff_ms,
+            } => {
                 let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("retry_then_fail_open", &RetryFieldsRef { attempts: *attempts, backoff_ms })?;
+                map.serialize_entry(
+                    "retry_then_fail_open",
+                    &RetryFieldsRef {
+                        attempts: *attempts,
+                        backoff_ms,
+                    },
+                )?;
                 map.end()
             }
-            Policy::RetryThenDegrade { attempts, backoff_ms } => {
+            Policy::RetryThenDegrade {
+                attempts,
+                backoff_ms,
+            } => {
                 let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("retry_then_degrade", &RetryFieldsRef { attempts: *attempts, backoff_ms })?;
+                map.serialize_entry(
+                    "retry_then_degrade",
+                    &RetryFieldsRef {
+                        attempts: *attempts,
+                        backoff_ms,
+                    },
+                )?;
                 map.end()
             }
         }
@@ -107,21 +130,31 @@ impl<'de> Visitor<'de> for PolicyVisitor {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-        let key: String = map.next_key()?
+        let key: String = map
+            .next_key()?
             .ok_or_else(|| de::Error::custom("empty map for Policy"))?;
 
         let result = match key.as_str() {
             "retry_then_fail_closed" => {
                 let fields: RetryFields = map.next_value()?;
-                Ok(Policy::RetryThenFailClosed { attempts: fields.attempts, backoff_ms: fields.backoff_ms })
+                Ok(Policy::RetryThenFailClosed {
+                    attempts: fields.attempts,
+                    backoff_ms: fields.backoff_ms,
+                })
             }
             "retry_then_fail_open" => {
                 let fields: RetryFields = map.next_value()?;
-                Ok(Policy::RetryThenFailOpen { attempts: fields.attempts, backoff_ms: fields.backoff_ms })
+                Ok(Policy::RetryThenFailOpen {
+                    attempts: fields.attempts,
+                    backoff_ms: fields.backoff_ms,
+                })
             }
             "retry_then_degrade" => {
                 let fields: RetryFields = map.next_value()?;
-                Ok(Policy::RetryThenDegrade { attempts: fields.attempts, backoff_ms: fields.backoff_ms })
+                Ok(Policy::RetryThenDegrade {
+                    attempts: fields.attempts,
+                    backoff_ms: fields.backoff_ms,
+                })
             }
             _ => Err(de::Error::unknown_variant(&key, POLICY_VARIANTS)),
         };
@@ -291,10 +324,12 @@ mod tests {
     fn fail_open_not_as_strict_as_fail_closed() {
         assert!(!Policy::FailOpen.is_at_least_as_strict_as(&Policy::FailClosed));
         assert!(!Policy::FailOpen.is_at_least_as_strict_as(&Policy::DegradeWithWarn));
-        assert!(!Policy::FailOpen.is_at_least_as_strict_as(&Policy::RetryThenFailOpen {
-            attempts: 1,
-            backoff_ms: vec![100],
-        }));
+        assert!(
+            !Policy::FailOpen.is_at_least_as_strict_as(&Policy::RetryThenFailOpen {
+                attempts: 1,
+                backoff_ms: vec![100],
+            })
+        );
         // FailOpen is at least as strict as itself
         assert!(Policy::FailOpen.is_at_least_as_strict_as(&Policy::FailOpen));
     }
@@ -382,11 +417,23 @@ on_transient_error:
 on_persistent_error: fail_closed
 "#;
         let ps: PolicySet = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(*ps.policy_for(FailureCategory::ConfigError), Policy::FailStartup);
-        assert_eq!(*ps.policy_for(FailureCategory::DependencyMissing), Policy::FailStartup);
-        assert_eq!(*ps.policy_for(FailureCategory::PersistentError), Policy::FailClosed);
+        assert_eq!(
+            *ps.policy_for(FailureCategory::ConfigError),
+            Policy::FailStartup
+        );
+        assert_eq!(
+            *ps.policy_for(FailureCategory::DependencyMissing),
+            Policy::FailStartup
+        );
+        assert_eq!(
+            *ps.policy_for(FailureCategory::PersistentError),
+            Policy::FailClosed
+        );
         match ps.policy_for(FailureCategory::TransientError) {
-            Policy::RetryThenFailClosed { attempts, backoff_ms } => {
+            Policy::RetryThenFailClosed {
+                attempts,
+                backoff_ms,
+            } => {
                 assert_eq!(*attempts, 3);
                 assert_eq!(*backoff_ms, vec![500, 2000, 8000]);
             }

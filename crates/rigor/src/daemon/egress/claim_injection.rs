@@ -97,8 +97,7 @@ fn inject_openai_context(body: &mut Json, context: &str) {
             for msg in messages.iter_mut() {
                 if msg.get("role").and_then(|r| r.as_str()) == Some("system") {
                     if let Some(content) = msg.get("content").and_then(|c| c.as_str()) {
-                        msg["content"] =
-                            Json::String(format!("{}\n{}", content, context));
+                        msg["content"] = Json::String(format!("{}\n{}", content, context));
                     }
                     break;
                 }
@@ -175,7 +174,11 @@ mod tests {
         filter.apply_request(&mut body, &mut ctx).await.unwrap();
 
         let system = body["system"].as_array().unwrap();
-        assert_eq!(system.len(), 2, "array should have 2 elements after injection");
+        assert_eq!(
+            system.len(),
+            2,
+            "array should have 2 elements after injection"
+        );
         assert_eq!(system[0]["text"], "existing");
         assert_eq!(system[1]["text"], RIGOR_CTX);
         assert_eq!(system[1]["type"], "text");
@@ -262,7 +265,10 @@ mod tests {
 
         filter.apply_request(&mut body, &mut ctx).await.unwrap();
 
-        assert_eq!(body, original, "body should be unchanged when context is empty");
+        assert_eq!(
+            body, original,
+            "body should be unchanged when context is empty"
+        );
     }
 
     #[tokio::test]

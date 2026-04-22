@@ -9,16 +9,18 @@ use bytes::Bytes;
 use http::header;
 use tracing::{info_span, Instrument};
 
-use crate::claim::{ClaimExtractor, HeuristicExtractor};
+use super::context::build_epistemic_context;
+use super::ws::{DaemonEvent, EventSender};
+use super::SharedState;
 use crate::claim::transcript::TranscriptMessage;
+use crate::claim::{ClaimExtractor, HeuristicExtractor};
 use crate::constraint::types::{Constraint, EpistemicType};
 use crate::evaluator::{EvaluatorPipeline, InProcessLookup, RelevanceLookup, SemanticEvaluator};
 use crate::info_println;
 use crate::policy::PolicyEngine;
-use crate::violation::{collect_violations, determine_decision, ConstraintMeta, Decision, SeverityThresholds};
-use super::context::build_epistemic_context;
-use super::ws::{DaemonEvent, EventSender};
-use super::SharedState;
+use crate::violation::{
+    collect_violations, determine_decision, ConstraintMeta, Decision, SeverityThresholds,
+};
 
 /// Apply the correct auth header for a daemon-originated LLM call.
 ///
@@ -35,10 +37,7 @@ use super::SharedState;
 /// API keys are `sk-ant-api03-abcd...` (the version digits come before the
 /// dash). The original check `sk-ant-api-` missed those entirely and sent
 /// them through Bearer, causing 401. Test coverage caught this regression.
-fn apply_provider_auth(
-    req: reqwest::RequestBuilder,
-    api_key: &str,
-) -> reqwest::RequestBuilder {
+fn apply_provider_auth(req: reqwest::RequestBuilder, api_key: &str) -> reqwest::RequestBuilder {
     if api_key.starts_with("sk-ant-api") {
         req.header("x-api-key", api_key)
     } else {
@@ -118,18 +117,9 @@ static PII_SANITIZER: std::sync::LazyLock<sanitize_pii::Sanitizer> =
             .credit_card()
             // Provider-specific secret formats with strict prefixes + high
             // minimum entropy to essentially eliminate false positives:
-            .custom(
-                "AnthropicOAuth",
-                r"sk-ant-oat\d+-[A-Za-z0-9_-]{32,}",
-            )
-            .custom(
-                "AnthropicApiKey",
-                r"sk-ant-api\d+-[A-Za-z0-9_-]{32,}",
-            )
-            .custom(
-                "OpenRouter",
-                r"sk-or-v\d+-[A-Za-z0-9]{48,}",
-            )
+            .custom("AnthropicOAuth", r"sk-ant-oat\d+-[A-Za-z0-9_-]{32,}")
+            .custom("AnthropicApiKey", r"sk-ant-api\d+-[A-Za-z0-9_-]{32,}")
+            .custom("OpenRouter", r"sk-or-v\d+-[A-Za-z0-9]{48,}")
             .custom(
                 "OpenAIProject",
                 // Real OpenAI project keys are ~164 chars. Bump minimum to
@@ -149,10 +139,7 @@ static PII_SANITIZER: std::sync::LazyLock<sanitize_pii::Sanitizer> =
                 // payload >= 20 chars and a signature segment >= 32.
                 r"eyJ[A-Za-z0-9_-]{16,}\.eyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}",
             )
-            .custom(
-                "PrivateKey",
-                r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
-            )
+            .custom("PrivateKey", r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
             .custom(
                 // US SSN hyphen-separated only. Bounded by word boundaries
                 // so it doesn't match fragments inside phone numbers.
@@ -179,7 +166,8 @@ static PII_SANITIZER: std::sync::LazyLock<sanitize_pii::Sanitizer> =
 /// Made `pub` so `rigor scan` CLI can reuse the same detector rigor uses on live
 /// proxy traffic — one rule set, one source of truth.
 pub fn detect_pii(text: &str) -> Vec<(String, String)> {
-    PII_SANITIZER.detect(text)
+    PII_SANITIZER
+        .detect(text)
         .into_iter()
         .map(|d| (format!("{:?}", d.kind), d.matched.clone()))
         .collect()
@@ -233,34 +221,66 @@ pub fn redact_with_tags(text: &str) -> String {
 }
 
 pub fn shannon_entropy(s: &str) -> f64 {
-    if s.is_empty() { return 0.0; }
+    if s.is_empty() {
+        return 0.0;
+    }
     let mut counts = std::collections::HashMap::new();
-    for c in s.chars() { *counts.entry(c).or_insert(0u64) += 1; }
+    for c in s.chars() {
+        *counts.entry(c).or_insert(0u64) += 1;
+    }
     let len = s.chars().count() as f64;
-    counts.values().map(|&c| { let p = c as f64 / len; -p * p.log2() }).sum()
+    counts
+        .values()
+        .map(|&c| {
+            let p = c as f64 / len;
+            -p * p.log2()
+        })
+        .sum()
 }
 
 pub fn context_suggests_false_positive(text: &str, matched: &str) -> bool {
-    let Some(pos) = text.find(matched) else { return false };
+    let Some(pos) = text.find(matched) else {
+        return false;
+    };
     let start = pos.saturating_sub(60);
     let end = (pos + matched.len() + 60).min(text.len());
     let ctx = text[start..end].to_lowercase();
     const FP: &[&str] = &[
-        "example", "e.g.", "for instance", "version", "commit", "hash",
-        "uuid", "guid", "placeholder", "sample", "test", "dummy", "fake",
-        "foo", "bar", "baz", "demo", "release",
+        "example",
+        "e.g.",
+        "for instance",
+        "version",
+        "commit",
+        "hash",
+        "uuid",
+        "guid",
+        "placeholder",
+        "sample",
+        "test",
+        "dummy",
+        "fake",
+        "foo",
+        "bar",
+        "baz",
+        "demo",
+        "release",
     ];
     FP.iter().any(|m| ctx.contains(m))
 }
 
 pub fn is_likely_real_secret(text: &str, matched: &str) -> bool {
     let entropy = shannon_entropy(matched);
-    if entropy >= 3.5 { return true; }
+    if entropy >= 3.5 {
+        return true;
+    }
     !context_suggests_false_positive(text, matched)
 }
 
 pub fn prettify_kind(kind: &str) -> String {
-    if let Some(inner) = kind.strip_prefix("Custom(\"").and_then(|s| s.strip_suffix("\")")) {
+    if let Some(inner) = kind
+        .strip_prefix("Custom(\"")
+        .and_then(|s| s.strip_suffix("\")"))
+    {
         inner.to_string()
     } else {
         kind.to_string()
@@ -438,22 +458,33 @@ pub async fn catch_all_proxy(
     // axum router over TLS — this gives us full visibility into HTTPS requests
     // and lets the existing proxy handlers inject epistemic context.
     if method == http::Method::CONNECT {
-        let target = uri.authority()
+        let target = uri
+            .authority()
             .map(|a| a.to_string())
-            .or_else(|| uri.host().map(|h| {
-                let port = uri.port_u16().unwrap_or(443);
-                format!("{}:{}", h, port)
-            }))
+            .or_else(|| {
+                uri.host().map(|h| {
+                    let port = uri.port_u16().unwrap_or(443);
+                    format!("{}:{}", h, port)
+                })
+            })
             .unwrap_or_else(|| path.clone());
 
         // Get the TLS config and event_tx from shared state
         let (rigor_ca, tls_config, event_tx) = {
             let st = state.lock().unwrap();
-            (st.rigor_ca.clone(), st.tls_config.clone(), st.event_tx.clone())
+            (
+                st.rigor_ca.clone(),
+                st.tls_config.clone(),
+                st.event_tx.clone(),
+            )
         };
 
-        crate::daemon::ws::emit_log(&event_tx, "info", "proxy",
-            format!("CONNECT tunnel request → {}", target));
+        crate::daemon::ws::emit_log(
+            &event_tx,
+            "info",
+            "proxy",
+            format!("CONNECT tunnel request → {}", target),
+        );
 
         let _ = event_tx.send(DaemonEvent::ProxyLog {
             id: uuid::Uuid::new_v4().to_string(),
@@ -475,9 +506,20 @@ pub async fn catch_all_proxy(
         let event_tx_clone = event_tx.clone();
         let should_mitm = super::should_mitm_target(&target);
 
-        crate::daemon::ws::emit_log(&event_tx_clone, "info", "proxy",
-            format!("Decision for {}: {}", target,
-                if should_mitm { "MITM (LLM endpoint)" } else { "blind tunnel (preserve TLS)" }));
+        crate::daemon::ws::emit_log(
+            &event_tx_clone,
+            "info",
+            "proxy",
+            format!(
+                "Decision for {}: {}",
+                target,
+                if should_mitm {
+                    "MITM (LLM endpoint)"
+                } else {
+                    "blind tunnel (preserve TLS)"
+                }
+            ),
+        );
 
         // Build router only if we'll MITM
         let router = if should_mitm {
@@ -493,158 +535,232 @@ pub async fn catch_all_proxy(
         // /v1/messages-style handler (Codex wss://.../v1/responses, etc.).
         let span = tunnel_span(&target_clone, should_mitm);
 
-        tokio::spawn(async move {
-            let upgraded = match hyper::upgrade::on(req).await {
-                Ok(u) => u,
-                Err(e) => {
-                    crate::daemon::ws::emit_log(&event_tx_clone, "error", "proxy",
-                        format!("CONNECT upgrade failed for {}: {}", target_clone, e));
-                    return;
-                }
-            };
-
-            crate::daemon::ws::emit_log(&event_tx_clone, "info", "proxy",
-                format!("CONNECT upgraded for {}", target_clone));
-
-            let mut upgraded_io = hyper_util::rt::TokioIo::new(upgraded);
-
-            // BLIND TUNNEL PATH (mirrord pattern): bytes flow unchanged.
-            // Used for non-LLM endpoints — OAuth, telemetry, CDNs, etc.
-            // Preserves end-to-end TLS so the original cert stays intact and
-            // sensitive flows like OAuth aren't disrupted.
-            if router.is_none() {
-                let mut upstream = match tokio::net::TcpStream::connect(&target_clone).await {
-                    Ok(s) => s,
+        tokio::spawn(
+            async move {
+                let upgraded = match hyper::upgrade::on(req).await {
+                    Ok(u) => u,
                     Err(e) => {
-                        crate::daemon::ws::emit_log(&event_tx_clone, "error", "net",
-                            format!("Blind tunnel upstream connect failed for {}: {}", target_clone, e));
+                        crate::daemon::ws::emit_log(
+                            &event_tx_clone,
+                            "error",
+                            "proxy",
+                            format!("CONNECT upgrade failed for {}: {}", target_clone, e),
+                        );
                         return;
                     }
                 };
 
-                crate::daemon::ws::emit_log(&event_tx_clone, "info", "net",
-                    format!("Blind tunnel established to {}", target_clone));
+                crate::daemon::ws::emit_log(
+                    &event_tx_clone,
+                    "info",
+                    "proxy",
+                    format!("CONNECT upgraded for {}", target_clone),
+                );
 
-                match tokio::io::copy_bidirectional(&mut upgraded_io, &mut upstream).await {
-                    Ok((from_client, from_upstream)) => {
-                        crate::daemon::ws::emit_log(&event_tx_clone, "info", "proxy",
-                            format!("Blind tunnel closed: {} ({}B out, {}B in)",
-                                target_clone, from_client, from_upstream));
-                    }
-                    Err(e) => {
-                        let msg = e.to_string();
-                        if !msg.contains("connection reset") && !msg.contains("broken pipe") {
-                            crate::daemon::ws::emit_log(&event_tx_clone, "warn", "proxy",
-                                format!("Blind tunnel copy error for {}: {}", target_clone, e));
+                let mut upgraded_io = hyper_util::rt::TokioIo::new(upgraded);
+
+                // BLIND TUNNEL PATH (mirrord pattern): bytes flow unchanged.
+                // Used for non-LLM endpoints — OAuth, telemetry, CDNs, etc.
+                // Preserves end-to-end TLS so the original cert stays intact and
+                // sensitive flows like OAuth aren't disrupted.
+                if router.is_none() {
+                    let mut upstream = match tokio::net::TcpStream::connect(&target_clone).await {
+                        Ok(s) => s,
+                        Err(e) => {
+                            crate::daemon::ws::emit_log(
+                                &event_tx_clone,
+                                "error",
+                                "net",
+                                format!(
+                                    "Blind tunnel upstream connect failed for {}: {}",
+                                    target_clone, e
+                                ),
+                            );
+                            return;
                         }
-                    }
-                }
-                return;
-            }
+                    };
 
-            // MITM PATH: terminate TLS with a per-host cert signed by our CA.
-            // Try CA first (proper cert chain), fall back to legacy multi-SAN cert.
-            let sni_host = target_clone.split(':').next().unwrap_or("unknown");
-            let server_cfg = if let Some(ref ca) = rigor_ca {
-                match ca.server_config_for_host(sni_host) {
-                    Ok(cfg) => cfg,
-                    Err(e) => {
-                        crate::daemon::ws::emit_log(&event_tx_clone, "warn", "tls",
-                            format!("CA cert generation failed for {}: {} (trying legacy)", sni_host, e));
-                        match tls_config {
-                            Some(ref cfg) => cfg.clone(),
-                            None => {
-                                crate::daemon::ws::emit_log(&event_tx_clone, "error", "tls",
-                                    format!("No TLS config for MITM of {}", target_clone));
-                                return;
+                    crate::daemon::ws::emit_log(
+                        &event_tx_clone,
+                        "info",
+                        "net",
+                        format!("Blind tunnel established to {}", target_clone),
+                    );
+
+                    match tokio::io::copy_bidirectional(&mut upgraded_io, &mut upstream).await {
+                        Ok((from_client, from_upstream)) => {
+                            crate::daemon::ws::emit_log(
+                                &event_tx_clone,
+                                "info",
+                                "proxy",
+                                format!(
+                                    "Blind tunnel closed: {} ({}B out, {}B in)",
+                                    target_clone, from_client, from_upstream
+                                ),
+                            );
+                        }
+                        Err(e) => {
+                            let msg = e.to_string();
+                            if !msg.contains("connection reset") && !msg.contains("broken pipe") {
+                                crate::daemon::ws::emit_log(
+                                    &event_tx_clone,
+                                    "warn",
+                                    "proxy",
+                                    format!("Blind tunnel copy error for {}: {}", target_clone, e),
+                                );
                             }
                         }
                     }
-                }
-            } else {
-                match tls_config {
-                    Some(ref cfg) => cfg.clone(),
-                    None => {
-                        crate::daemon::ws::emit_log(&event_tx_clone, "error", "tls",
-                            format!("No TLS config for MITM of {}", target_clone));
-                        return;
-                    }
-                }
-            };
-
-            let acceptor = tokio_rustls::TlsAcceptor::from(server_cfg);
-            let tls_stream = match acceptor.accept(upgraded_io).await {
-                Ok(s) => s,
-                Err(e) => {
-                    crate::daemon::ws::emit_log(&event_tx_clone, "warn", "tls",
-                        format!("MITM handshake failed for {}: {}", target_clone, e));
                     return;
                 }
-            };
 
-            crate::daemon::ws::emit_log(&event_tx_clone, "info", "tls",
-                format!("MITM TLS handshake OK for {}", target_clone));
-
-            let tls_io = hyper_util::rt::TokioIo::new(tls_stream);
-
-            // Serve the axum router on the decrypted TLS stream.
-            let tower_service = router.unwrap();
-            let log_tx = event_tx_clone.clone();
-            let target_for_svc = target_clone.clone();
-            let service = hyper::service::service_fn(move |mut req: hyper::Request<hyper::body::Incoming>| {
-                let mut router = tower_service.clone();
-                let log_tx = log_tx.clone();
-                let target = target_for_svc.clone();
-
-                // Ensure the Host header carries the CONNECT target so proxy handlers
-                // forward to the right upstream.
-                if !req.headers().contains_key(http::header::HOST) {
-                    if let Some(host_only) = target.split(':').next() {
-                        if let Ok(hv) = http::HeaderValue::from_str(host_only) {
-                            req.headers_mut().insert(http::header::HOST, hv);
+                // MITM PATH: terminate TLS with a per-host cert signed by our CA.
+                // Try CA first (proper cert chain), fall back to legacy multi-SAN cert.
+                let sni_host = target_clone.split(':').next().unwrap_or("unknown");
+                let server_cfg = if let Some(ref ca) = rigor_ca {
+                    match ca.server_config_for_host(sni_host) {
+                        Ok(cfg) => cfg,
+                        Err(e) => {
+                            crate::daemon::ws::emit_log(
+                                &event_tx_clone,
+                                "warn",
+                                "tls",
+                                format!(
+                                    "CA cert generation failed for {}: {} (trying legacy)",
+                                    sni_host, e
+                                ),
+                            );
+                            match tls_config {
+                                Some(ref cfg) => cfg.clone(),
+                                None => {
+                                    crate::daemon::ws::emit_log(
+                                        &event_tx_clone,
+                                        "error",
+                                        "tls",
+                                        format!("No TLS config for MITM of {}", target_clone),
+                                    );
+                                    return;
+                                }
+                            }
                         }
+                    }
+                } else {
+                    match tls_config {
+                        Some(ref cfg) => cfg.clone(),
+                        None => {
+                            crate::daemon::ws::emit_log(
+                                &event_tx_clone,
+                                "error",
+                                "tls",
+                                format!("No TLS config for MITM of {}", target_clone),
+                            );
+                            return;
+                        }
+                    }
+                };
+
+                let acceptor = tokio_rustls::TlsAcceptor::from(server_cfg);
+                let tls_stream = match acceptor.accept(upgraded_io).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        crate::daemon::ws::emit_log(
+                            &event_tx_clone,
+                            "warn",
+                            "tls",
+                            format!("MITM handshake failed for {}: {}", target_clone, e),
+                        );
+                        return;
+                    }
+                };
+
+                crate::daemon::ws::emit_log(
+                    &event_tx_clone,
+                    "info",
+                    "tls",
+                    format!("MITM TLS handshake OK for {}", target_clone),
+                );
+
+                let tls_io = hyper_util::rt::TokioIo::new(tls_stream);
+
+                // Serve the axum router on the decrypted TLS stream.
+                let tower_service = router.unwrap();
+                let log_tx = event_tx_clone.clone();
+                let target_for_svc = target_clone.clone();
+                let service = hyper::service::service_fn(
+                    move |mut req: hyper::Request<hyper::body::Incoming>| {
+                        let mut router = tower_service.clone();
+                        let log_tx = log_tx.clone();
+                        let target = target_for_svc.clone();
+
+                        // Ensure the Host header carries the CONNECT target so proxy handlers
+                        // forward to the right upstream.
+                        if !req.headers().contains_key(http::header::HOST) {
+                            if let Some(host_only) = target.split(':').next() {
+                                if let Ok(hv) = http::HeaderValue::from_str(host_only) {
+                                    req.headers_mut().insert(http::header::HOST, hv);
+                                }
+                            }
+                        }
+
+                        let method = req.method().to_string();
+                        let path = req.uri().path().to_string();
+
+                        async move {
+                            crate::daemon::ws::emit_log(
+                                &log_tx,
+                                "info",
+                                "proxy",
+                                format!("MITM request: {} {} (via {})", method, path, target),
+                            );
+                            use tower::Service;
+                            let (parts, body) = req.into_parts();
+                            let body = axum::body::Body::new(body);
+                            let req = hyper::Request::from_parts(parts, body);
+                            router
+                                .call(req)
+                                .await
+                                .map_err(|e| std::io::Error::other(e.to_string()))
+                        }
+                    },
+                );
+
+                if let Err(e) = hyper_util::server::conn::auto::Builder::new(
+                    hyper_util::rt::TokioExecutor::new(),
+                )
+                .serve_connection(tls_io, service)
+                .await
+                {
+                    let msg = e.to_string();
+                    if !msg.contains("connection closed") && !msg.contains("broken pipe") {
+                        crate::daemon::ws::emit_log(
+                            &event_tx_clone,
+                            "warn",
+                            "proxy",
+                            format!("MITM HTTP error for {}: {}", target_clone, msg),
+                        );
                     }
                 }
 
-                let method = req.method().to_string();
-                let path = req.uri().path().to_string();
-
-                async move {
-                    crate::daemon::ws::emit_log(&log_tx, "info", "proxy",
-                        format!("MITM request: {} {} (via {})", method, path, target));
-                    use tower::Service;
-                    let (parts, body) = req.into_parts();
-                    let body = axum::body::Body::new(body);
-                    let req = hyper::Request::from_parts(parts, body);
-                    router.call(req).await.map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                    })
-                }
-            });
-
-            if let Err(e) = hyper_util::server::conn::auto::Builder::new(
-                hyper_util::rt::TokioExecutor::new(),
-            )
-            .serve_connection(tls_io, service)
-            .await
-            {
-                let msg = e.to_string();
-                if !msg.contains("connection closed") && !msg.contains("broken pipe") {
-                    crate::daemon::ws::emit_log(&event_tx_clone, "warn", "proxy",
-                        format!("MITM HTTP error for {}: {}", target_clone, msg));
-                }
+                crate::daemon::ws::emit_log(
+                    &event_tx_clone,
+                    "info",
+                    "proxy",
+                    format!("MITM tunnel closed: {}", target_clone),
+                );
             }
-
-            crate::daemon::ws::emit_log(&event_tx_clone, "info", "proxy",
-                format!("MITM tunnel closed: {}", target_clone));
-        }.instrument(span));
+            .instrument(span),
+        );
 
         // Return 200 immediately so the client sees the tunnel is open
         return Response::builder()
             .status(200)
             .body(Body::empty())
             .unwrap_or_else(|e| {
-                (StatusCode::INTERNAL_SERVER_ERROR, format!("Tunnel error: {}", e)).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Tunnel error: {}", e),
+                )
+                    .into_response()
             });
     }
 
@@ -655,16 +771,28 @@ pub async fn catch_all_proxy(
     let body_bytes = match axum::body::to_bytes(body, 10 * 1024 * 1024).await {
         Ok(b) => b,
         Err(e) => {
-            return (StatusCode::BAD_REQUEST, format!("Failed to read body: {}", e)).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Failed to read body: {}", e),
+            )
+                .into_response();
         }
     };
 
-    let host_str = headers.get("host").and_then(|h| h.to_str().ok()).unwrap_or("unknown").to_string();
+    let host_str = headers
+        .get("host")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
 
     {
         let st = state.lock().unwrap();
-        crate::daemon::ws::emit_log(&st.event_tx, "info", "proxy",
-            format!("catch-all: {} {} host={}", method, path, host_str));
+        crate::daemon::ws::emit_log(
+            &st.event_tx,
+            "info",
+            "proxy",
+            format!("catch-all: {} {} host={}", method, path, host_str),
+        );
     }
 
     // Emit ProxyLog for ALL catch-all requests
@@ -678,8 +806,11 @@ pub async fn catch_all_proxy(
             url: format!("https://{}{}", host_str, path),
             host: host_str.clone(),
             status: None,
-            content_type: headers.get("content-type").and_then(|v| v.to_str().ok()).map(|s| s.to_string()),
-            body_preview: if body_bytes.len() > 0 {
+            content_type: headers
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string()),
+            body_preview: if !body_bytes.is_empty() {
                 Some(String::from_utf8_lossy(&body_bytes[..body_bytes.len().min(500)]).to_string())
             } else {
                 None
@@ -696,8 +827,9 @@ pub async fn catch_all_proxy(
     // For POST requests to actual LLM endpoints, treat as proxy + constraint injection.
     // Use stricter path matching: only the real LLM completion endpoints, NOT
     // telemetry endpoints like /api/event_logging/v2/batch or /api/oauth/*.
-    let is_llm_endpoint = method == http::Method::POST && (
-        path == "/v1/messages"                          // Anthropic
+    let is_llm_endpoint = method == http::Method::POST
+        && (
+            path == "/v1/messages"                          // Anthropic
         || path == "/v1/chat/completions"               // OpenAI
         || path == "/v1/completions"                    // OpenAI legacy
         || path == "/zen/v1/messages"                   // OpenCode Zen (Anthropic format)
@@ -709,8 +841,9 @@ pub async fn catch_all_proxy(
         || path.ends_with(":generateContent")           // Vertex AI / Gemini
         || path.ends_with(":streamGenerateContent")     // Vertex AI streaming
         || path.ends_with(":predict")                   // Vertex AI prediction
-        || path.ends_with(":streamRawPredict")          // Vertex AI streaming raw
-    );
+        || path.ends_with(":streamRawPredict")
+            // Vertex AI streaming raw
+        );
 
     // x-rigor-internal header allows opting out of constraint evaluation
     // for rigor's own LLM calls (e.g., relevance scoring).
@@ -720,7 +853,7 @@ pub async fn catch_all_proxy(
     let skip_internal = std::env::var("RIGOR_SKIP_INTERNAL").is_ok();
 
     if is_llm_endpoint && !(is_internal && skip_internal) {
-        return proxy_request(state, headers, body_bytes.into(), &path).await;
+        return proxy_request(state, headers, body_bytes, &path).await;
     }
 
     // For everything else (OAuth, telemetry, account settings, etc.) forward transparently.
@@ -735,7 +868,12 @@ pub async fn catch_all_proxy(
     let target_url = format!("https://{}{}", upstream_host, path);
 
     if !path.contains("health") {
-        info_println!("rigor proxy: passthrough {} {} → {}", method, path, target_url);
+        info_println!(
+            "rigor proxy: passthrough {} {} → {}",
+            method,
+            path,
+            target_url
+        );
     }
 
     // Use shared HTTP client for connection pooling across all requests.
@@ -780,7 +918,11 @@ pub async fn catch_all_proxy(
             let body_bytes = match response.bytes().await {
                 Ok(b) => b,
                 Err(e) => {
-                    return (StatusCode::BAD_GATEWAY, format!("Upstream body error: {}", e)).into_response();
+                    return (
+                        StatusCode::BAD_GATEWAY,
+                        format!("Upstream body error: {}", e),
+                    )
+                        .into_response();
                 }
             };
 
@@ -799,15 +941,15 @@ pub async fn catch_all_proxy(
                     }
                 }
             }
-            builder
-                .body(Body::from(body_bytes))
-                .unwrap_or_else(|e| {
-                    (StatusCode::INTERNAL_SERVER_ERROR, format!("Body build error: {}", e)).into_response()
-                })
+            builder.body(Body::from(body_bytes)).unwrap_or_else(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Body build error: {}", e),
+                )
+                    .into_response()
+            })
         }
-        Err(e) => {
-            (StatusCode::BAD_GATEWAY, format!("Upstream error: {}", e)).into_response()
-        }
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("Upstream error: {}", e)).into_response(),
     }
 }
 
@@ -823,7 +965,10 @@ fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
             match decoder.read_to_end(&mut out) {
                 Ok(_) => out,
                 Err(e) => {
-                    eprintln!("rigor proxy: gzip decompress failed: {} (using raw body)", e);
+                    eprintln!(
+                        "rigor proxy: gzip decompress failed: {} (using raw body)",
+                        e
+                    );
                     body.to_vec()
                 }
             }
@@ -834,7 +979,10 @@ fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
             match decoder.read_to_end(&mut out) {
                 Ok(_) => out,
                 Err(e) => {
-                    eprintln!("rigor proxy: deflate decompress failed: {} (using raw body)", e);
+                    eprintln!(
+                        "rigor proxy: deflate decompress failed: {} (using raw body)",
+                        e
+                    );
                     body.to_vec()
                 }
             }
@@ -845,7 +993,10 @@ fn decompress_body(body: &[u8], encoding: Option<&str>) -> Vec<u8> {
             match decoder.read_to_end(&mut out) {
                 Ok(_) => out,
                 Err(e) => {
-                    eprintln!("rigor proxy: brotli decompress failed: {} (using raw body)", e);
+                    eprintln!(
+                        "rigor proxy: brotli decompress failed: {} (using raw body)",
+                        e
+                    );
                     body.to_vec()
                 }
             }
@@ -861,7 +1012,7 @@ async fn proxy_request(
     path: &str,
 ) -> Response {
     // Governance: check if proxy is paused
-    let (proxy_paused, disabled_constraints) = {
+    let (proxy_paused, _disabled_constraints) = {
         let st = state.lock().unwrap();
         (st.proxy_paused, st.disabled_constraints.clone())
     };
@@ -876,14 +1027,16 @@ async fn proxy_request(
         let mut req = http_client.post(&target_url);
         for (name, value) in headers.iter() {
             let n = name.as_str().to_lowercase();
-            if n != "host" && n != "content-length" && n != "transfer-encoding" && n != "connection" {
+            if n != "host" && n != "content-length" && n != "transfer-encoding" && n != "connection"
+            {
                 req = req.header(name.clone(), value.clone());
             }
         }
         req = req.body(body.to_vec());
         return match req.send().await {
             Ok(resp) => {
-                let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+                let status =
+                    StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
                 match resp.bytes().await {
                     Ok(b) => (status, b.to_vec()).into_response(),
                     Err(e) => (StatusCode::BAD_GATEWAY, format!("error: {}", e)).into_response(),
@@ -895,8 +1048,9 @@ async fn proxy_request(
 
     // Retroactive action gate: block this request if a pending gate matches this session
     let session_id_for_block = {
-        use sha2::{Sha256, Digest};
-        let auth = headers.get("x-api-key")
+        use sha2::{Digest, Sha256};
+        let auth = headers
+            .get("x-api-key")
             .or_else(|| headers.get("authorization"))
             .and_then(|v| v.to_str().ok())
             .unwrap_or("no-auth");
@@ -909,15 +1063,18 @@ async fn proxy_request(
 
     let pending_gate_id = {
         let st = state.lock().unwrap();
-        st.action_gates.iter()
-            .find(|(_, e)| matches!(e.gate_type, crate::daemon::GateType::Retroactive)
-                && e.session_id == session_id_for_block)
+        st.action_gates
+            .iter()
+            .find(|(_, e)| {
+                matches!(e.gate_type, crate::daemon::GateType::Retroactive)
+                    && e.session_id == session_id_for_block
+            })
             .map(|(id, _)| id.clone())
     };
 
     if let Some(gate_id) = pending_gate_id {
-        let deadline = std::time::Instant::now() +
-            std::time::Duration::from_secs(crate::daemon::gate::GATE_TIMEOUT_SECS);
+        let deadline = std::time::Instant::now()
+            + std::time::Duration::from_secs(crate::daemon::gate::GATE_TIMEOUT_SECS);
         loop {
             let decision = {
                 let st = state.lock().unwrap();
@@ -932,11 +1089,19 @@ async fn proxy_request(
                     let event_tx_log = st.event_tx.clone();
                     drop(st);
                     if !d.approved {
-                        crate::daemon::ws::emit_log(&event_tx_log, "info", "gate",
-                            format!("Retroactive gate {} rejected", gate_id));
+                        crate::daemon::ws::emit_log(
+                            &event_tx_log,
+                            "info",
+                            "gate",
+                            format!("Retroactive gate {} rejected", gate_id),
+                        );
                     } else {
-                        crate::daemon::ws::emit_log(&event_tx_log, "info", "gate",
-                            format!("Retroactive gate {} approved", gate_id));
+                        crate::daemon::ws::emit_log(
+                            &event_tx_log,
+                            "info",
+                            "gate",
+                            format!("Retroactive gate {} approved", gate_id),
+                        );
                     }
                     break;
                 }
@@ -947,8 +1112,12 @@ async fn proxy_request(
                 st.action_gates.remove(&gate_id);
                 let event_tx_log = st.event_tx.clone();
                 drop(st);
-                crate::daemon::ws::emit_log(&event_tx_log, "warn", "gate",
-                    format!("Retroactive gate {} timeout — auto-rejected", gate_id));
+                crate::daemon::ws::emit_log(
+                    &event_tx_log,
+                    "warn",
+                    "gate",
+                    format!("Retroactive gate {} timeout — auto-rejected", gate_id),
+                );
                 break;
             }
 
@@ -963,19 +1132,28 @@ async fn proxy_request(
 
     // Decompress the request body if it's encoded (gzip/br/deflate).
     // Bun and other modern HTTP clients compress request bodies by default.
-    let content_encoding = headers.get("content-encoding").and_then(|v| v.to_str().ok());
+    let content_encoding = headers
+        .get("content-encoding")
+        .and_then(|v| v.to_str().ok());
     let body_decoded = decompress_body(&body, content_encoding);
     if content_encoding.is_some() {
-        info_println!("rigor proxy: decoded {} request body ({} → {} bytes)",
-            content_encoding.unwrap_or("none"), body.len(), body_decoded.len());
+        info_println!(
+            "rigor proxy: decoded {} request body ({} → {} bytes)",
+            content_encoding.unwrap_or("none"),
+            body.len(),
+            body_decoded.len()
+        );
     }
 
     // Parse the request body
     let mut body_json: serde_json::Value = match serde_json::from_slice(&body_decoded) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("rigor proxy: failed to parse request body: {} (first 80 bytes: {:?})",
-                e, &body_decoded.iter().take(80).copied().collect::<Vec<u8>>());
+            eprintln!(
+                "rigor proxy: failed to parse request body: {} (first 80 bytes: {:?})",
+                e,
+                &body_decoded.iter().take(80).copied().collect::<Vec<u8>>()
+            );
             return (StatusCode::BAD_REQUEST, format!("Invalid JSON: {}", e)).into_response();
         }
     };
@@ -993,17 +1171,22 @@ async fn proxy_request(
 
     eprintln!("rigor proxy: request model={}", model);
 
-    let user_message = body_json.get("messages")
+    let user_message = body_json
+        .get("messages")
         .and_then(|m| m.as_array())
-        .and_then(|msgs| msgs.iter().rev().find(|m|
-            m.get("role").and_then(|r| r.as_str()) == Some("user")))
+        .and_then(|msgs| {
+            msgs.iter()
+                .rev()
+                .find(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
+        })
         .and_then(|m| m.get("content").and_then(|c| c.as_str()))
         .unwrap_or("")
         .to_string();
 
     let session_id = {
-        use sha2::{Sha256, Digest};
-        let auth = headers.get("x-api-key")
+        use sha2::{Digest, Sha256};
+        let auth = headers
+            .get("x-api-key")
             .or_else(|| headers.get("authorization"))
             .and_then(|v| v.to_str().ok())
             .unwrap_or("no-auth");
@@ -1024,23 +1207,45 @@ async fn proxy_request(
     let last_user_msg = body_json
         .get("messages")
         .and_then(|m| m.as_array())
-        .and_then(|msgs| msgs.iter().rev().find(|m| m.get("role").and_then(|r| r.as_str()) == Some("user")))
+        .and_then(|msgs| {
+            msgs.iter()
+                .rev()
+                .find(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
+        })
         .and_then(|m| m.get("content").and_then(|c| c.as_str()))
-        .map(|s| if s.len() > 200 { format!("{}...", &s[..200]) } else { s.to_string() });
+        .map(|s| {
+            if s.len() > 200 {
+                format!("{}...", &s[..200])
+            } else {
+                s.to_string()
+            }
+        });
 
     // Capture API key from proxied request headers (Claude Code uses OAuth,
     // so ANTHROPIC_API_KEY env var may not be set — but the auth token flows
     // through us on every request in x-api-key or Authorization headers).
-    let captured_key = headers.get("x-api-key")
+    let captured_key = headers
+        .get("x-api-key")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
-        .or_else(|| headers.get("authorization")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.strip_prefix("Bearer "))
-            .map(|s| s.to_string()));
+        .or_else(|| {
+            headers
+                .get("authorization")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.strip_prefix("Bearer "))
+                .map(|s| s.to_string())
+        });
 
     // Lock state to read config, build context, and get event_tx + shared client
-    let (target_api, api_key, epistemic_context, event_tx, constraints_count, http_client, fallback) = {
+    let (
+        target_api,
+        _api_key,
+        epistemic_context,
+        event_tx,
+        constraints_count,
+        http_client,
+        fallback,
+    ) = {
         let mut st = state.lock().unwrap();
         // Store captured key if we don't have one yet
         if st.api_key.is_none() {
@@ -1075,17 +1280,31 @@ async fn proxy_request(
     let original_system = if path.contains("messages") {
         // Anthropic: system is top-level string or array
         body_json.get("system").map(|s| {
-            if let Some(text) = s.as_str() { text.to_string() }
-            else if let Some(arr) = s.as_array() {
-                arr.iter().filter_map(|b| b.get("text").and_then(|t| t.as_str())).collect::<Vec<_>>().join("\n")
-            } else { String::new() }
+            if let Some(text) = s.as_str() {
+                text.to_string()
+            } else if let Some(arr) = s.as_array() {
+                arr.iter()
+                    .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            } else {
+                String::new()
+            }
         })
     } else {
         // OpenAI: system is first message with role=system
-        body_json.get("messages").and_then(|m| m.as_array()).and_then(|msgs| {
-            msgs.iter().find(|m| m.get("role").and_then(|r| r.as_str()) == Some("system"))
-                .and_then(|m| m.get("content").and_then(|c| c.as_str()).map(|s| s.to_string()))
-        })
+        body_json
+            .get("messages")
+            .and_then(|m| m.as_array())
+            .and_then(|msgs| {
+                msgs.iter()
+                    .find(|m| m.get("role").and_then(|r| r.as_str()) == Some("system"))
+                    .and_then(|m| {
+                        m.get("content")
+                            .and_then(|c| c.as_str())
+                            .map(|s| s.to_string())
+                    })
+            })
     };
 
     // PII-IN: detect and REDACT secrets in the outbound user message.
@@ -1128,27 +1347,32 @@ async fn proxy_request(
 
     // Build per-request filter chain and apply via fallback policy
     use super::egress;
-    let claim_filter = egress::ClaimInjectionFilter::new(
-        epistemic_context.clone(),
-        path.to_string(),
-    );
-    let request_chain = egress::FilterChain::new(vec![
-        std::sync::Arc::new(claim_filter),
-    ]);
+    let claim_filter =
+        egress::ClaimInjectionFilter::new(epistemic_context.clone(), path.to_string());
+    let request_chain = egress::FilterChain::new(vec![std::sync::Arc::new(claim_filter)]);
 
     let modified_body = {
         let chain = request_chain.clone();
         let body_for_chain = body_json.clone();
-        match fallback.execute("claim_injection", move || {
-            let mut body_clone = body_for_chain.clone();
-            let c = chain.clone();
-            async move {
-                let mut ctx = egress::ConversationCtx::new_anonymous();
-                c.apply_request(&mut body_clone, &mut ctx).await
-                    .map_err(|e| (crate::fallback::FailureCategory::PersistentError, e.to_string()))?;
-                Ok::<_, (crate::fallback::FailureCategory, String)>(body_clone)
-            }
-        }).await {
+        match fallback
+            .execute("claim_injection", move || {
+                let mut body_clone = body_for_chain.clone();
+                let c = chain.clone();
+                async move {
+                    let mut ctx = egress::ConversationCtx::new_anonymous();
+                    c.apply_request(&mut body_clone, &mut ctx)
+                        .await
+                        .map_err(|e| {
+                            (
+                                crate::fallback::FailureCategory::PersistentError,
+                                e.to_string(),
+                            )
+                        })?;
+                    Ok::<_, (crate::fallback::FailureCategory, String)>(body_clone)
+                }
+            })
+            .await
+        {
             crate::fallback::FallbackOutcome::Ok(body) => body,
             crate::fallback::FallbackOutcome::Blocked(msg) => {
                 return (axum::http::StatusCode::BAD_GATEWAY, msg).into_response();
@@ -1202,7 +1426,9 @@ async fn proxy_request(
         direction: "request".to_string(),
         method: "POST".to_string(),
         url: target_url.clone(),
-        host: upstream_host.clone().unwrap_or_else(|| "unknown".to_string()),
+        host: upstream_host
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string()),
         status: None,
         content_type: Some("application/json".to_string()),
         body_preview: last_user_msg.clone(),
@@ -1213,7 +1439,12 @@ async fn proxy_request(
     });
     // Only log to stderr in debug; events go to dashboard via WebSocket
     if std::env::var("RIGOR_DEBUG").is_ok() {
-        info_println!("rigor proxy: {} → {} (host: {:?})", path, target_url, upstream_host);
+        info_println!(
+            "rigor proxy: {} → {} (host: {:?})",
+            path,
+            target_url,
+            upstream_host
+        );
     }
 
     // Build the forwarding request (using shared client for connection pooling)
@@ -1262,7 +1493,8 @@ async fn proxy_request(
 
     let status = response.status();
     let resp_headers = response.headers().clone();
-    let resp_content_type = resp_headers.get("content-type")
+    let resp_content_type = resp_headers
+        .get("content-type")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
@@ -1273,7 +1505,9 @@ async fn proxy_request(
         direction: "response".to_string(),
         method: "POST".to_string(),
         url: target_url.clone(),
-        host: upstream_host.clone().unwrap_or_else(|| "unknown".to_string()),
+        host: upstream_host
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string()),
         status: Some(status.as_u16()),
         content_type: resp_content_type,
         body_preview: None,
@@ -1301,7 +1535,8 @@ async fn proxy_request(
         });
 
         // Channel from evaluator task → client response body
-        let (client_tx, client_rx) = tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(64);
+        let (client_tx, client_rx) =
+            tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(64);
 
         let event_tx_bg = event_tx.clone();
         let request_id_bg = request_id.clone();
@@ -1318,13 +1553,24 @@ async fn proxy_request(
         // Build constraint keywords from config for cheap pre-filter
         let constraint_keywords: Vec<String> = {
             let st = state.lock().unwrap();
-            st.config.all_constraints().iter()
+            st.config
+                .all_constraints()
+                .iter()
                 .flat_map(|c| {
                     // Extract keywords from constraint name + description
                     let mut words = Vec::new();
-                    for word in c.name.split_whitespace().chain(c.description.split_whitespace()) {
-                        let w = word.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string();
-                        if w.len() > 3 { words.push(w); }
+                    for word in c
+                        .name
+                        .split_whitespace()
+                        .chain(c.description.split_whitespace())
+                    {
+                        let w = word
+                            .to_lowercase()
+                            .trim_matches(|c: char| !c.is_alphanumeric())
+                            .to_string();
+                        if w.len() > 3 {
+                            words.push(w);
+                        }
                     }
                     words
                 })
@@ -1340,19 +1586,24 @@ async fn proxy_request(
             let strengths = st.graph.get_all_strengths();
             let engine = st.policy_engine.as_ref().cloned();
             let meta: HashMap<String, ConstraintMeta> = config
-                .all_constraints().iter()
+                .all_constraints()
+                .iter()
                 .map(|c| {
                     let etype = match c.epistemic_type {
                         EpistemicType::Belief => "belief",
                         EpistemicType::Justification => "justification",
                         EpistemicType::Defeater => "defeater",
                     };
-                    (c.id.clone(), ConstraintMeta {
-                        name: c.name.clone(),
-                        epistemic_type: etype.to_string(),
-                        rego_path: format!("data.rigor.{}", c.id),
-                    })
-                }).collect();
+                    (
+                        c.id.clone(),
+                        ConstraintMeta {
+                            name: c.name.clone(),
+                            epistemic_type: etype.to_string(),
+                            rego_path: format!("data.rigor.{}", c.id),
+                        },
+                    )
+                })
+                .collect();
             (config, strengths, engine, meta)
         };
 
@@ -1371,7 +1622,7 @@ async fn proxy_request(
             let mut last_eval_len = 0;
             let mut blocked = false;
             let mut last_stream_text_len: usize = 0; // for throttling StreamText events
-            // Track SSE parse position for incremental parsing
+                                                     // Track SSE parse position for incremental parsing
             let mut sse_parse_offset: usize = 0;
 
             while let Some(chunk_result) = upstream.next().await {
@@ -1390,22 +1641,30 @@ async fn proxy_request(
                     let parseable = &new_data[..last_newline + 1];
                     for line in parseable.lines() {
                         if let Some(data) = line.strip_prefix("data: ") {
-                            if data == "[DONE]" { break; }
+                            if data == "[DONE]" {
+                                break;
+                            }
                             if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                                 if path_bg.contains("messages") {
-                                    if json.get("type").and_then(|t| t.as_str()) == Some("content_block_delta") {
-                                        if let Some(text) = json.get("delta")
+                                    if json.get("type").and_then(|t| t.as_str())
+                                        == Some("content_block_delta")
+                                    {
+                                        if let Some(text) = json
+                                            .get("delta")
                                             .and_then(|d| d.get("text"))
-                                            .and_then(|t| t.as_str()) {
+                                            .and_then(|t| t.as_str())
+                                        {
                                             text_so_far.push_str(text);
                                         }
                                     }
-                                } else if let Some(content) = json.get("choices")
+                                } else if let Some(content) = json
+                                    .get("choices")
                                     .and_then(|c| c.as_array())
                                     .and_then(|a| a.first())
                                     .and_then(|c| c.get("delta"))
                                     .and_then(|d| d.get("content"))
-                                    .and_then(|c| c.as_str()) {
+                                    .and_then(|c| c.as_str())
+                                {
                                     text_so_far.push_str(content);
                                 }
                             }
@@ -1438,10 +1697,14 @@ async fn proxy_request(
 
                 // Check for sentence boundary + keyword hit (cheap pre-filter)
                 let new_text = &text_so_far[last_eval_len..];
-                let has_sentence_end = new_text.contains(". ") || new_text.contains("! ")
-                    || new_text.contains("? ") || new_text.contains(".\n");
-                let has_keyword = has_sentence_end && constraint_keywords.iter()
-                    .any(|kw| new_text.to_lowercase().contains(kw));
+                let has_sentence_end = new_text.contains(". ")
+                    || new_text.contains("! ")
+                    || new_text.contains("? ")
+                    || new_text.contains(".\n");
+                let has_keyword = has_sentence_end
+                    && constraint_keywords
+                        .iter()
+                        .any(|kw| new_text.to_lowercase().contains(kw));
 
                 if has_keyword && text_so_far.len() > last_eval_len + 20 {
                     // Run evaluation on new text only
@@ -1461,7 +1724,11 @@ async fn proxy_request(
                             let (judge_url, judge_key, judge_model) = {
                                 let st = state_bg.lock().unwrap();
                                 let key = st.judge_api_key.clone().or_else(|| st.api_key.clone());
-                                let url = if st.judge_api_key.is_some() { st.judge_api_url.clone() } else { st.target_api.clone() };
+                                let url = if st.judge_api_key.is_some() {
+                                    st.judge_api_url.clone()
+                                } else {
+                                    st.target_api.clone()
+                                };
                                 (url, key, st.judge_model.clone())
                             };
                             if let Some(api_key) = judge_key {
@@ -1474,9 +1741,15 @@ async fn proxy_request(
                                 let st_clone = state_bg.clone();
                                 tokio::spawn(async move {
                                     let (within_scope, reason) = scope_judge_check(
-                                        &http, &judge_url, &api_key, &judge_model,
-                                        &user_msg, &action_text, &etx,
-                                    ).await;
+                                        &http,
+                                        &judge_url,
+                                        &api_key,
+                                        &judge_model,
+                                        &user_msg,
+                                        &action_text,
+                                        &etx,
+                                    )
+                                    .await;
                                     if !within_scope {
                                         let gate_id = uuid::Uuid::new_v4().to_string();
                                         let is_active = {
@@ -1485,13 +1758,22 @@ async fn proxy_request(
                                         };
                                         if is_active {
                                             let rx = crate::daemon::gate::create_realtime_gate(
-                                                &st_clone, req_id.clone(), gate_id.clone(),
-                                                action_text, user_msg, sess, reason, &etx,
+                                                &st_clone,
+                                                req_id.clone(),
+                                                gate_id.clone(),
+                                                action_text,
+                                                user_msg,
+                                                sess,
+                                                reason,
+                                                &etx,
                                             );
                                             let decision = tokio::time::timeout(
-                                                std::time::Duration::from_secs(crate::daemon::gate::GATE_TIMEOUT_SECS),
-                                                rx
-                                            ).await;
+                                                std::time::Duration::from_secs(
+                                                    crate::daemon::gate::GATE_TIMEOUT_SECS,
+                                                ),
+                                                rx,
+                                            )
+                                            .await;
                                             let approved = matches!(decision, Ok(Ok(true)));
                                             if !approved {
                                                 let mut st = st_clone.lock().unwrap();
@@ -1504,8 +1786,14 @@ async fn proxy_request(
                                             });
                                         } else {
                                             crate::daemon::gate::register_retroactive_gate(
-                                                &st_clone, req_id, gate_id,
-                                                action_text, user_msg, sess, reason, &etx,
+                                                &st_clone,
+                                                req_id,
+                                                gate_id,
+                                                action_text,
+                                                user_msg,
+                                                sess,
+                                                reason,
+                                                &etx,
                                             );
                                         }
                                     }
@@ -1526,7 +1814,9 @@ async fn proxy_request(
                             Some(e) => e,
                             None => match PolicyEngine::new(&config_bg) {
                                 Ok(e) => e,
-                                Err(_) => { continue; }
+                                Err(_) => {
+                                    continue;
+                                }
                             },
                         };
                         let mut pipeline = EvaluatorPipeline::with_engine_fallback(engine);
@@ -1534,26 +1824,31 @@ async fn proxy_request(
                             std::sync::Arc::new(InProcessLookup::new());
                         pipeline.register(Box::new(SemanticEvaluator::new(lookup)));
 
-                        let all_constraints: Vec<Constraint> = config_bg
-                            .all_constraints()
-                            .into_iter()
-                            .cloned()
-                            .collect();
+                        let all_constraints: Vec<Constraint> =
+                            config_bg.all_constraints().into_iter().cloned().collect();
                         let raw_violations = pipeline.run(&claims, &all_constraints);
                         {
                             let thresholds = SeverityThresholds::default();
                             let violations = collect_violations(
-                                raw_violations, &strengths_bg, &thresholds, &constraint_meta_bg, &claims
+                                raw_violations,
+                                &strengths_bg,
+                                &thresholds,
+                                &constraint_meta_bg,
+                                &claims,
                             );
                             // Governance: check block_next flag
                             let force_block = {
                                 let mut st = state_bg.lock().unwrap();
                                 let b = st.block_next;
-                                if b { st.block_next = false; }
+                                if b {
+                                    st.block_next = false;
+                                }
                                 b
                             };
                             let decision = if force_block {
-                                Decision::Block { violations: violations.clone() }
+                                Decision::Block {
+                                    violations: violations.clone(),
+                                }
                             } else {
                                 determine_decision(&violations)
                             };
@@ -1563,7 +1858,8 @@ async fn proxy_request(
                                 blocked = true;
 
                                 // Check if this is already a retry — don't retry retries
-                                let already_retried = modified_body_bg.get("system")
+                                let already_retried = modified_body_bg
+                                    .get("system")
                                     .and_then(|s| s.as_str())
                                     .map(|s| s.contains("[RIGOR EPISTEMIC CORRECTION]"))
                                     .unwrap_or(false);
@@ -1594,7 +1890,8 @@ async fn proxy_request(
                                 // Persist violations to disk (streaming path)
                                 if let Ok(logger) = crate::logging::ViolationLogger::new() {
                                     let session_meta = crate::logging::SessionMetadata::default();
-                                    let mut persisted: Vec<crate::logging::ViolationLogEntry> = Vec::new();
+                                    let mut persisted: Vec<crate::logging::ViolationLogEntry> =
+                                        Vec::new();
                                     for v in &violations {
                                         let sev = match v.severity {
                                             crate::violation::Severity::Block => "block",
@@ -1630,7 +1927,9 @@ async fn proxy_request(
                                     // Fire alert webhooks (best-effort, non-blocking)
                                     if !persisted.is_empty() {
                                         tokio::spawn(async move {
-                                            let _ = crate::alerting::fire_for_violations(&persisted).await;
+                                            let _ =
+                                                crate::alerting::fire_for_violations(&persisted)
+                                                    .await;
                                         });
                                     }
                                     // Auto-refine: check if any constraint needs refinement
@@ -1639,15 +1938,18 @@ async fn proxy_request(
                                         st.yaml_path.clone()
                                     };
                                     tokio::spawn(async move {
-                                        let _ = crate::cli::refine::auto_refine_if_needed(&auto_refine_yaml);
+                                        let _ = crate::cli::refine::auto_refine_if_needed(
+                                            &auto_refine_yaml,
+                                        );
                                     });
                                 }
 
                                 // Build violation summary
-                                let violation_lines: Vec<String> = violations.iter()
+                                let violation_lines: Vec<String> = violations
+                                    .iter()
                                     .map(|v| format!("{}: {}", v.constraint_id, v.message))
                                     .collect();
-                                let error_msg = format!(
+                                let _error_msg = format!(
                                     "rigor BLOCKED — {} violation(s): {}",
                                     violations.len(),
                                     violation_lines.join("; ")
@@ -1666,13 +1968,19 @@ async fn proxy_request(
 
                                 if already_retried || retries_disabled {
                                     // Already retried once or retries disabled — send error and stop.
-                                    crate::daemon::ws::emit_log(&event_tx_bg, "error", "proxy",
-                                        "BLOCK after retry — not retrying again (max 1 retry)".to_string());
+                                    crate::daemon::ws::emit_log(
+                                        &event_tx_bg,
+                                        "error",
+                                        "proxy",
+                                        "BLOCK after retry — not retrying again (max 1 retry)"
+                                            .to_string(),
+                                    );
                                     let _ = event_tx_bg.send(DaemonEvent::Retry {
                                         request_id: request_id_bg.clone(),
                                         violations: violations.len(),
                                         status: "retry_failed".to_string(),
-                                        message: "Block persists after retry — giving up".to_string(),
+                                        message: "Block persists after retry — giving up"
+                                            .to_string(),
                                         feedback: None,
                                         blocked_text: Some(text_so_far.clone()),
                                     });
@@ -1685,13 +1993,17 @@ async fn proxy_request(
                                 }
 
                                 // Build truth statements from the violated constraints
-                                let truth_lines: Vec<String> = violations.iter()
+                                let truth_lines: Vec<String> = violations
+                                    .iter()
                                     .map(|v| {
-                                        let desc = constraint_meta_bg.get(&v.constraint_id)
+                                        let desc = constraint_meta_bg
+                                            .get(&v.constraint_id)
                                             .map(|m| m.name.as_str())
                                             .unwrap_or(&v.constraint_id);
                                         // Get the full description from config
-                                        let full_desc = config_bg.all_constraints().iter()
+                                        let full_desc = config_bg
+                                            .all_constraints()
+                                            .iter()
                                             .find(|c| c.id == v.constraint_id)
                                             .map(|c| c.description.as_str())
                                             .unwrap_or("");
@@ -1714,8 +2026,13 @@ async fn proxy_request(
                                     truth_lines.join("\n")
                                 );
                                 // Append feedback to system prompt
-                                if let Some(sys) = retry_body.get("system").and_then(|s| s.as_str()).map(|s| s.to_string()) {
-                                    retry_body["system"] = serde_json::Value::String(format!("{}{}", sys, feedback));
+                                if let Some(sys) = retry_body
+                                    .get("system")
+                                    .and_then(|s| s.as_str())
+                                    .map(|s| s.to_string())
+                                {
+                                    retry_body["system"] =
+                                        serde_json::Value::String(format!("{}{}", sys, feedback));
                                 }
 
                                 // Auto-retry event with blocked text + feedback
@@ -1723,20 +2040,33 @@ async fn proxy_request(
                                     request_id: request_id_bg.clone(),
                                     violations: violations.len(),
                                     status: "retrying".to_string(),
-                                    message: format!("RETRYING ON BLOCK — {} violation(s): {}", violations.len(), violation_lines.join("; ")),
+                                    message: format!(
+                                        "RETRYING ON BLOCK — {} violation(s): {}",
+                                        violations.len(),
+                                        violation_lines.join("; ")
+                                    ),
                                     feedback: Some(feedback.clone()),
                                     blocked_text: Some(text_so_far.clone()),
                                 });
-                                crate::daemon::ws::emit_log(&event_tx_bg, "warn", "proxy",
-                                    format!("RETRYING ON BLOCK ({} violations)", violations.len()));
+                                crate::daemon::ws::emit_log(
+                                    &event_tx_bg,
+                                    "warn",
+                                    "proxy",
+                                    format!("RETRYING ON BLOCK ({} violations)", violations.len()),
+                                );
 
                                 // Rebuild and send retry request (reuse shared client)
                                 let mut retry_req = http_client_bg.post(&target_url_bg);
                                 for (name, value) in headers_bg.iter() {
                                     let n = name.as_str().to_lowercase();
                                     match n.as_str() {
-                                        "host"|"content-length"|"transfer-encoding"|"connection"|"content-encoding"|"accept-encoding" => {}
-                                        _ => { retry_req = retry_req.header(name.clone(), value.clone()); }
+                                        "host" | "content-length" | "transfer-encoding"
+                                        | "connection" | "content-encoding" | "accept-encoding" => {
+                                        }
+                                        _ => {
+                                            retry_req =
+                                                retry_req.header(name.clone(), value.clone());
+                                        }
                                     }
                                 }
                                 retry_req = retry_req
@@ -1757,14 +2087,22 @@ async fn proxy_request(
 
                                         // Extract text from the retry response
                                         let retry_raw = String::from_utf8_lossy(&retry_bytes);
-                                        let retry_text = extract_sse_assistant_text(&retry_raw, &path_bg)
-                                            .unwrap_or_default();
+                                        let retry_text =
+                                            extract_sse_assistant_text(&retry_raw, &path_bg)
+                                                .unwrap_or_default();
 
                                         // Fast LLM-as-judge: use judge config (OpenRouter) if available
                                         let (judge_url_1, judge_key_1, judge_model_1) = {
                                             let st = state_bg.lock().unwrap();
-                                            let key = st.judge_api_key.clone().or_else(|| st.api_key.clone());
-                                            let url = if st.judge_api_key.is_some() { st.judge_api_url.clone() } else { st.target_api.clone() };
+                                            let key = st
+                                                .judge_api_key
+                                                .clone()
+                                                .or_else(|| st.api_key.clone());
+                                            let url = if st.judge_api_key.is_some() {
+                                                st.judge_api_url.clone()
+                                            } else {
+                                                st.target_api.clone()
+                                            };
                                             (url, key, st.judge_model.clone())
                                         };
                                         let still_violated = if !retry_text.is_empty() {
@@ -1776,7 +2114,8 @@ async fn proxy_request(
                                                 &violation_lines,
                                                 &retry_text,
                                                 &event_tx_bg,
-                                            ).await
+                                            )
+                                            .await
                                         } else {
                                             false
                                         };
@@ -1797,20 +2136,29 @@ async fn proxy_request(
                                                 "event: error\ndata: {{\"type\":\"error\",\"error\":{{\"type\":\"overloaded_error\",\"message\":{}}}}}\n\n",
                                                 serde_json::to_string("rigor BLOCKED — retry still contained the same factual error").unwrap_or_default()
                                             );
-                                            let _ = client_tx.send(Ok(Bytes::from(error_event))).await;
+                                            let _ =
+                                                client_tx.send(Ok(Bytes::from(error_event))).await;
                                         } else {
                                             // Retry is clean — send it to client
-                                            let _ = client_tx.send(Ok(Bytes::from(retry_bytes))).await;
+                                            let _ =
+                                                client_tx.send(Ok(Bytes::from(retry_bytes))).await;
                                             let _ = event_tx_bg.send(DaemonEvent::Retry {
                                                 request_id: request_id_bg.clone(),
                                                 violations: violations.len(),
                                                 status: "retry_success".to_string(),
-                                                message: "Retry response verified clean by LLM judge".to_string(),
+                                                message:
+                                                    "Retry response verified clean by LLM judge"
+                                                        .to_string(),
                                                 feedback: None,
                                                 blocked_text: Some(retry_text),
                                             });
-                                            crate::daemon::ws::emit_log(&event_tx_bg, "info", "proxy",
-                                                "RETRY SUCCESS — verified clean by LLM judge".to_string());
+                                            crate::daemon::ws::emit_log(
+                                                &event_tx_bg,
+                                                "info",
+                                                "proxy",
+                                                "RETRY SUCCESS — verified clean by LLM judge"
+                                                    .to_string(),
+                                            );
                                         }
                                     }
                                     Err(e) => {
@@ -1822,8 +2170,12 @@ async fn proxy_request(
                                             feedback: None,
                                             blocked_text: None,
                                         });
-                                        crate::daemon::ws::emit_log(&event_tx_bg, "error", "proxy",
-                                            format!("RETRY FAILED: {}", e));
+                                        crate::daemon::ws::emit_log(
+                                            &event_tx_bg,
+                                            "error",
+                                            "proxy",
+                                            format!("RETRY FAILED: {}", e),
+                                        );
                                         // Retry failed — send error to client
                                         let error_event = format!(
                                             "event: error\ndata: {{\"type\":\"error\",\"error\":{{\"type\":\"overloaded_error\",\"message\":{}}}}}\n\n",
@@ -1837,7 +2189,6 @@ async fn proxy_request(
                         }
                     }
                 }
-
             }
 
             // Extract token usage from accumulated SSE data
@@ -1858,11 +2209,17 @@ async fn proxy_request(
                     st.cumulative_input_tokens += input_tokens;
                     st.cumulative_output_tokens += output_tokens;
                     st.cumulative_cost_usd += cost;
-                    let entry = st.cost_by_model.entry(model_bg.clone()).or_insert((0, 0, 0.0));
+                    let entry = st
+                        .cost_by_model
+                        .entry(model_bg.clone())
+                        .or_insert((0, 0, 0.0));
                     entry.0 += input_tokens;
                     entry.1 += output_tokens;
                     entry.2 += cost;
-                    let exceeded = st.max_cost_usd.map(|max| st.cumulative_cost_usd > max).unwrap_or(false);
+                    let exceeded = st
+                        .max_cost_usd
+                        .map(|max| st.cumulative_cost_usd > max)
+                        .unwrap_or(false);
                     if exceeded && !st.proxy_paused {
                         st.proxy_paused = true;
                     }
@@ -1882,8 +2239,12 @@ async fn proxy_request(
                         action: "pause".to_string(),
                         detail: "Budget exceeded".to_string(),
                     });
-                    crate::daemon::ws::emit_log(&event_tx_bg, "warn", "cost",
-                        format!("Budget exceeded (${:.4}) — proxy paused", cum_cost));
+                    crate::daemon::ws::emit_log(
+                        &event_tx_bg,
+                        "warn",
+                        "cost",
+                        format!("Budget exceeded (${:.4}) — proxy paused", cum_cost),
+                    );
                 }
             }
 
@@ -1892,7 +2253,11 @@ async fn proxy_request(
             if !blocked && !text_so_far.is_empty() {
                 // Phase 1: Rego evaluation
                 let final_decision = evaluate_text_inline(
-                    &text_so_far, &path_bg, &request_id_bg, &event_tx_bg, &state_bg,
+                    &text_so_far,
+                    &path_bg,
+                    &request_id_bg,
+                    &event_tx_bg,
+                    &state_bg,
                 );
 
                 // Phase 2: If Rego passed, run LLM judge as semantic safety net
@@ -1900,8 +2265,15 @@ async fn proxy_request(
                     let (judge_url_2, judge_key_2, judge_model_2, constraint_descs) = {
                         let st = state_bg.lock().unwrap();
                         let key = st.judge_api_key.clone().or_else(|| st.api_key.clone());
-                        let url = if st.judge_api_key.is_some() { st.judge_api_url.clone() } else { st.target_api.clone() };
-                        let descs: Vec<String> = st.config.all_constraints().iter()
+                        let url = if st.judge_api_key.is_some() {
+                            st.judge_api_url.clone()
+                        } else {
+                            st.target_api.clone()
+                        };
+                        let descs: Vec<String> = st
+                            .config
+                            .all_constraints()
+                            .iter()
                             .map(|c| format!("{}: {}", c.name, c.description))
                             .collect();
                         (url, key, st.judge_model.clone(), descs)
@@ -1912,7 +2284,11 @@ async fn proxy_request(
                             request_id: request_id_bg.clone(),
                             action: "semantic_eval_start".to_string(),
                             duration_ms: None,
-                            detail: format!("Evaluating {} chars against {} constraints", text_so_far.len(), constraint_descs.len()),
+                            detail: format!(
+                                "Evaluating {} chars against {} constraints",
+                                text_so_far.len(),
+                                constraint_descs.len()
+                            ),
                         });
 
                         let judge_start = std::time::Instant::now();
@@ -1924,14 +2300,19 @@ async fn proxy_request(
                             &constraint_descs,
                             &text_so_far,
                             &event_tx_bg,
-                        ).await;
+                        )
+                        .await;
 
                         let judge_ms = judge_start.elapsed().as_millis() as u64;
                         let _ = event_tx_bg.send(DaemonEvent::JudgeActivity {
                             request_id: request_id_bg.clone(),
                             action: "semantic_eval_done".to_string(),
                             duration_ms: Some(judge_ms),
-                            detail: format!("{} — {}ms", if violated { "VIOLATION FOUND" } else { "clean" }, judge_ms),
+                            detail: format!(
+                                "{} — {}ms",
+                                if violated { "VIOLATION FOUND" } else { "clean" },
+                                judge_ms
+                            ),
                         });
 
                         violated
@@ -1943,10 +2324,11 @@ async fn proxy_request(
                 };
 
                 if final_decision == "block" || llm_blocked {
-                    blocked = true;
+                    let _was_blocked = true;
 
                     // Check if this is already a retry or retries disabled
-                    let already_retried_post = modified_body_bg.get("system")
+                    let already_retried_post = modified_body_bg
+                        .get("system")
                         .and_then(|s| s.as_str())
                         .map(|s| s.contains("[RIGOR EPISTEMIC CORRECTION]"))
                         .unwrap_or(false);
@@ -1959,8 +2341,12 @@ async fn proxy_request(
                     });
 
                     if already_retried_post || retries_disabled_post {
-                        crate::daemon::ws::emit_log(&event_tx_bg, "error", "proxy",
-                            "POST-STREAM BLOCK after retry — not retrying again".to_string());
+                        crate::daemon::ws::emit_log(
+                            &event_tx_bg,
+                            "error",
+                            "proxy",
+                            "POST-STREAM BLOCK after retry — not retrying again".to_string(),
+                        );
                         let _ = event_tx_bg.send(DaemonEvent::Retry {
                             request_id: request_id_bg.clone(),
                             violations: 0,
@@ -1975,16 +2361,17 @@ async fn proxy_request(
                         );
                         let _ = client_tx.send(Ok(Bytes::from(error_event))).await;
                     } else {
-
-                    // Build truth statements from the full constraint graph
-                    let truth_lines: Vec<String> = {
-                        let st = state_bg.lock().unwrap();
-                        st.config.all_constraints().iter()
-                            .map(|c| format!("TRUTH: {} — {}", c.name, c.description))
-                            .collect()
-                    };
-                    let violation_summary = truth_lines.join("\n");
-                    let feedback = format!(
+                        // Build truth statements from the full constraint graph
+                        let truth_lines: Vec<String> = {
+                            let st = state_bg.lock().unwrap();
+                            st.config
+                                .all_constraints()
+                                .iter()
+                                .map(|c| format!("TRUTH: {} — {}", c.name, c.description))
+                                .collect()
+                        };
+                        let violation_summary = truth_lines.join("\n");
+                        let feedback = format!(
                         "\n\n[RIGOR EPISTEMIC CORRECTION]\n\
                         Your previous response was BLOCKED. Here are the verified truths:\n\n\
                         {}\n\n\
@@ -1996,118 +2383,146 @@ async fn proxy_request(
                         [END CORRECTION]\n",
                         violation_summary
                     );
-                    let mut retry_body = modified_body_bg.clone();
-                    if let Some(sys) = retry_body.get("system").and_then(|s| s.as_str()).map(|s| s.to_string()) {
-                        retry_body["system"] = serde_json::Value::String(format!("{}{}", sys, feedback));
-                    }
-
-                    let _ = event_tx_bg.send(DaemonEvent::Retry {
-                        request_id: request_id_bg.clone(),
-                        violations: 0,
-                        status: "retrying".to_string(),
-                        message: "RETRYING ON BLOCK (post-stream evaluation)".to_string(),
-                        feedback: Some(feedback.clone()),
-                        blocked_text: Some(text_so_far.clone()),
-                    });
-                    crate::daemon::ws::emit_log(&event_tx_bg, "warn", "proxy",
-                        "RETRYING ON BLOCK (post-stream)".to_string());
-
-                    // DON'T send an error event here — the client is still connected
-                    // and waiting for SSE data. Send the retry response directly.
-                    // Only send error if the retry itself fails.
-
-                    // Retry: resend with violation feedback
-                    let mut retry_req = http_client_bg.post(&target_url_bg);
-                    for (name, value) in headers_bg.iter() {
-                        let n = name.as_str().to_lowercase();
-                        match n.as_str() {
-                            "host"|"content-length"|"transfer-encoding"|"connection"|"content-encoding"|"accept-encoding" => {}
-                            _ => { retry_req = retry_req.header(name.clone(), value.clone()); }
+                        let mut retry_body = modified_body_bg.clone();
+                        if let Some(sys) = retry_body
+                            .get("system")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s.to_string())
+                        {
+                            retry_body["system"] =
+                                serde_json::Value::String(format!("{}{}", sys, feedback));
                         }
-                    }
-                    retry_req = retry_req
-                        .header("content-type", "application/json")
-                        .header("accept-encoding", "identity")
-                        .body(serde_json::to_vec(&retry_body).unwrap_or_default());
 
-                    match retry_req.send().await {
-                        Ok(retry_resp) => {
-                            // Buffer retry response, verify with judge, then send
-                            let mut retry_bytes = Vec::new();
-                            let mut retry_stream = retry_resp.bytes_stream();
-                            while let Some(chunk) = retry_stream.next().await {
-                                if let Ok(b) = chunk {
-                                    retry_bytes.extend_from_slice(&b);
+                        let _ = event_tx_bg.send(DaemonEvent::Retry {
+                            request_id: request_id_bg.clone(),
+                            violations: 0,
+                            status: "retrying".to_string(),
+                            message: "RETRYING ON BLOCK (post-stream evaluation)".to_string(),
+                            feedback: Some(feedback.clone()),
+                            blocked_text: Some(text_so_far.clone()),
+                        });
+                        crate::daemon::ws::emit_log(
+                            &event_tx_bg,
+                            "warn",
+                            "proxy",
+                            "RETRYING ON BLOCK (post-stream)".to_string(),
+                        );
+
+                        // DON'T send an error event here — the client is still connected
+                        // and waiting for SSE data. Send the retry response directly.
+                        // Only send error if the retry itself fails.
+
+                        // Retry: resend with violation feedback
+                        let mut retry_req = http_client_bg.post(&target_url_bg);
+                        for (name, value) in headers_bg.iter() {
+                            let n = name.as_str().to_lowercase();
+                            match n.as_str() {
+                                "host" | "content-length" | "transfer-encoding" | "connection"
+                                | "content-encoding" | "accept-encoding" => {}
+                                _ => {
+                                    retry_req = retry_req.header(name.clone(), value.clone());
                                 }
                             }
+                        }
+                        retry_req = retry_req
+                            .header("content-type", "application/json")
+                            .header("accept-encoding", "identity")
+                            .body(serde_json::to_vec(&retry_body).unwrap_or_default());
 
-                            let retry_raw = String::from_utf8_lossy(&retry_bytes);
-                            let retry_text = extract_sse_assistant_text(&retry_raw, &path_bg)
-                                .unwrap_or_default();
+                        match retry_req.send().await {
+                            Ok(retry_resp) => {
+                                // Buffer retry response, verify with judge, then send
+                                let mut retry_bytes = Vec::new();
+                                let mut retry_stream = retry_resp.bytes_stream();
+                                while let Some(chunk) = retry_stream.next().await {
+                                    if let Ok(b) = chunk {
+                                        retry_bytes.extend_from_slice(&b);
+                                    }
+                                }
 
-                            // Fast LLM judge: use judge config (OpenRouter) if available
-                            let (judge_url_3, judge_key_3, judge_model_3) = {
-                                let st = state_bg.lock().unwrap();
-                                let key = st.judge_api_key.clone().or_else(|| st.api_key.clone());
-                                let url = if st.judge_api_key.is_some() { st.judge_api_url.clone() } else { st.target_api.clone() };
-                                (url, key, st.judge_model.clone())
-                            };
-                            let still_violated = if !retry_text.is_empty() {
-                                check_violations_persist(
-                                    &http_client_bg,
-                                    &judge_url_3,
-                                    judge_key_3.as_deref(),
-                                    &judge_model_3,
-                                    &[violation_summary.to_string()],
-                                    &retry_text,
-                                    &event_tx_bg,
-                                ).await
-                            } else {
-                                false
-                            };
+                                let retry_raw = String::from_utf8_lossy(&retry_bytes);
+                                let retry_text = extract_sse_assistant_text(&retry_raw, &path_bg)
+                                    .unwrap_or_default();
 
-                            if still_violated {
-                                crate::daemon::ws::emit_log(&event_tx_bg, "error", "proxy",
-                                    "POST-STREAM RETRY STILL VIOLATED".to_string());
+                                // Fast LLM judge: use judge config (OpenRouter) if available
+                                let (judge_url_3, judge_key_3, judge_model_3) = {
+                                    let st = state_bg.lock().unwrap();
+                                    let key =
+                                        st.judge_api_key.clone().or_else(|| st.api_key.clone());
+                                    let url = if st.judge_api_key.is_some() {
+                                        st.judge_api_url.clone()
+                                    } else {
+                                        st.target_api.clone()
+                                    };
+                                    (url, key, st.judge_model.clone())
+                                };
+                                let still_violated = if !retry_text.is_empty() {
+                                    check_violations_persist(
+                                        &http_client_bg,
+                                        &judge_url_3,
+                                        judge_key_3.as_deref(),
+                                        &judge_model_3,
+                                        &[violation_summary.to_string()],
+                                        &retry_text,
+                                        &event_tx_bg,
+                                    )
+                                    .await
+                                } else {
+                                    false
+                                };
+
+                                if still_violated {
+                                    crate::daemon::ws::emit_log(
+                                        &event_tx_bg,
+                                        "error",
+                                        "proxy",
+                                        "POST-STREAM RETRY STILL VIOLATED".to_string(),
+                                    );
+                                    let _ = event_tx_bg.send(DaemonEvent::Retry {
+                                        request_id: request_id_bg.clone(),
+                                        violations: 0,
+                                        status: "retry_failed".to_string(),
+                                        message: "Post-stream retry still contains same violations"
+                                            .to_string(),
+                                        feedback: None,
+                                        blocked_text: Some(retry_text),
+                                    });
+                                    let error_event = format!(
+                                    "event: error\ndata: {{\"type\":\"error\",\"error\":{{\"type\":\"overloaded_error\",\"message\":{}}}}}\n\n",
+                                    serde_json::to_string("rigor BLOCKED — retry still contained the same factual error").unwrap_or_default()
+                                );
+                                    let _ = client_tx.send(Ok(Bytes::from(error_event))).await;
+                                } else {
+                                    // Clean — send to client
+                                    let _ = client_tx.send(Ok(Bytes::from(retry_bytes))).await;
+                                    let _ = event_tx_bg.send(DaemonEvent::Retry {
+                                        request_id: request_id_bg.clone(),
+                                        violations: 0,
+                                        status: "retry_success".to_string(),
+                                        message: "Post-stream retry verified clean by LLM judge"
+                                            .to_string(),
+                                        feedback: None,
+                                        blocked_text: Some(retry_text),
+                                    });
+                                    crate::daemon::ws::emit_log(
+                                        &event_tx_bg,
+                                        "info",
+                                        "proxy",
+                                        "POST-STREAM RETRY SUCCESS — verified clean".to_string(),
+                                    );
+                                }
+                            }
+                            Err(e) => {
                                 let _ = event_tx_bg.send(DaemonEvent::Retry {
                                     request_id: request_id_bg.clone(),
                                     violations: 0,
                                     status: "retry_failed".to_string(),
-                                    message: "Post-stream retry still contains same violations".to_string(),
+                                    message: format!("Post-stream retry failed: {}", e),
                                     feedback: None,
-                                    blocked_text: Some(retry_text),
+                                    blocked_text: None,
                                 });
-                                let error_event = format!(
-                                    "event: error\ndata: {{\"type\":\"error\",\"error\":{{\"type\":\"overloaded_error\",\"message\":{}}}}}\n\n",
-                                    serde_json::to_string("rigor BLOCKED — retry still contained the same factual error").unwrap_or_default()
-                                );
-                                let _ = client_tx.send(Ok(Bytes::from(error_event))).await;
-                            } else {
-                                // Clean — send to client
-                                let _ = client_tx.send(Ok(Bytes::from(retry_bytes))).await;
-                                let _ = event_tx_bg.send(DaemonEvent::Retry {
-                                    request_id: request_id_bg.clone(),
-                                    violations: 0,
-                                    status: "retry_success".to_string(),
-                                    message: "Post-stream retry verified clean by LLM judge".to_string(),
-                                    feedback: None,
-                                    blocked_text: Some(retry_text),
-                                });
-                                crate::daemon::ws::emit_log(&event_tx_bg, "info", "proxy",
-                                    "POST-STREAM RETRY SUCCESS — verified clean".to_string());
                             }
                         }
-                        Err(e) => {
-                            let _ = event_tx_bg.send(DaemonEvent::Retry {
-                                request_id: request_id_bg.clone(),
-                                violations: 0,
-                                status: "retry_failed".to_string(),
-                                message: format!("Post-stream retry failed: {}", e),
-                                feedback: None,
-                                blocked_text: None,
-                            });
-                        }
-                    }
                     } // end else (not already retried)
                 }
             }
@@ -2136,7 +2551,11 @@ async fn proxy_request(
         return builder
             .body(Body::from_stream(client_stream))
             .unwrap_or_else(|e| {
-                (StatusCode::INTERNAL_SERVER_ERROR, format!("Stream error: {}", e)).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Stream error: {}", e),
+                )
+                    .into_response()
             });
     }
 
@@ -2182,7 +2601,10 @@ async fn proxy_request(
                 entry.0 += input_tokens;
                 entry.1 += output_tokens;
                 entry.2 += cost;
-                let exceeded = st.max_cost_usd.map(|max| st.cumulative_cost_usd > max).unwrap_or(false);
+                let exceeded = st
+                    .max_cost_usd
+                    .map(|max| st.cumulative_cost_usd > max)
+                    .unwrap_or(false);
                 if exceeded && !st.proxy_paused {
                     st.proxy_paused = true;
                 }
@@ -2202,8 +2624,12 @@ async fn proxy_request(
                     action: "pause".to_string(),
                     detail: "Budget exceeded".to_string(),
                 });
-                crate::daemon::ws::emit_log(&event_tx, "warn", "cost",
-                    format!("Budget exceeded (${:.4}) — proxy paused", cum_cost));
+                crate::daemon::ws::emit_log(
+                    &event_tx,
+                    "warn",
+                    "cost",
+                    format!("Budget exceeded (${:.4}) — proxy paused", cum_cost),
+                );
             }
         }
     }
@@ -2241,7 +2667,11 @@ async fn proxy_request(
     builder
         .body(Body::from(response_bytes))
         .unwrap_or_else(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("Stream error: {}", e)).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Stream error: {}", e),
+            )
+                .into_response()
         })
 }
 
@@ -2257,7 +2687,9 @@ fn extract_assistant_text(body: &serde_json::Value, path: &str) -> Option<String
                     .iter()
                     .filter_map(|b| {
                         if b.get("type").and_then(|t| t.as_str()) == Some("text") {
-                            b.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                            b.get("text")
+                                .and_then(|t| t.as_str())
+                                .map(|s| s.to_string())
                         } else {
                             None
                         }
@@ -2292,7 +2724,10 @@ fn extract_and_evaluate(
     let response_json: serde_json::Value = match serde_json::from_slice(response_bytes) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("rigor proxy: failed to parse response JSON for claim extraction: {}", e);
+            eprintln!(
+                "rigor proxy: failed to parse response JSON for claim extraction: {}",
+                e
+            );
             let _ = event_tx.send(DaemonEvent::Decision {
                 request_id: request_id.to_string(),
                 decision: "allow".to_string(),
@@ -2331,7 +2766,7 @@ async fn check_violations_persist(
     api_url: &str,
     api_key: Option<&str>,
     model: &str,
-    original_violations: &[String],  // "constraint_id: violation message"
+    original_violations: &[String], // "constraint_id: violation message"
     retry_text: &str,
     event_tx: &EventSender,
 ) -> bool {
@@ -2340,7 +2775,9 @@ async fn check_violations_persist(
         None => return false, // can't check without API key, assume clean
     };
 
-    if original_violations.is_empty() || retry_text.is_empty() { return false; }
+    if original_violations.is_empty() || retry_text.is_empty() {
+        return false;
+    }
 
     // Build a focused prompt — one check for all violations at once
     let mut violation_list = String::new();
@@ -2382,27 +2819,33 @@ async fn check_violations_persist(
 
     // Call API directly — not through the proxy (avoids self-evaluation loop)
     let mut req = client
-        .post(&format!("{}/v1/messages", api_url))
+        .post(format!("{}/v1/messages", api_url))
         .header("anthropic-version", "2023-06-01")
         .header("content-type", "application/json");
 
     req = apply_provider_auth(req, api_key);
 
-    let resp = tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        req.json(&body).send()
-    ).await;
+    let resp =
+        tokio::time::timeout(std::time::Duration::from_secs(10), req.json(&body).send()).await;
 
     let resp = match resp {
         Ok(Ok(r)) => r,
         Ok(Err(e)) => {
-            crate::daemon::ws::emit_log(event_tx, "error", "relevance",
-                format!("Retry verification LLM call failed: {}", e));
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "relevance",
+                format!("Retry verification LLM call failed: {}", e),
+            );
             return false; // fail open
         }
         Err(_) => {
-            crate::daemon::ws::emit_log(event_tx, "error", "relevance",
-                "Retry verification timed out (10s)".to_string());
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "relevance",
+                "Retry verification timed out (10s)".to_string(),
+            );
             return false; // fail open
         }
     };
@@ -2412,7 +2855,8 @@ async fn check_violations_persist(
         Err(_) => return false,
     };
 
-    let answer = resp_json.get("content")
+    let answer = resp_json
+        .get("content")
         .and_then(|c| c.as_array())
         .and_then(|a| a.first())
         .and_then(|b| b.get("text"))
@@ -2428,11 +2872,31 @@ async fn check_violations_persist(
         request_id: String::new(),
         action: "retry_verify_done".to_string(),
         duration_ms: Some(judge_ms),
-        detail: format!("{} — {}ms", if persists { "violations PERSIST" } else { "clean" }, judge_ms),
+        detail: format!(
+            "{} — {}ms",
+            if persists {
+                "violations PERSIST"
+            } else {
+                "clean"
+            },
+            judge_ms
+        ),
     });
 
-    crate::daemon::ws::emit_log(event_tx, "info", "relevance",
-        format!("Retry verification: {} ({}ms)", if persists { "violations PERSIST" } else { "clean" }, judge_ms));
+    crate::daemon::ws::emit_log(
+        event_tx,
+        "info",
+        "relevance",
+        format!(
+            "Retry verification: {} ({}ms)",
+            if persists {
+                "violations PERSIST"
+            } else {
+                "clean"
+            },
+            judge_ms
+        ),
+    );
 
     // Broadcast full evaluation details to dashboard
     let _ = event_tx.send(DaemonEvent::JudgeEvaluation {
@@ -2441,7 +2905,11 @@ async fn check_violations_persist(
         response: Some(answer.clone()),
         claims: None,
         constraints: Some(original_violations.to_vec()),
-        result: Some(if persists { "VIOLATIONS PERSIST".to_string() } else { "CLEAN".to_string() }),
+        result: Some(if persists {
+            "VIOLATIONS PERSIST".to_string()
+        } else {
+            "CLEAN".to_string()
+        }),
         duration_ms: Some(judge_ms),
     });
 
@@ -2476,24 +2944,35 @@ async fn scope_judge_check(
         "messages": [{"role": "user", "content": prompt}]
     });
 
-    let mut req = client.post(&format!("{}/v1/messages", api_url))
+    let mut req = client
+        .post(format!("{}/v1/messages", api_url))
         .header("anthropic-version", "2023-06-01")
         .header("content-type", "application/json");
     req = apply_provider_auth(req, api_key);
 
     let resp = match tokio::time::timeout(
         std::time::Duration::from_secs(10),
-        req.json(&body).send()
-    ).await {
+        req.json(&body).send(),
+    )
+    .await
+    {
         Ok(Ok(r)) => r,
         Ok(Err(e)) => {
-            crate::daemon::ws::emit_log(event_tx, "error", "gate",
-                format!("Scope judge request failed: {}", e));
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "gate",
+                format!("Scope judge request failed: {}", e),
+            );
             return (true, "Judge error — defaulting to allow".to_string());
         }
         Err(_) => {
-            crate::daemon::ws::emit_log(event_tx, "warn", "gate",
-                "Scope judge timeout".to_string());
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "warn",
+                "gate",
+                "Scope judge timeout".to_string(),
+            );
             return (true, "Judge timeout — defaulting to allow".to_string());
         }
     };
@@ -2504,8 +2983,12 @@ async fn scope_judge_check(
     // action instead of failing open. This caused the contrapunk gate stall.
     let status = resp.status();
     if !status.is_success() {
-        crate::daemon::ws::emit_log(event_tx, "warn", "gate",
-            format!("Scope judge HTTP {} — defaulting to allow", status));
+        crate::daemon::ws::emit_log(
+            event_tx,
+            "warn",
+            "gate",
+            format!("Scope judge HTTP {} — defaulting to allow", status),
+        );
         return (true, format!("Judge HTTP {} — defaulting to allow", status));
     }
 
@@ -2514,7 +2997,8 @@ async fn scope_judge_check(
         Err(_) => return (true, "Parse error — defaulting to allow".to_string()),
     };
 
-    let text = resp_json.get("content")
+    let text = resp_json
+        .get("content")
         .and_then(|c| c.as_array())
         .and_then(|a| a.first())
         .and_then(|b| b.get("text"))
@@ -2524,7 +3008,8 @@ async fn scope_judge_check(
         .to_string();
 
     let within_scope = text.to_uppercase().starts_with("YES");
-    let reason = text.split_once(|c: char| c == '\n' || c == '.')
+    let reason = text
+        .split_once(['\n', '.'])
         .map(|(f, _)| f.trim().to_string())
         .unwrap_or_else(|| text.clone());
 
@@ -2550,11 +3035,17 @@ fn evaluate_text_inline(
     }];
     let extractor = HeuristicExtractor::new();
     let claims = extractor.extract(&messages);
-    if claims.is_empty() { return "allow".to_string(); }
+    if claims.is_empty() {
+        return "allow".to_string();
+    }
 
     let (config, strengths, cached_engine) = {
         let st = state.lock().unwrap();
-        (st.config.clone(), st.graph.get_all_strengths(), st.policy_engine.as_ref().cloned())
+        (
+            st.config.clone(),
+            st.graph.get_all_strengths(),
+            st.policy_engine.as_ref().cloned(),
+        )
     };
     let engine = match cached_engine {
         Some(e) => e,
@@ -2570,21 +3061,32 @@ fn evaluate_text_inline(
     let all_constraints: Vec<Constraint> = config.all_constraints().into_iter().cloned().collect();
     let raw_violations = pipeline.run(&claims, &all_constraints);
     let constraint_meta: HashMap<String, ConstraintMeta> = config
-        .all_constraints().iter()
+        .all_constraints()
+        .iter()
         .map(|c| {
             let etype = match c.epistemic_type {
                 EpistemicType::Belief => "belief",
                 EpistemicType::Justification => "justification",
                 EpistemicType::Defeater => "defeater",
             };
-            (c.id.clone(), ConstraintMeta {
-                name: c.name.clone(),
-                epistemic_type: etype.to_string(),
-                rego_path: format!("data.rigor.{}", c.id),
-            })
-        }).collect();
+            (
+                c.id.clone(),
+                ConstraintMeta {
+                    name: c.name.clone(),
+                    epistemic_type: etype.to_string(),
+                    rego_path: format!("data.rigor.{}", c.id),
+                },
+            )
+        })
+        .collect();
     let thresholds = SeverityThresholds::default();
-    let violations = collect_violations(raw_violations, &strengths, &thresholds, &constraint_meta, &claims);
+    let violations = collect_violations(
+        raw_violations,
+        &strengths,
+        &thresholds,
+        &constraint_meta,
+        &claims,
+    );
     let decision = determine_decision(&violations);
     match decision {
         Decision::Block { .. } => "block".to_string(),
@@ -2595,7 +3097,7 @@ fn evaluate_text_inline(
 
 fn extract_and_evaluate_text(
     assistant_text: &str,
-    path: &str,
+    _path: &str,
     request_id: &str,
     event_tx: &EventSender,
     state: &SharedState,
@@ -2648,8 +3150,12 @@ fn extract_and_evaluate_text(
             violations: pii_found.len(),
             claims: claims.len(),
         });
-        crate::daemon::ws::emit_log(event_tx, "error", "pii",
-            format!("PII-OUT BLOCK — {} PII items in response", pii_found.len()));
+        crate::daemon::ws::emit_log(
+            event_tx,
+            "error",
+            "pii",
+            format!("PII-OUT BLOCK — {} PII items in response", pii_found.len()),
+        );
         return;
     }
 
@@ -2711,7 +3217,13 @@ fn extract_and_evaluate_text(
         .collect();
 
     let thresholds = SeverityThresholds::default();
-    let violations = collect_violations(raw_violations, &strengths, &thresholds, &constraint_meta, &claims);
+    let violations = collect_violations(
+        raw_violations,
+        &strengths,
+        &thresholds,
+        &constraint_meta,
+        &claims,
+    );
 
     // Emit Violation events
     for v in &violations {
@@ -2809,7 +3321,8 @@ fn extract_and_evaluate_text(
             .map(|c| (c.id.clone(), format!("{}: {}", c.name, c.description)))
             .collect();
 
-        let claim_summaries: Vec<(String, String)> = claims.iter()
+        let claim_summaries: Vec<(String, String)> = claims
+            .iter()
             .map(|c| (c.id.clone(), c.text.clone()))
             .collect();
 
@@ -2817,7 +3330,11 @@ fn extract_and_evaluate_text(
         let (judge_url, judge_key, judge_model, http_client) = {
             let st = state.lock().unwrap();
             let key = st.judge_api_key.clone().or_else(|| st.api_key.clone());
-            let url = if st.judge_api_key.is_some() { st.judge_api_url.clone() } else { st.target_api.clone() };
+            let url = if st.judge_api_key.is_some() {
+                st.judge_api_url.clone()
+            } else {
+                st.target_api.clone()
+            };
             let model = st.judge_model.clone();
             (url, key, model, st.http_client.clone())
         };
@@ -2825,9 +3342,15 @@ fn extract_and_evaluate_text(
         let event_tx_rel = event_tx.clone();
         tokio::spawn(async move {
             score_claim_relevance(
-                &http_client, &judge_url, judge_key.as_deref(), &judge_model,
-                &claim_summaries, &constraint_summaries, &event_tx_rel,
-            ).await;
+                &http_client,
+                &judge_url,
+                judge_key.as_deref(),
+                &judge_model,
+                &claim_summaries,
+                &constraint_summaries,
+                &event_tx_rel,
+            )
+            .await;
             RELEVANCE_SEMAPHORE.release();
         });
     }
@@ -2837,18 +3360,30 @@ fn extract_and_evaluate_text(
 /// Only 1 relevance scoring request in flight at a time.
 struct SimpleSemaphore(std::sync::atomic::AtomicBool);
 impl SimpleSemaphore {
-    const fn new() -> Self { Self(std::sync::atomic::AtomicBool::new(false)) }
-    fn try_acquire(&self) -> Option<()> {
-        self.0.compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
-            .ok().map(|_| ())
+    const fn new() -> Self {
+        Self(std::sync::atomic::AtomicBool::new(false))
     }
-    fn release(&self) { self.0.store(false, std::sync::atomic::Ordering::SeqCst); }
+    fn try_acquire(&self) -> Option<()> {
+        self.0
+            .compare_exchange(
+                false,
+                true,
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+            )
+            .ok()
+            .map(|_| ())
+    }
+    fn release(&self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 static RELEVANCE_SEMAPHORE: SimpleSemaphore = SimpleSemaphore::new();
 
 /// Cache for LLM-as-judge results: claim_text -> Vec<(constraint_id, relevance, reason)>
-static RELEVANCE_CACHE: std::sync::LazyLock<std::sync::Mutex<HashMap<String, Vec<(String, String, String)>>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+static RELEVANCE_CACHE: std::sync::LazyLock<
+    std::sync::Mutex<HashMap<String, Vec<(String, String, String)>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
 /// Look up the current LLM-as-judge relevance verdicts for a given claim text.
 ///
@@ -2873,20 +3408,26 @@ async fn score_claim_relevance(
     api_url: &str,
     api_key: Option<&str>,
     model: &str,
-    claims: &[(String, String)],       // (id, text)
-    constraints: &[(String, String)],  // (id, "name: description")
+    claims: &[(String, String)],      // (id, text)
+    constraints: &[(String, String)], // (id, "name: description")
     event_tx: &EventSender,
 ) {
     let api_key = match api_key {
         Some(k) => k,
         None => {
-            crate::daemon::ws::emit_log(event_tx, "debug", "relevance",
-                "Skipping LLM-as-judge: no API key".to_string());
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "debug",
+                "relevance",
+                "Skipping LLM-as-judge: no API key".to_string(),
+            );
             return;
         }
     };
 
-    if claims.is_empty() || constraints.is_empty() { return; }
+    if claims.is_empty() || constraints.is_empty() {
+        return;
+    }
 
     // Check cache first — emit cached results immediately
     let mut uncached_claims = Vec::new();
@@ -2909,14 +3450,25 @@ async fn score_claim_relevance(
     }
 
     if uncached_claims.is_empty() {
-        crate::daemon::ws::emit_log(event_tx, "debug", "relevance",
-            format!("All {} claims cached, skipping LLM call", claims.len()));
+        crate::daemon::ws::emit_log(
+            event_tx,
+            "debug",
+            "relevance",
+            format!("All {} claims cached, skipping LLM call", claims.len()),
+        );
         return;
     }
 
-    crate::daemon::ws::emit_log(event_tx, "info", "relevance",
-        format!("Scoring {} claims against {} constraints via LLM-as-judge",
-            uncached_claims.len(), constraints.len()));
+    crate::daemon::ws::emit_log(
+        event_tx,
+        "info",
+        "relevance",
+        format!(
+            "Scoring {} claims against {} constraints via LLM-as-judge",
+            uncached_claims.len(),
+            constraints.len()
+        ),
+    );
 
     // Build prompt
     let mut constraint_list = String::new();
@@ -2949,66 +3501,107 @@ async fn score_claim_relevance(
     let delays = [0u64, 3, 8, 15]; // seconds to wait before each attempt
     for (attempt, delay) in delays.iter().enumerate() {
         if *delay > 0 {
-            crate::daemon::ws::emit_log(event_tx, "info", "relevance",
-                format!("Rate limited, retrying in {}s (attempt {}/{})", delay, attempt + 1, delays.len()));
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "info",
+                "relevance",
+                format!(
+                    "Rate limited, retrying in {}s (attempt {}/{})",
+                    delay,
+                    attempt + 1,
+                    delays.len()
+                ),
+            );
             tokio::time::sleep(std::time::Duration::from_secs(*delay)).await;
         }
 
         // Rebuild request each attempt (reqwest consumes the builder)
         let mut retry_req = client
-            .post(&format!("{}/v1/messages", api_url))
+            .post(format!("{}/v1/messages", api_url))
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json");
         retry_req = apply_provider_auth(retry_req, api_key);
 
         let resp = tokio::time::timeout(
             std::time::Duration::from_secs(30),
-            retry_req.json(&body).send()
-        ).await;
+            retry_req.json(&body).send(),
+        )
+        .await;
 
         let r = match resp {
             Ok(Ok(r)) => r,
             Ok(Err(e)) => {
-                crate::daemon::ws::emit_log(event_tx, "error", "relevance",
-                    format!("LLM call failed: {}", e));
+                crate::daemon::ws::emit_log(
+                    event_tx,
+                    "error",
+                    "relevance",
+                    format!("LLM call failed: {}", e),
+                );
                 return;
             }
             Err(_) => {
-                crate::daemon::ws::emit_log(event_tx, "error", "relevance",
-                    "LLM call timed out after 30s".to_string());
+                crate::daemon::ws::emit_log(
+                    event_tx,
+                    "error",
+                    "relevance",
+                    "LLM call timed out after 30s".to_string(),
+                );
                 return;
             }
         };
 
         let status = r.status();
-        eprintln!("rigor relevance: API status: {} (attempt {})", status, attempt + 1);
+        eprintln!(
+            "rigor relevance: API status: {} (attempt {})",
+            status,
+            attempt + 1
+        );
 
         if status.as_u16() == 429 {
             // Rate limited — will retry if more attempts remain
-            if attempt < delays.len() - 1 { continue; }
-            crate::daemon::ws::emit_log(event_tx, "error", "relevance",
-                "Rate limited after all retry attempts".to_string());
+            if attempt < delays.len() - 1 {
+                continue;
+            }
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "relevance",
+                "Rate limited after all retry attempts".to_string(),
+            );
             return;
         }
 
         match r.json().await {
-            Ok(j) => { resp_json = j; break; }
+            Ok(j) => {
+                resp_json = j;
+                break;
+            }
             Err(e) => {
-                crate::daemon::ws::emit_log(event_tx, "error", "relevance",
-                    format!("Failed to parse LLM response: {}", e));
+                crate::daemon::ws::emit_log(
+                    event_tx,
+                    "error",
+                    "relevance",
+                    format!("Failed to parse LLM response: {}", e),
+                );
                 return;
             }
         }
     }
 
-    if resp_json.is_null() { return; }
+    if resp_json.is_null() {
+        return;
+    }
 
     // Log full response JSON for debugging
     let resp_str = serde_json::to_string(&resp_json).unwrap_or_default();
-    eprintln!("rigor relevance: full API response: {}", &resp_str[..resp_str.len().min(800)]);
+    eprintln!(
+        "rigor relevance: full API response: {}",
+        &resp_str[..resp_str.len().min(800)]
+    );
 
     // Extract text from Anthropic response
-    let text = resp_json.get("content")
+    let text = resp_json
+        .get("content")
         .and_then(|c| c.as_array())
         .and_then(|a| a.first())
         .and_then(|b| b.get("text"))
@@ -3016,21 +3609,35 @@ async fn score_claim_relevance(
         .unwrap_or("");
 
     // Log raw response for debugging
-    eprintln!("rigor relevance: raw LLM response: {}", &text[..text.len().min(500)]);
+    eprintln!(
+        "rigor relevance: raw LLM response: {}",
+        &text[..text.len().min(500)]
+    );
 
     // Broadcast full evaluation details to dashboard
     let _ = event_tx.send(DaemonEvent::JudgeEvaluation {
         eval_type: "relevance".to_string(),
         prompt: Some(prompt.clone()),
         response: Some(text.to_string()),
-        claims: Some(uncached_claims.iter().map(|(id, t)| format!("[{}] {}", id, t)).collect()),
-        constraints: Some(constraints.iter().map(|(id, d)| format!("[{}] {}", id, d)).collect()),
+        claims: Some(
+            uncached_claims
+                .iter()
+                .map(|(id, t)| format!("[{}] {}", id, t))
+                .collect(),
+        ),
+        constraints: Some(
+            constraints
+                .iter()
+                .map(|(id, d)| format!("[{}] {}", id, d))
+                .collect(),
+        ),
         result: Some(format!("{} lines in response", text.lines().count())),
         duration_ms: None,
     });
 
     // Build a map from claim_id -> claim_text for cache keying
-    let claim_text_map: HashMap<String, String> = uncached_claims.iter()
+    let claim_text_map: HashMap<String, String> = uncached_claims
+        .iter()
         .map(|(id, text)| (id.clone(), text.clone()))
         .collect();
 
@@ -3043,7 +3650,11 @@ async fn score_claim_relevance(
             let claim_id = parts[0].trim().to_string();
             let constraint_id = parts[1].trim().to_string();
             let relevance = parts[2].trim().to_lowercase();
-            let reason = if parts.len() >= 4 { parts[3].trim().to_string() } else { String::new() };
+            let reason = if parts.len() >= 4 {
+                parts[3].trim().to_string()
+            } else {
+                String::new()
+            };
 
             if relevance == "high" || relevance == "medium" {
                 let _ = event_tx.send(DaemonEvent::ClaimRelevance {
@@ -3057,16 +3668,26 @@ async fn score_claim_relevance(
                 // Cache the result keyed by claim text
                 if let Some(claim_text) = claim_text_map.get(&claim_id) {
                     let mut cache = RELEVANCE_CACHE.lock().unwrap();
-                    cache.entry(claim_text.clone())
-                        .or_insert_with(Vec::new)
-                        .push((constraint_id, relevance, reason));
+                    cache.entry(claim_text.clone()).or_default().push((
+                        constraint_id,
+                        relevance,
+                        reason,
+                    ));
                 }
             }
         }
     }
 
-    crate::daemon::ws::emit_log(event_tx, "info", "relevance",
-        format!("LLM-as-judge: {} relevance links from {} claims", match_count, uncached_claims.len()));
+    crate::daemon::ws::emit_log(
+        event_tx,
+        "info",
+        "relevance",
+        format!(
+            "LLM-as-judge: {} relevance links from {} claims",
+            match_count,
+            uncached_claims.len()
+        ),
+    );
 }
 
 /// Parse SSE event stream and extract accumulated assistant text.
@@ -3083,7 +3704,8 @@ fn extract_sse_assistant_text(sse_data: &str, path: &str) -> Option<String> {
                 if path.contains("messages") {
                     // Anthropic streaming: content_block_delta events
                     if json.get("type").and_then(|t| t.as_str()) == Some("content_block_delta") {
-                        if let Some(text) = json.get("delta")
+                        if let Some(text) = json
+                            .get("delta")
                             .and_then(|d| d.get("text"))
                             .and_then(|t| t.as_str())
                         {
@@ -3092,7 +3714,8 @@ fn extract_sse_assistant_text(sse_data: &str, path: &str) -> Option<String> {
                     }
                 } else {
                     // OpenAI streaming: choices[0].delta.content
-                    if let Some(content) = json.get("choices")
+                    if let Some(content) = json
+                        .get("choices")
                         .and_then(|c| c.as_array())
                         .and_then(|a| a.first())
                         .and_then(|c| c.get("delta"))
@@ -3123,12 +3746,15 @@ fn extract_sse_usage(sse_data: &str, path: &str) -> (u64, u64) {
 
     for line in sse_data.lines() {
         if let Some(data) = line.strip_prefix("data: ") {
-            if data == "[DONE]" { break; }
+            if data == "[DONE]" {
+                break;
+            }
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                 if path.contains("messages") {
                     // Anthropic: message_start → message.usage.input_tokens
                     if json.get("type").and_then(|t| t.as_str()) == Some("message_start") {
-                        if let Some(it) = json.get("message")
+                        if let Some(it) = json
+                            .get("message")
                             .and_then(|m| m.get("usage"))
                             .and_then(|u| u.get("input_tokens"))
                             .and_then(|v| v.as_u64())
@@ -3138,7 +3764,8 @@ fn extract_sse_usage(sse_data: &str, path: &str) -> (u64, u64) {
                     }
                     // Anthropic: message_delta → usage.output_tokens
                     if json.get("type").and_then(|t| t.as_str()) == Some("message_delta") {
-                        if let Some(ot) = json.get("usage")
+                        if let Some(ot) = json
+                            .get("usage")
                             .and_then(|u| u.get("output_tokens"))
                             .and_then(|v| v.as_u64())
                         {
@@ -3167,13 +3794,25 @@ fn extract_usage(body: &serde_json::Value, path: &str) -> (u64, u64) {
     if let Some(usage) = body.get("usage") {
         if path.contains("messages") {
             // Anthropic: usage.input_tokens, usage.output_tokens
-            let input = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let output = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let input = usage
+                .get("input_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let output = usage
+                .get("output_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             (input, output)
         } else {
             // OpenAI: usage.prompt_tokens, usage.completion_tokens
-            let input = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let output = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let input = usage
+                .get("prompt_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let output = usage
+                .get("completion_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             (input, output)
         }
     } else {
@@ -3190,7 +3829,11 @@ mod tests {
 
     fn auth_header(req: reqwest::RequestBuilder, name: &str) -> Option<String> {
         let built = req.build().expect("request builds");
-        built.headers().get(name).and_then(|v| v.to_str().ok()).map(String::from)
+        built
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(String::from)
     }
 
     fn fresh_req() -> reqwest::RequestBuilder {
@@ -3200,7 +3843,10 @@ mod tests {
     #[test]
     fn auth_anthropic_api_key_uses_x_api_key() {
         let req = apply_provider_auth(fresh_req(), "sk-ant-api03-abcdef");
-        assert_eq!(auth_header(req, "x-api-key"), Some("sk-ant-api03-abcdef".into()));
+        assert_eq!(
+            auth_header(req, "x-api-key"),
+            Some("sk-ant-api03-abcdef".into())
+        );
     }
 
     #[test]
@@ -3306,18 +3952,24 @@ mod tests {
 
     #[test]
     fn pii_detects_email() {
-        assert!(detected_kinds("contact vibhav@example.com today").iter().any(|k| k == "Email"));
+        assert!(detected_kinds("contact vibhav@example.com today")
+            .iter()
+            .any(|k| k == "Email"));
     }
 
     #[test]
     fn pii_detects_credit_card_with_luhn() {
         // 4111-1111-1111-1111 is the canonical Visa test number, passes Luhn.
-        assert!(detected_kinds("pay with 4111111111111111").iter().any(|k| k == "CreditCard"));
+        assert!(detected_kinds("pay with 4111111111111111")
+            .iter()
+            .any(|k| k == "CreditCard"));
     }
 
     #[test]
     fn pii_detects_ssn() {
-        assert!(detected_kinds("SSN: 123-45-6789").iter().any(|k| k.contains("SSN")));
+        assert!(detected_kinds("SSN: 123-45-6789")
+            .iter()
+            .any(|k| k.contains("SSN")));
     }
 
     #[test]
@@ -3329,13 +3981,17 @@ mod tests {
     #[test]
     fn pii_detects_anthropic_api_key() {
         let k = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ";
-        assert!(detected_kinds(k).iter().any(|k| k.contains("AnthropicApiKey")));
+        assert!(detected_kinds(k)
+            .iter()
+            .any(|k| k.contains("AnthropicApiKey")));
     }
 
     #[test]
     fn pii_detects_anthropic_oauth() {
         let k = "sk-ant-oat01-abcdefghijklmnopqrstuvwxyz01234567";
-        assert!(detected_kinds(k).iter().any(|k| k.contains("AnthropicOAuth")));
+        assert!(detected_kinds(k)
+            .iter()
+            .any(|k| k.contains("AnthropicOAuth")));
     }
 
     #[test]
@@ -3344,7 +4000,11 @@ mod tests {
         // requires exact 36 (\b boundary) so test uses exact length.
         let k = "ghp_0123456789abcdefghijklmnopqrstuvwxyz";
         assert_eq!(k.len(), 40, "fixture has wrong length");
-        assert!(!detected_kinds(k).is_empty(), "actual: {:?}", detected_kinds(k));
+        assert!(
+            !detected_kinds(k).is_empty(),
+            "actual: {:?}",
+            detected_kinds(k)
+        );
     }
 
     #[test]

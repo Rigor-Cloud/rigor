@@ -9,7 +9,7 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use super::{AnchorVerification, AnchorStatus, LanguageServer, ReferenceInfo, SymbolInfo};
+use super::{AnchorStatus, AnchorVerification, LanguageServer, ReferenceInfo, SymbolInfo};
 
 /// Convert a file path to an LSP Uri.
 fn file_uri(path: &Path) -> Result<Uri> {
@@ -19,13 +19,15 @@ fn file_uri(path: &Path) -> Result<Uri> {
         std::env::current_dir()?.join(path)
     };
     let uri_str = format!("file://{}", abs.display());
-    uri_str.parse().map_err(|e| anyhow!("Invalid URI {}: {}", uri_str, e))
+    uri_str
+        .parse()
+        .map_err(|e| anyhow!("Invalid URI {}: {}", uri_str, e))
 }
 
 /// Extract file path from an LSP Uri string.
 fn uri_to_path(uri: &Uri) -> Option<std::path::PathBuf> {
     let s = uri.as_str();
-    s.strip_prefix("file://").map(|p| std::path::PathBuf::from(p))
+    s.strip_prefix("file://").map(std::path::PathBuf::from)
 }
 
 /// A client that communicates with a language server over stdin/stdout.
@@ -54,7 +56,7 @@ struct JsonRpcResponse {
 impl LspClient {
     /// Spawn a language server and perform the initialize handshake.
     pub fn start(server: &LanguageServer, project_root: &Path) -> Result<Self> {
-        let mut child = Command::new(&server.command)
+        let child = Command::new(&server.command)
             .args(&server.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -71,7 +73,10 @@ impl LspClient {
         // Send initialize request
         let root_uri = file_uri(project_root)?;
 
+        #[allow(deprecated)]
         let init_params = InitializeParams {
+            // `root_uri` is deprecated in favor of `workspace_folders`. Migration
+            // tracked alongside Phase 4A (LSP verification fully wired).
             root_uri: Some(root_uri.clone()),
             capabilities: ClientCapabilities {
                 text_document: Some(TextDocumentClientCapabilities {
@@ -93,7 +98,7 @@ impl LspClient {
             ..Default::default()
         };
 
-        let response = client.send_request("initialize", serde_json::to_value(init_params)?)?;
+        let _response = client.send_request("initialize", serde_json::to_value(init_params)?)?;
 
         // Send initialized notification (no response expected)
         client.send_notification("initialized", serde_json::json!({}))?;
@@ -130,7 +135,12 @@ impl LspClient {
     }
 
     /// Find all references to the symbol at a given position.
-    pub fn find_references(&mut self, file_path: &Path, line: u32, character: u32) -> Result<Vec<Location>> {
+    pub fn find_references(
+        &mut self,
+        file_path: &Path,
+        line: u32,
+        character: u32,
+    ) -> Result<Vec<Location>> {
         let uri = file_uri(file_path)?;
 
         let params = ReferenceParams {
@@ -145,7 +155,8 @@ impl LspClient {
             },
         };
 
-        let response = self.send_request("textDocument/references", serde_json::to_value(params)?)?;
+        let response =
+            self.send_request("textDocument/references", serde_json::to_value(params)?)?;
 
         match response {
             Some(value) => {
@@ -177,10 +188,13 @@ impl LspClient {
                     HoverContents::Scalar(MarkedString::String(s)) => Some(s),
                     HoverContents::Scalar(MarkedString::LanguageString(ls)) => Some(ls.value),
                     HoverContents::Array(items) => {
-                        let texts: Vec<String> = items.into_iter().map(|i| match i {
-                            MarkedString::String(s) => s,
-                            MarkedString::LanguageString(ls) => ls.value,
-                        }).collect();
+                        let texts: Vec<String> = items
+                            .into_iter()
+                            .map(|i| match i {
+                                MarkedString::String(s) => s,
+                                MarkedString::LanguageString(ls) => ls.value,
+                            })
+                            .collect();
                         Some(texts.join("\n"))
                     }
                     HoverContents::Markup(mc) => Some(mc.value),
@@ -192,7 +206,12 @@ impl LspClient {
     }
 
     /// Go to definition of the symbol at a given position.
-    pub fn goto_definition(&mut self, file_path: &Path, line: u32, character: u32) -> Result<Vec<Location>> {
+    pub fn goto_definition(
+        &mut self,
+        file_path: &Path,
+        line: u32,
+        character: u32,
+    ) -> Result<Vec<Location>> {
         let uri = file_uri(file_path)?;
 
         let params = GotoDefinitionParams {
@@ -204,7 +223,8 @@ impl LspClient {
             partial_result_params: Default::default(),
         };
 
-        let response = self.send_request("textDocument/definition", serde_json::to_value(params)?)?;
+        let response =
+            self.send_request("textDocument/definition", serde_json::to_value(params)?)?;
 
         match response {
             Some(value) => {
@@ -216,10 +236,13 @@ impl LspClient {
                     return Ok(locs);
                 }
                 if let Ok(links) = serde_json::from_value::<Vec<LocationLink>>(value) {
-                    return Ok(links.into_iter().map(|l| Location {
-                        uri: l.target_uri,
-                        range: l.target_range,
-                    }).collect());
+                    return Ok(links
+                        .into_iter()
+                        .map(|l| Location {
+                            uri: l.target_uri,
+                            range: l.target_range,
+                        })
+                        .collect());
                 }
                 Ok(vec![])
             }
@@ -236,7 +259,11 @@ impl LspClient {
     }
 
     /// Send a JSON-RPC request and wait for the response.
-    fn send_request(&mut self, method: &str, params: serde_json::Value) -> Result<Option<serde_json::Value>> {
+    fn send_request(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<Option<serde_json::Value>> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         let request = JsonRpcRequest {
@@ -249,19 +276,29 @@ impl LspClient {
         let body = serde_json::to_string(&request)?;
         let message = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
 
-        let stdin = self.process.stdin.as_mut()
+        let stdin = self
+            .process
+            .stdin
+            .as_mut()
             .ok_or_else(|| anyhow!("LSP stdin not available"))?;
         stdin.write_all(message.as_bytes())?;
         stdin.flush()?;
 
         // Read response — keep reading until we get one with matching id
-        let stdout = self.process.stdout.as_mut()
+        let stdout = self
+            .process
+            .stdout
+            .as_mut()
             .ok_or_else(|| anyhow!("LSP stdout not available"))?;
 
         loop {
             let response = read_lsp_message(stdout)?;
-            let parsed: JsonRpcResponse = serde_json::from_str(&response)
-                .with_context(|| format!("Failed to parse LSP response: {}", &response[..response.len().min(200)]))?;
+            let parsed: JsonRpcResponse = serde_json::from_str(&response).with_context(|| {
+                format!(
+                    "Failed to parse LSP response: {}",
+                    &response[..response.len().min(200)]
+                )
+            })?;
 
             // Skip notifications (no id)
             if parsed.id.is_none() {
@@ -289,7 +326,10 @@ impl LspClient {
         let body = serde_json::to_string(&notification)?;
         let message = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
 
-        let stdin = self.process.stdin.as_mut()
+        let stdin = self
+            .process
+            .stdin
+            .as_mut()
             .ok_or_else(|| anyhow!("LSP stdin not available"))?;
         stdin.write_all(message.as_bytes())?;
         stdin.flush()?;
@@ -335,7 +375,10 @@ pub fn verify_anchors_lsp(
     server: &LanguageServer,
     config: &crate::constraint::types::RigorConfig,
 ) -> Result<Vec<AnchorVerification>> {
-    eprintln!("rigor: starting {} for deep anchor verification...", server.command);
+    eprintln!(
+        "rigor: starting {} for deep anchor verification...",
+        server.command
+    );
     let mut client = LspClient::start(server, project_root)?;
 
     // Give the server a moment to index
@@ -391,16 +434,24 @@ pub fn verify_anchors_lsp(
             // Query LSP for references
             let lsp_refs = if anchor_line > 0 {
                 match client.find_references(&file_path, anchor_line - 1, anchor_char) {
-                    Ok(locs) => locs.into_iter().map(|loc| {
-                        let ref_path = uri_to_path(&loc.uri)
-                            .map(|p| p.strip_prefix(project_root).unwrap_or(&p).to_string_lossy().to_string())
-                            .unwrap_or_else(|| loc.uri.as_str().to_string());
-                        ReferenceInfo {
-                            file: ref_path,
-                            line: loc.range.start.line + 1,
-                            context: String::new(),
-                        }
-                    }).collect(),
+                    Ok(locs) => locs
+                        .into_iter()
+                        .map(|loc| {
+                            let ref_path = uri_to_path(&loc.uri)
+                                .map(|p| {
+                                    p.strip_prefix(project_root)
+                                        .unwrap_or(&p)
+                                        .to_string_lossy()
+                                        .to_string()
+                                })
+                                .unwrap_or_else(|| loc.uri.as_str().to_string());
+                            ReferenceInfo {
+                                file: ref_path,
+                                line: loc.range.start.line + 1,
+                                context: String::new(),
+                            }
+                        })
+                        .collect(),
                     Err(e) => {
                         eprintln!("rigor: LSP references failed for {}: {}", anchor.path, e);
                         vec![]
@@ -412,7 +463,8 @@ pub fn verify_anchors_lsp(
 
             // Query LSP for hover info (type, docs)
             let type_info = if anchor_line > 0 {
-                client.hover(&file_path, anchor_line - 1, anchor_char)
+                client
+                    .hover(&file_path, anchor_line - 1, anchor_char)
                     .unwrap_or(None)
             } else {
                 None

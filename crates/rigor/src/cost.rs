@@ -20,9 +20,7 @@ pub fn estimate_cost(model: &str, input_tokens: u64, output_tokens: u64) -> f64 
     } else if model_lower.contains("claude-sonnet")
         || model_lower.contains("claude-4-sonnet")
         || model_lower.contains("sonnet-4")
-    {
-        (3.0, 15.0)
-    } else if model_lower.contains("claude-3-5-sonnet")
+        || model_lower.contains("claude-3-5-sonnet")
         || model_lower.contains("claude-3.5-sonnet")
     {
         (3.0, 15.0)

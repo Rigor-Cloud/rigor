@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::logging::{query, ViolationLogger, ViolationLogEntry};
+use crate::logging::{query, ViolationLogEntry, ViolationLogger};
 
 /// Per-constraint eval metrics derived from the violation log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,7 +98,7 @@ pub fn compute_metrics(entries: &[ViolationLogEntry]) -> EvalMetrics {
     }
 
     let mut per_constraint: Vec<ConstraintMetric> = per_constraint_map.into_values().collect();
-    per_constraint.sort_by(|a, b| b.hits.cmp(&a.hits));
+    per_constraint.sort_by_key(|c| std::cmp::Reverse(c.hits));
 
     // Build a per-session trend (chronologically ordered by first-seen timestamp)
     let mut session_order: Vec<(String, String)> = Vec::new();
@@ -185,8 +185,14 @@ fn write_report(metrics: &EvalMetrics) -> Result<PathBuf> {
     md.push_str("# Rigor Evaluation Report\n\n");
     md.push_str(&format!("_Generated: {}_\n\n", metrics.generated_at));
     md.push_str("## Summary\n\n");
-    md.push_str(&format!("- Total violations: **{}**\n", metrics.total_violations));
-    md.push_str(&format!("- Total sessions: **{}**\n", metrics.total_sessions));
+    md.push_str(&format!(
+        "- Total violations: **{}**\n",
+        metrics.total_violations
+    ));
+    md.push_str(&format!(
+        "- Total sessions: **{}**\n",
+        metrics.total_sessions
+    ));
     md.push_str(&format!(
         "- Violations per session (recall proxy): **{:.2}**\n",
         metrics.violations_per_session
@@ -195,7 +201,10 @@ fn write_report(metrics: &EvalMetrics) -> Result<PathBuf> {
         "- Annotated: **{}** ({} TP / {} FP)\n",
         metrics.annotated_violations, metrics.true_positives, metrics.false_positives
     ));
-    md.push_str(&format!("- Precision: **{:.2}%**\n\n", metrics.precision * 100.0));
+    md.push_str(&format!(
+        "- Precision: **{:.2}%**\n\n",
+        metrics.precision * 100.0
+    ));
 
     md.push_str("## Per-Constraint\n\n");
     md.push_str("| Constraint | Hits | TP | FP | Unannotated | FP Rate | Precision |\n");
@@ -213,7 +222,7 @@ fn write_report(metrics: &EvalMetrics) -> Result<PathBuf> {
             c.precision * 100.0,
         ));
     }
-    md.push_str("\n");
+    md.push('\n');
 
     md.push_str("## Recall Trend (violations per session)\n\n");
     md.push_str("| Session | Timestamp | Violations |\n|---|---|---:|\n");
@@ -231,7 +240,10 @@ fn write_report(metrics: &EvalMetrics) -> Result<PathBuf> {
 }
 
 fn compare_metrics(current: &EvalMetrics, baseline: &EvalMetrics) {
-    println!("Comparison vs baseline (generated {}):", baseline.generated_at);
+    println!(
+        "Comparison vs baseline (generated {}):",
+        baseline.generated_at
+    );
     println!();
     fn delta(cur: f64, base: f64) -> String {
         let d = cur - base;
@@ -242,13 +254,19 @@ fn compare_metrics(current: &EvalMetrics, baseline: &EvalMetrics) {
         "  Total violations:      {} -> {} ({})",
         baseline.total_violations,
         current.total_violations,
-        delta(current.total_violations as f64, baseline.total_violations as f64)
+        delta(
+            current.total_violations as f64,
+            baseline.total_violations as f64
+        )
     );
     println!(
         "  Violations/session:    {:.2} -> {:.2} ({})",
         baseline.violations_per_session,
         current.violations_per_session,
-        delta(current.violations_per_session, baseline.violations_per_session)
+        delta(
+            current.violations_per_session,
+            baseline.violations_per_session
+        )
     );
     println!(
         "  Precision:             {:.2}% -> {:.2}% ({})",
@@ -260,7 +278,10 @@ fn compare_metrics(current: &EvalMetrics, baseline: &EvalMetrics) {
         "  FP count:              {} -> {} ({})",
         baseline.false_positives,
         current.false_positives,
-        delta(current.false_positives as f64, baseline.false_positives as f64)
+        delta(
+            current.false_positives as f64,
+            baseline.false_positives as f64
+        )
     );
 }
 
@@ -269,7 +290,10 @@ fn print_summary(metrics: &EvalMetrics) {
     println!("================");
     println!("Total violations:        {}", metrics.total_violations);
     println!("Total sessions:          {}", metrics.total_sessions);
-    println!("Violations/session:      {:.2}", metrics.violations_per_session);
+    println!(
+        "Violations/session:      {:.2}",
+        metrics.violations_per_session
+    );
     println!(
         "Annotated: {} (TP: {}, FP: {})",
         metrics.annotated_violations, metrics.true_positives, metrics.false_positives
@@ -368,7 +392,11 @@ mod tests {
         assert_eq!(m.false_positives, 1);
         assert_eq!(m.true_positives, 1);
         assert!((m.precision - 0.5).abs() < 1e-9);
-        let c1 = m.per_constraint.iter().find(|x| x.constraint_id == "c1").unwrap();
+        let c1 = m
+            .per_constraint
+            .iter()
+            .find(|x| x.constraint_id == "c1")
+            .unwrap();
         assert_eq!(c1.hits, 2);
         assert!((c1.false_positive_rate - 0.5).abs() < 1e-9);
     }

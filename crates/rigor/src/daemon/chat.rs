@@ -46,12 +46,18 @@ pub async fn chat_handler(
         }
     };
 
-    eprintln!("rigor chat: sending to {}/v1/messages, key_prefix={}, key_len={}",
-        target_api, &api_key[..api_key.len().min(8)], api_key.len());
+    eprintln!(
+        "rigor chat: sending to {}/v1/messages, key_prefix={}, key_len={}",
+        target_api,
+        &api_key[..api_key.len().min(8)],
+        api_key.len()
+    );
 
-    let mut messages: Vec<serde_json::Value> = body.history.iter().map(|m| {
-        serde_json::json!({"role": m.role, "content": m.content})
-    }).collect();
+    let mut messages: Vec<serde_json::Value> = body
+        .history
+        .iter()
+        .map(|m| serde_json::json!({"role": m.role, "content": m.content}))
+        .collect();
     messages.push(serde_json::json!({"role": "user", "content": body.message}));
 
     let api_body = serde_json::json!({
@@ -75,14 +81,11 @@ pub async fn chat_handler(
         req = req.header("authorization", format!("Bearer {}", api_key));
     }
 
-    let response = match req
-        .json(&api_body)
-        .send()
-        .await
-    {
+    let response = match req.json(&api_body).send().await {
         Ok(r) => r,
         Err(e) => {
-            return Json(serde_json::json!({"error": format!("API request failed: {}", e)})).into_response();
+            return Json(serde_json::json!({"error": format!("API request failed: {}", e)}))
+                .into_response();
         }
     };
 
@@ -91,11 +94,15 @@ pub async fn chat_handler(
     let response_body: serde_json::Value = match response.json().await {
         Ok(b) => b,
         Err(e) => {
-            return Json(serde_json::json!({"error": format!("Failed to parse response: {}", e)})).into_response();
+            return Json(serde_json::json!({"error": format!("Failed to parse response: {}", e)}))
+                .into_response();
         }
     };
 
-    eprintln!("rigor chat: response body={}", serde_json::to_string(&response_body).unwrap_or_default());
+    eprintln!(
+        "rigor chat: response body={}",
+        serde_json::to_string(&response_body).unwrap_or_default()
+    );
 
     // Check for API errors (non-2xx status or error type in body)
     if !status.is_success() || response_body.get("type").and_then(|t| t.as_str()) == Some("error") {
@@ -104,13 +111,18 @@ pub async fn chat_handler(
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 // Fall back to full error object or body for debugging
-                response_body["error"].as_str()
+                response_body["error"]
+                    .as_str()
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| serde_json::to_string(&response_body).unwrap_or_else(|_| "Unknown API error".to_string()))
+                    .unwrap_or_else(|| {
+                        serde_json::to_string(&response_body)
+                            .unwrap_or_else(|_| "Unknown API error".to_string())
+                    })
             });
         return Json(serde_json::json!({
             "error": format!("Claude API error ({}): {}", status.as_u16(), error_msg)
-        })).into_response();
+        }))
+        .into_response();
     }
 
     let text = response_body["content"]
@@ -130,5 +142,6 @@ pub async fn chat_handler(
         "chat_id": chat_id,
         "text": text,
         "model": response_body["model"].as_str().unwrap_or("unknown"),
-    })).into_response()
+    }))
+    .into_response()
 }

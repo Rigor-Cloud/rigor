@@ -25,7 +25,8 @@ pub async fn register_snapshot(
         tool_name: body.tool_name,
         created_at: std::time::Instant::now(),
     };
-    st.gate_snapshots.entry(body.session_id)
+    st.gate_snapshots
+        .entry(body.session_id)
         .or_insert_with(Vec::new)
         .push(entry);
     Json(serde_json::json!({"ok": true}))
@@ -41,8 +42,12 @@ pub async fn tool_completed(
     Json(body): Json<ToolCompletedBody>,
 ) -> impl IntoResponse {
     let st = state.lock().unwrap();
-    crate::daemon::ws::emit_log(&st.event_tx, "info", "gate",
-        format!("Tool completed for session {}", body.session_id));
+    crate::daemon::ws::emit_log(
+        &st.event_tx,
+        "info",
+        "gate",
+        format!("Tool completed for session {}", body.session_id),
+    );
     Json(serde_json::json!({"ok": true}))
 }
 
@@ -59,7 +64,9 @@ pub async fn get_decision(
 ) -> impl IntoResponse {
     let st = state.lock().unwrap();
     let decision = st.gate_decisions.get(&session_id);
-    let snapshot_info = st.gate_snapshots.get(&session_id)
+    let snapshot_info = st
+        .gate_snapshots
+        .get(&session_id)
         .and_then(|snaps| snaps.last())
         .map(|s| (s.snapshot_id.as_str(), s.affected_paths.as_slice()));
     let resp = compute_decision_response(decision, snapshot_info);
@@ -105,12 +112,20 @@ pub(crate) fn compute_decision_response(
 ) -> DecisionResponse {
     match (decision, latest_snapshot) {
         (Some(d), Some((snap_id, paths))) => DecisionResponse {
-            status: if d.approved { "approved".to_string() } else { "rejected".to_string() },
+            status: if d.approved {
+                "approved".to_string()
+            } else {
+                "rejected".to_string()
+            },
             snapshot_id: Some(snap_id.to_string()),
             affected_paths: paths.to_vec(),
         },
         (Some(d), None) => DecisionResponse {
-            status: if d.approved { "approved".to_string() } else { "rejected".to_string() },
+            status: if d.approved {
+                "approved".to_string()
+            } else {
+                "rejected".to_string()
+            },
             snapshot_id: None,
             affected_paths: Vec::new(),
         },

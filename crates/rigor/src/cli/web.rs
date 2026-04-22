@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use axum::http::header;
@@ -95,7 +95,7 @@ struct GraphLink {
     curvature: Option<f64>,
 }
 
-fn build_graph_data(yaml_path: &PathBuf) -> Result<GraphData> {
+fn build_graph_data(yaml_path: &Path) -> Result<GraphData> {
     let config = load_rigor_config(yaml_path)?;
     let mut arg_graph = ArgumentationGraph::from_config(&config);
     arg_graph.compute_strengths()?;
@@ -105,7 +105,9 @@ fn build_graph_data(yaml_path: &PathBuf) -> Result<GraphData> {
 
     // Add constraint nodes
     for c in config.all_constraints() {
-        let strength = arg_graph.get_strength(&c.id).unwrap_or(c.epistemic_type.base_strength());
+        let strength = arg_graph
+            .get_strength(&c.id)
+            .unwrap_or(c.epistemic_type.base_strength());
         let (epistemic_label, color) = match c.epistemic_type {
             EpistemicType::Belief => ("belief", "#ff6b6b"),
             EpistemicType::Justification => ("justification", "#51cf66"),
@@ -166,7 +168,8 @@ fn build_graph_data(yaml_path: &PathBuf) -> Result<GraphData> {
     if let Ok(logger) = ViolationLogger::new() {
         if let Ok(entries) = logger.read_all() {
             // Deduplicate by claim text to avoid flooding the graph
-            let mut seen_claims: std::collections::HashSet<String> = std::collections::HashSet::new();
+            let mut seen_claims: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
 
             for entry in &entries {
                 // Skip violations referencing constraints not in this config
@@ -240,11 +243,7 @@ fn serve_asset(path: &str) -> Response {
     };
 
     match ViewerAssets::get(path) {
-        Some(content) => (
-            [(header::CONTENT_TYPE, mime)],
-            content.data.to_vec(),
-        )
-            .into_response(),
+        Some(content) => ([(header::CONTENT_TYPE, mime)], content.data.to_vec()).into_response(),
         None => (axum::http::StatusCode::NOT_FOUND, "Not found").into_response(),
     }
 }
@@ -285,9 +284,11 @@ pub fn run_web(path: Option<PathBuf>, port: u16) -> Result<()> {
             )
             .route(
                 "/assets/{*path}",
-                get(|axum::extract::Path(path): axum::extract::Path<String>| async move {
-                    serve_asset(&path)
-                }),
+                get(
+                    |axum::extract::Path(path): axum::extract::Path<String>| async move {
+                        serve_asset(&path)
+                    },
+                ),
             );
 
         let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -319,14 +320,11 @@ impl EpistemicType {
 
 /// Serve index.html
 pub async fn serve_index() -> axum::response::Html<String> {
-    let content = serve_asset("index.html");
-    match content.into_response().into_body() {
-        _ => axum::response::Html(
-            ViewerAssets::get("index.html")
-                .map(|f| String::from_utf8_lossy(&f.data).to_string())
-                .unwrap_or_else(|| "Not found".to_string()),
-        ),
-    }
+    axum::response::Html(
+        ViewerAssets::get("index.html")
+            .map(|f| String::from_utf8_lossy(&f.data).to_string())
+            .unwrap_or_else(|| "Not found".to_string()),
+    )
 }
 
 /// Serve viewer asset files
@@ -337,9 +335,7 @@ pub async fn serve_viewer_asset(
 }
 
 /// Build graph JSON from shared daemon state
-pub async fn graph_json_from_state(
-    state: crate::daemon::SharedState,
-) -> Response {
+pub async fn graph_json_from_state(state: crate::daemon::SharedState) -> Response {
     let yaml_path = {
         let st = state.lock().unwrap();
         st.yaml_path.clone()

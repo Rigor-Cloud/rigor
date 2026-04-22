@@ -123,7 +123,11 @@ pub struct PrependedStream<S> {
 
 impl<S> PrependedStream<S> {
     pub fn new(prefix: Vec<u8>, inner: S) -> Self {
-        Self { prefix, pos: 0, inner }
+        Self {
+            prefix,
+            pos: 0,
+            inner,
+        }
     }
 }
 
@@ -153,17 +157,11 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for PrependedStream<S> {
         Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }

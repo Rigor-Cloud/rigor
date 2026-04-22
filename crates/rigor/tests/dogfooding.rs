@@ -35,7 +35,9 @@ fn run_rigor_with_claims(dir: &std::path::Path, claims: &Value) -> (String, Stri
     let mut child = cmd.spawn().expect("Failed to spawn rigor process");
     {
         let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-        stdin.write_all(input.to_string().as_bytes()).expect("Failed to write to stdin");
+        stdin
+            .write_all(input.to_string().as_bytes())
+            .expect("Failed to write to stdin");
     }
     let output = child.wait_with_output().expect("Failed to read stdout");
     (
@@ -73,8 +75,12 @@ fn test_dogfood_rust_no_gc_fires() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert_eq!(response["decision"].as_str(), Some("block"),
-        "rust-no-gc should block on GC claim. Response: {}", stdout);
+    assert_eq!(
+        response["decision"].as_str(),
+        Some("block"),
+        "rust-no-gc should block on GC claim. Response: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -90,8 +96,12 @@ fn test_dogfood_rust_no_null_fires() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert_eq!(response["decision"].as_str(), Some("block"),
-        "rust-no-null should block on null pointer claim. Response: {}", stdout);
+    assert_eq!(
+        response["decision"].as_str(),
+        Some("block"),
+        "rust-no-null should block on null pointer claim. Response: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -107,8 +117,12 @@ fn test_dogfood_rust_no_exceptions_fires() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert_eq!(response["decision"].as_str(), Some("block"),
-        "rust-no-exceptions should block on try/catch claim. Response: {}", stdout);
+    assert_eq!(
+        response["decision"].as_str(),
+        Some("block"),
+        "rust-no-exceptions should block on try/catch claim. Response: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -124,8 +138,12 @@ fn test_dogfood_rust_no_inheritance_fires() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert_eq!(response["decision"].as_str(), Some("block"),
-        "rust-no-inheritance should block on class claim. Response: {}", stdout);
+    assert_eq!(
+        response["decision"].as_str(),
+        Some("block"),
+        "rust-no-inheritance should block on class claim. Response: {}",
+        stdout
+    );
 }
 
 // ============================================================================
@@ -145,8 +163,12 @@ fn test_dogfood_regorus_subset() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert_eq!(response["decision"].as_str(), Some("block"),
-        "regorus-capabilities should block. Response: {}", stdout);
+    assert_eq!(
+        response["decision"].as_str(),
+        Some("block"),
+        "regorus-capabilities should block. Response: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -162,8 +184,12 @@ fn test_dogfood_axum_not_actix() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert_eq!(response["decision"].as_str(), Some("block"),
-        "axum-is-tower-based should block. Response: {}", stdout);
+    assert_eq!(
+        response["decision"].as_str(),
+        Some("block"),
+        "axum-is-tower-based should block. Response: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -179,8 +205,12 @@ fn test_dogfood_tokio_not_green_threads() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert_eq!(response["decision"].as_str(), Some("block"),
-        "tokio-is-async-runtime should block. Response: {}", stdout);
+    assert_eq!(
+        response["decision"].as_str(),
+        Some("block"),
+        "tokio-is-async-runtime should block. Response: {}",
+        stdout
+    );
 }
 
 // ============================================================================
@@ -200,8 +230,11 @@ fn test_dogfood_truthful_rust_claim_allowed() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert!(response.get("decision").is_none() || response["decision"].is_null(),
-        "Truthful Rust claim should NOT trigger. Response: {}", stdout);
+    assert!(
+        response.get("decision").is_none() || response["decision"].is_null(),
+        "Truthful Rust claim should NOT trigger. Response: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -217,8 +250,11 @@ fn test_dogfood_truthful_regorus_claim_allowed() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    assert!(response.get("decision").is_none() || response["decision"].is_null(),
-        "Truthful regorus claim should NOT trigger. Response: {}", stdout);
+    assert!(
+        response.get("decision").is_none() || response["decision"].is_null(),
+        "Truthful regorus claim should NOT trigger. Response: {}",
+        stdout
+    );
 }
 
 // ============================================================================
@@ -233,6 +269,12 @@ fn test_dogfood_production_config_loads() {
     let (stdout, stderr, exit_code) = run_rigor_with_claims(temp.path(), &claims);
     assert_eq!(exit_code, 0, "stderr: {}", stderr);
     let response = parse_response(&stdout);
-    let count = response["metadata"]["constraint_count"].as_u64().unwrap_or(0);
-    assert!(count >= 9, "Should have at least 9 constraints (5 lang + 4 dep). Got: {}", count);
+    let count = response["metadata"]["constraint_count"]
+        .as_u64()
+        .unwrap_or(0);
+    assert!(
+        count >= 9,
+        "Should have at least 9 constraints (5 lang + 4 dep). Got: {}",
+        count
+    );
 }

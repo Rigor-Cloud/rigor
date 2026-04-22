@@ -149,9 +149,7 @@ fn step_two_project() -> Result<PathBuf> {
 
     if yaml_path.exists() {
         let count = count_constraints(&yaml_path);
-        println!(
-            "  Found rigor.yaml in current directory ✓"
-        );
+        println!("  Found rigor.yaml in current directory ✓");
         println!("  {} constraints loaded", count);
         return Ok(cwd);
     }
@@ -191,11 +189,7 @@ fn step_three_plugin(project_dir: &Path) -> Result<()> {
     let plugin_path = plugins_dir.join("rigor.ts");
 
     if let Err(e) = std::fs::create_dir_all(&plugins_dir) {
-        println!(
-            "  Could not create {}: {}",
-            plugins_dir.display(),
-            e
-        );
+        println!("  Could not create {}: {}", plugins_dir.display(), e);
         return Ok(());
     }
 
@@ -240,10 +234,7 @@ fn step_four_verify(port: u16) -> Result<()> {
 
     if health_check(port, Duration::from_secs(2)) {
         println!("✓");
-        println!(
-            "  Dashboard available at http://127.0.0.1:{}",
-            port
-        );
+        println!("  Dashboard available at http://127.0.0.1:{}", port);
     } else {
         println!("✗");
         println!(

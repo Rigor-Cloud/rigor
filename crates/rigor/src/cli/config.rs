@@ -10,7 +10,6 @@ use anyhow::Result;
 ///   judge.api_key   — API key for LLM-as-judge calls (e.g. OpenRouter key)
 ///   judge.api_url   — Base URL for judge API (default: https://openrouter.ai/api)
 ///   judge.model     — Model for judge calls (default: anthropic/claude-sonnet-4-6)
-
 fn config_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     PathBuf::from(home).join(".rigor").join("config")
@@ -63,14 +62,20 @@ pub fn get(key: &str) -> Option<String> {
 pub fn judge_config() -> (String, Option<String>, String) {
     let config = load_config();
 
-    let api_key = config.get("judge.api_key").cloned()
+    let api_key = config
+        .get("judge.api_key")
+        .cloned()
         .or_else(|| std::env::var("RIGOR_JUDGE_API_KEY").ok());
 
-    let api_url = config.get("judge.api_url").cloned()
+    let api_url = config
+        .get("judge.api_url")
+        .cloned()
         .or_else(|| std::env::var("RIGOR_JUDGE_API_URL").ok())
         .unwrap_or_else(|| "https://openrouter.ai/api".to_string());
 
-    let model = config.get("judge.model").cloned()
+    let model = config
+        .get("judge.model")
+        .cloned()
         .or_else(|| std::env::var("RIGOR_JUDGE_MODEL").ok())
         .unwrap_or_else(|| "anthropic/claude-sonnet-4-6".to_string());
 
@@ -81,19 +86,33 @@ pub fn judge_config() -> (String, Option<String>, String) {
 pub fn run_config(action: &str, key: Option<&str>, value: Option<&str>) -> Result<()> {
     match action {
         "set" => {
-            let key = key.ok_or_else(|| anyhow::anyhow!("Usage: rigor config set <key> <value>"))?;
-            let value = value.ok_or_else(|| anyhow::anyhow!("Usage: rigor config set <key> <value>"))?;
+            let key =
+                key.ok_or_else(|| anyhow::anyhow!("Usage: rigor config set <key> <value>"))?;
+            let value =
+                value.ok_or_else(|| anyhow::anyhow!("Usage: rigor config set <key> <value>"))?;
             let mut config = load_config();
             config.insert(key.to_string(), value.to_string());
             save_config(&config)?;
-            eprintln!("rigor: set {} = {}", key, if key.contains("key") { mask_key(value) } else { value.to_string() });
+            eprintln!(
+                "rigor: set {} = {}",
+                key,
+                if key.contains("key") {
+                    mask_key(value)
+                } else {
+                    value.to_string()
+                }
+            );
             Ok(())
         }
         "get" => {
             let key = key.ok_or_else(|| anyhow::anyhow!("Usage: rigor config get <key>"))?;
             match get(key) {
                 Some(val) => {
-                    let display = if key.contains("key") { mask_key(&val) } else { val };
+                    let display = if key.contains("key") {
+                        mask_key(&val)
+                    } else {
+                        val
+                    };
                     println!("{}", display);
                 }
                 None => eprintln!("rigor: key '{}' not set", key),
@@ -107,7 +126,11 @@ pub fn run_config(action: &str, key: Option<&str>, value: Option<&str>) -> Resul
                 eprintln!("rigor: use 'rigor config set <key> <value>' to configure");
             } else {
                 for (key, value) in &config {
-                    let display = if key.contains("key") { mask_key(value) } else { value.clone() };
+                    let display = if key.contains("key") {
+                        mask_key(value)
+                    } else {
+                        value.clone()
+                    };
                     println!("{} = {}", key, display);
                 }
             }
@@ -121,6 +144,6 @@ fn mask_key(key: &str) -> String {
     if key.len() <= 8 {
         "****".to_string()
     } else {
-        format!("{}...{}", &key[..4], &key[key.len()-4..])
+        format!("{}...{}", &key[..4], &key[key.len() - 4..])
     }
 }

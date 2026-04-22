@@ -1,15 +1,15 @@
 //! REST API handlers for dashboard observability tabs.
 
 use axum::extract::{Query, State};
-use axum::response::{IntoResponse, Json, Response};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Json, Response};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use super::SharedState;
 use crate::logging::session_registry;
 use crate::logging::ViolationLogger;
-use super::SharedState;
 
 /// Walk up from `start` looking for `rigor.yaml`. Returns `None` when we
 /// reach the filesystem root without finding one.
@@ -108,7 +108,9 @@ pub async fn search_violations(Query(params): Query<ViolationQuery>) -> Response
                 let q_lower = q.to_lowercase();
                 let matches = e.constraint_id.to_lowercase().contains(&q_lower)
                     || e.message.to_lowercase().contains(&q_lower)
-                    || e.claim_text.iter().any(|c| c.to_lowercase().contains(&q_lower));
+                    || e.claim_text
+                        .iter()
+                        .any(|c| c.to_lowercase().contains(&q_lower));
                 if !matches {
                     return false;
                 }
@@ -192,8 +194,14 @@ pub async fn eval_stats() -> Response {
     let sessions: std::collections::HashSet<_> =
         entries.iter().map(|e| &e.session.session_id).collect();
     let session_count = sessions.len().max(1);
-    let fp_count = entries.iter().filter(|e| e.false_positive == Some(true)).count();
-    let annotated = entries.iter().filter(|e| e.false_positive.is_some()).count();
+    let fp_count = entries
+        .iter()
+        .filter(|e| e.false_positive == Some(true))
+        .count();
+    let annotated = entries
+        .iter()
+        .filter(|e| e.false_positive.is_some())
+        .count();
     let precision = if annotated > 0 {
         ((annotated - fp_count) as f64 / annotated as f64) * 100.0
     } else {
@@ -229,7 +237,7 @@ pub async fn eval_stats() -> Response {
             last_fired: last,
         })
         .collect();
-    constraints.sort_by(|a, b| b.hits.cmp(&a.hits));
+    constraints.sort_by_key(|c| std::cmp::Reverse(c.hits));
 
     Json(EvalStats {
         total_violations: total,
@@ -272,7 +280,10 @@ pub async fn cost_stats(State(state): State<SharedState>) -> Response {
     // Count violations for cost-per-violation
     let violation_count = {
         let logger = ViolationLogger::new().ok();
-        logger.and_then(|l| l.read_all().ok()).map(|e| e.len()).unwrap_or(0)
+        logger
+            .and_then(|l| l.read_all().ok())
+            .map(|e| e.len())
+            .unwrap_or(0)
     };
     let cost_per_violation = if violation_count > 0 {
         st.cumulative_cost_usd / violation_count as f64
@@ -280,7 +291,9 @@ pub async fn cost_stats(State(state): State<SharedState>) -> Response {
         0.0
     };
 
-    let models: Vec<CostModelBreakdown> = st.cost_by_model.iter()
+    let models: Vec<CostModelBreakdown> = st
+        .cost_by_model
+        .iter()
         .map(|(model, (inp, out, cost))| CostModelBreakdown {
             model: model.clone(),
             input_tokens: *inp,
@@ -289,7 +302,8 @@ pub async fn cost_stats(State(state): State<SharedState>) -> Response {
         })
         .collect();
 
-    let budget_exceeded = st.max_cost_usd
+    let budget_exceeded = st
+        .max_cost_usd
         .map(|max| st.cumulative_cost_usd > max)
         .unwrap_or(false);
 
@@ -428,9 +442,7 @@ pub struct RelevanceLookupResponse {
     pub matches: Vec<RelevanceMatchRow>,
 }
 
-pub async fn relevance_lookup(
-    Json(body): Json<RelevanceLookupRequest>,
-) -> Response {
+pub async fn relevance_lookup(Json(body): Json<RelevanceLookupRequest>) -> Response {
     let matches = crate::daemon::proxy::lookup_relevance(&body.claim_text)
         .into_iter()
         .map(|(constraint_id, relevance, reason)| RelevanceMatchRow {
