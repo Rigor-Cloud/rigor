@@ -21,8 +21,11 @@ async fn e1_openrouter_proof_of_life() {
 
     let api_key =
         std::env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY must be set (guarded)");
-    let model = std::env::var("RIGOR_E1_MODEL")
-        .unwrap_or_else(|_| "anthropic/claude-haiku-4-5".to_string());
+    // DeepSeek R1 is the rigor-wide default for judge-style tests — a
+    // reasoning model gives stronger signal on adversarial fixtures.
+    // Override via RIGOR_E1_MODEL when a cheaper/faster model suffices.
+    let model =
+        std::env::var("RIGOR_E1_MODEL").unwrap_or_else(|_| "deepseek/deepseek-r1".to_string());
 
     let body = json!({
         "model": model,
