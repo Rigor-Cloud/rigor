@@ -395,4 +395,165 @@ mod tests {
             "body should be unchanged through empty chain"
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Frozen-prefix invariant (§5.6 "0F")
+    // -----------------------------------------------------------------------
+
+    use crate::daemon::egress::frozen::{set_frozen_prefix, FrozenPrefix};
+
+    /// Seals the frozen prefix at the current messages[0..freeze_count].
+    struct SealerFilter {
+        freeze_count: usize,
+    }
+
+    #[async_trait]
+    impl EgressFilter for SealerFilter {
+        fn name(&self) -> &'static str {
+            "sealer"
+        }
+        async fn apply_request(
+            &self,
+            body: &mut Json,
+            ctx: &mut ConversationCtx,
+        ) -> Result<(), FilterError> {
+            let msgs: Vec<Json> = body
+                .get("messages")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            set_frozen_prefix(ctx, &msgs, self.freeze_count);
+            Ok(())
+        }
+    }
+
+    /// Mutates messages[0] — illegal once a FrozenPrefix with count >= 1 is sealed.
+    struct EvilFilter;
+
+    #[async_trait]
+    impl EgressFilter for EvilFilter {
+        fn name(&self) -> &'static str {
+            "evil"
+        }
+        async fn apply_request(
+            &self,
+            body: &mut Json,
+            _ctx: &mut ConversationCtx,
+        ) -> Result<(), FilterError> {
+            if let Some(arr) = body.get_mut("messages").and_then(|v| v.as_array_mut()) {
+                if let Some(first) = arr.get_mut(0) {
+                    first["content"] = json!("MUTATED-BY-EVIL");
+                }
+            }
+            Ok(())
+        }
+    }
+
+    /// Mutates only messages[1..] — legal under any FrozenPrefix(count=1).
+    struct TailMutator;
+
+    #[async_trait]
+    impl EgressFilter for TailMutator {
+        fn name(&self) -> &'static str {
+            "tail_mutator"
+        }
+        async fn apply_request(
+            &self,
+            body: &mut Json,
+            _ctx: &mut ConversationCtx,
+        ) -> Result<(), FilterError> {
+            if let Some(arr) = body.get_mut("messages").and_then(|v| v.as_array_mut()) {
+                for msg in arr.iter_mut().skip(1) {
+                    if let Some(c) = msg.get_mut("content") {
+                        if let Some(s) = c.as_str() {
+                            *c = json!(s.to_uppercase());
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn two_message_body() -> Json {
+        json!({
+            "messages": [
+                {"role": "user", "content": "system prompt content"},
+                {"role": "user", "content": "user question"}
+            ]
+        })
+    }
+
+    #[tokio::test]
+    async fn apply_request_passes_when_no_frozen_prefix_sealed() {
+        // No sealer — verifier must be a no-op.
+        let chain = FilterChain::new(vec![
+            Arc::new(BodyMutator { label: "noop" }) as Arc<dyn EgressFilter>
+        ]);
+        let mut body = json!({"tags": [], "messages": []});
+        let mut ctx = ConversationCtx::new_anonymous();
+        assert!(chain.apply_request(&mut body, &mut ctx).await.is_ok());
+        assert!(
+            ctx.scratch_get::<FrozenPrefix>().is_none(),
+            "no filter sealed a prefix, scratch must be empty"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_request_passes_when_frozen_range_unchanged() {
+        let chain = FilterChain::new(vec![
+            Arc::new(SealerFilter { freeze_count: 1 }) as Arc<dyn EgressFilter>,
+            Arc::new(TailMutator) as Arc<dyn EgressFilter>,
+        ]);
+        let mut body = two_message_body();
+        let mut ctx = ConversationCtx::new_anonymous();
+        chain
+            .apply_request(&mut body, &mut ctx)
+            .await
+            .expect("tail mutation must not trip frozen-prefix verifier");
+        // Confirm sealing actually happened.
+        assert_eq!(ctx.scratch_get::<FrozenPrefix>().unwrap().message_count, 1);
+        // Confirm tail was mutated.
+        let tail_content = body["messages"][1]["content"].as_str().unwrap();
+        assert_eq!(tail_content, "USER QUESTION");
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[tokio::test]
+    async fn apply_request_release_returns_err_on_frozen_violation() {
+        let chain = FilterChain::new(vec![
+            Arc::new(SealerFilter { freeze_count: 1 }) as Arc<dyn EgressFilter>,
+            Arc::new(EvilFilter) as Arc<dyn EgressFilter>,
+        ]);
+        let mut body = two_message_body();
+        let mut ctx = ConversationCtx::new_anonymous();
+        let err = chain
+            .apply_request(&mut body, &mut ctx)
+            .await
+            .expect_err("frozen-prefix violation must produce FilterError in release");
+        match err {
+            FilterError::Internal { filter, reason } => {
+                assert_eq!(filter, "frozen_prefix");
+                assert!(
+                    reason.contains("checksum mismatch"),
+                    "unexpected reason: {reason}"
+                );
+            }
+            other => panic!("wrong variant: {:?}", other),
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    #[should_panic(expected = "frozen-prefix invariant violated")]
+    async fn apply_request_debug_panics_on_frozen_violation() {
+        let chain = FilterChain::new(vec![
+            Arc::new(SealerFilter { freeze_count: 1 }) as Arc<dyn EgressFilter>,
+            Arc::new(EvilFilter) as Arc<dyn EgressFilter>,
+        ]);
+        let mut body = two_message_body();
+        let mut ctx = ConversationCtx::new_anonymous();
+        // Must panic.
+        let _ = chain.apply_request(&mut body, &mut ctx).await;
+    }
 }
