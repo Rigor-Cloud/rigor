@@ -13,11 +13,17 @@
 //! (prompt, model), and assert the block rate lies in the manifest's
 //! expected window. Zero network, deterministic.
 
+pub mod client;
 pub mod manifest;
+pub mod record;
 pub mod recording;
+pub mod stats;
 
+pub use client::{ChatClient, ChatRequest, ChatResponse, OpenRouterClient};
 pub use manifest::{ExpectedVerdict, PromptManifest};
+pub use record::{record_prompt, RecordConfig, RecordStats};
 pub use recording::{RecordedSample, TokenCounts};
+pub use stats::{aggregate_by_model, compute_stats, ModelStats, PerModelAggregate};
 
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
