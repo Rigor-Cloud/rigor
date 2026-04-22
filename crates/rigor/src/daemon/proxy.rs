@@ -1921,7 +1921,15 @@ async fn proxy_request(
                                             annotation_note: None,
                                             model: Some(model_bg.clone()),
                                         };
-                                        let _ = logger.log(&entry);
+                                        // Phase 0I dogfood: write through the trait, not the
+                                        // concrete logger.log(). Same behavior today (JSONL impl
+                                        // wraps the sync call), but the daemon is now ready to
+                                        // swap to the Postgres backend in Phase 4D without
+                                        // touching this site.
+                                        let _ = crate::logging::ViolationLogBackend::append(
+                                            &logger, &entry,
+                                        )
+                                        .await;
                                         persisted.push(entry);
                                     }
                                     // Fire alert webhooks (best-effort, non-blocking)
@@ -3298,6 +3306,9 @@ fn extract_and_evaluate_text(
                     annotation_note: None,
                     model: None,
                 };
+                // Sync context (extract_and_evaluate_text is not async).
+                // The trait-based migration lives at the streaming async site above;
+                // this one stays on the inherent sync method for now.
                 let _ = logger.log(&entry);
             }
         }
