@@ -1,0 +1,1 @@
+{"text":"When rigor decides BLOCK, it drops the upstream connection to save tokens","expected_decision":"none","notes":"control claim in same domain that must not trigger block-drops-upstream"}

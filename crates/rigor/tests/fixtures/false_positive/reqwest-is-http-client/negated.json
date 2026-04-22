@@ -1,0 +1,1 @@
+{"text":"reqwest is not a web server; it is an HTTP client used for outgoing requests.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip reqwest-is-http-client"}

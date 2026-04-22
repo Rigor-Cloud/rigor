@@ -1,0 +1,1 @@
+{"text":"Rust uses Result<T, E> for recoverable errors and panic! for unrecoverable ones","expected_decision":"none","notes":"control claim in same domain that must not trigger rust-no-exceptions"}

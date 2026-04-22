@@ -1,0 +1,1 @@
+{"text":"Unlike actix-web which uses actor guards, axum uses tower middleware.","expected_decision":"none","notes":"false-positive probe — comparative scenario must not trip axum-is-tower-based"}

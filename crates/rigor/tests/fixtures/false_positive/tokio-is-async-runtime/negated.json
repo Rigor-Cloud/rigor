@@ -1,0 +1,1 @@
+{"text":"tokio is not a green thread runtime; it does cooperative async scheduling.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip tokio-is-async-runtime"}

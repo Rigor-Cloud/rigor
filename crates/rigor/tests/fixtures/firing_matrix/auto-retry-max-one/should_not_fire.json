@@ -1,0 +1,1 @@
+{"text":"Rigor auto-retries at most once with violation feedback; a second block is surfaced","expected_decision":"none","notes":"control claim in same domain that must not trigger auto-retry-max-one"}

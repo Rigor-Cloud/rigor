@@ -1,0 +1,1 @@
+{"text":"rigor's DF-QuAD fixed-point loop uses BTreeMap for sorted deterministic iteration","expected_decision":"none","notes":"control claim in same domain that must not trigger dfquad-deterministic-iteration"}

@@ -1,0 +1,1 @@
+{"text":"tokio uses green threads with preemptive scheduling like goroutines","expected_decision":"block","notes":"positive probe — claim violates tokio-is-async-runtime pattern"}

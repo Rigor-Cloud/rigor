@@ -1,0 +1,1 @@
+{"text":"rigor's content store uses MD5 hashing for audit trail addressing","expected_decision":"block","notes":"positive probe — claim violates sha2-sha256-content-addressing pattern"}

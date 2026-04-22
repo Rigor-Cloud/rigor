@@ -1,0 +1,1 @@
+{"text":"rigor blocks when computed strength is at least 0.7 and warns at 0.4 or higher","expected_decision":"none","notes":"control claim in same domain that must not trigger severity-thresholds-default"}

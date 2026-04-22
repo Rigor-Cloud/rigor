@@ -1,0 +1,1 @@
+{"text":"regorus does not support http.send or opa.runtime; it is a policy-evaluation subset.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip regorus-capabilities"}

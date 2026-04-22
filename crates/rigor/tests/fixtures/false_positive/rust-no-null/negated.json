@@ -1,0 +1,1 @@
+{"text":"Rust has no null pointers; Option<T> represents optional values.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip rust-no-null"}

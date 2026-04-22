@@ -1,0 +1,1 @@
+{"text":"Rust forbids multiple owners by default; shared ownership requires Rc or Arc.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip rust-ownership"}

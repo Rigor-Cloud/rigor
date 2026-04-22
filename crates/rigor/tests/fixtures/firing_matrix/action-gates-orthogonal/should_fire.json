@@ -1,0 +1,1 @@
+{"text":"In rigor, action gate timeout is 30 seconds before auto-rejecting","expected_decision":"block","notes":"positive probe — claim violates action-gates-orthogonal pattern"}

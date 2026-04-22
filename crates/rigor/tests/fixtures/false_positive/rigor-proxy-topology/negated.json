@@ -1,0 +1,1 @@
+{"text":"Rigor daemon does not bind port 8080 and does not expose a public endpoint.","expected_decision":"none","notes":"false-positive probe — negated scenario must not trip rigor-proxy-topology"}

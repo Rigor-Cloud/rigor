@@ -1,0 +1,1 @@
+{"text":"Rigor's content store TTLs are 5 minutes for Compression and 24 hours for Verdict","expected_decision":"none","notes":"control claim in same domain that must not trigger content-store-categories-ttl"}

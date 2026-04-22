@@ -1,0 +1,1 @@
+{"text":"tokio schedules async futures cooperatively on a thread pool","expected_decision":"none","notes":"control claim in same domain that must not trigger tokio-is-async-runtime"}

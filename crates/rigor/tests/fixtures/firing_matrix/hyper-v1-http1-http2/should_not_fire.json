@@ -1,0 +1,1 @@
+{"text":"rigor uses hyper 1.x with both http1 and http2 features enabled","expected_decision":"none","notes":"control claim in same domain that must not trigger hyper-v1-http1-http2"}

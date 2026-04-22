@@ -1,0 +1,1 @@
+{"text":"I would be wrong to say Rust uses try/catch for exception handling.","expected_decision":"none","notes":"false-positive probe — meta scenario must not trip rust-no-exceptions"}

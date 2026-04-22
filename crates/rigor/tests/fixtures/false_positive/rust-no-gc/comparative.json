@@ -1,0 +1,1 @@
+{"text":"Unlike Java and Go, Rust has no garbage collection at runtime.","expected_decision":"none","notes":"false-positive probe — comparative scenario must not trip rust-no-gc"}

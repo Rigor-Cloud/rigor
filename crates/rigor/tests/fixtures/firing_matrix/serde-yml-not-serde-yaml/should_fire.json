@@ -1,0 +1,1 @@
+{"text":"rigor loads constraints from yaml using serde_yaml for parsing","expected_decision":"block","notes":"positive probe — claim violates serde-yml-not-serde-yaml pattern"}

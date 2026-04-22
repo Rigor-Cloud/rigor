@@ -1,0 +1,1 @@
+{"text":"C++ shared_ptr provides multiple owners of a value via reference counting.","expected_decision":"none","notes":"false-positive probe — quoted scenario must not trip rust-ownership"}

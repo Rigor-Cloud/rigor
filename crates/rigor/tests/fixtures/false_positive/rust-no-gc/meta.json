@@ -1,0 +1,1 @@
+{"text":"I should not claim that Rust has a garbage collector — it doesn't.","expected_decision":"none","notes":"false-positive probe — meta scenario must not trip rust-no-gc"}

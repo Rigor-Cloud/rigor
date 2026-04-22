@@ -1,0 +1,1 @@
+{"text":"Do not claim Rust supports class inheritance — it does not.","expected_decision":"none","notes":"false-positive probe — meta scenario must not trip rust-no-inheritance"}

@@ -1,0 +1,1 @@
+{"text":"Unlike Java, where subclass extends superclass, Rust uses traits and composition.","expected_decision":"none","notes":"false-positive probe — comparative scenario must not trip rust-no-inheritance"}

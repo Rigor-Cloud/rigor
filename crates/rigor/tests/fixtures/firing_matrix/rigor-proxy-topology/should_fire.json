@@ -1,0 +1,1 @@
+{"text":"The rigor daemon runs on port 8080 and exposes a public HTTP endpoint","expected_decision":"block","notes":"positive probe — claim violates rigor-proxy-topology pattern"}

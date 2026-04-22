@@ -1,0 +1,1 @@
+{"text":"rigor uses rustls with the aws-lc-rs cryptographic backend for TLS","expected_decision":"block","notes":"positive probe — claim violates rustls-ring-backend pattern"}

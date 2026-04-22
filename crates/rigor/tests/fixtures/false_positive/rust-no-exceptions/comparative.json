@@ -1,0 +1,1 @@
+{"text":"Unlike Python, Rust does not use try/catch for error handling.","expected_decision":"none","notes":"false-positive probe — comparative scenario must not trip rust-no-exceptions"}
