@@ -28,19 +28,20 @@ status: active
 
 ### Workstream: phase-0-close
 
-#### Phase 1: PR-3 — frozen-prefix invariant (0F) + wire FilterChain into response path (0G)
+#### Phase 1: PR-3 — frozen-prefix invariant (0F) + wire FilterChain into response path (0G) ✓ COMPLETE 2026-04-23
 **Goal:** Land frozen-prefix invariant over the egress request-body messages array; wire the FilterChain into the proxy response path so egress filters run on streamed chunks. Unblocks Phase 1B CCR annotation emission and Phase 3A retroactive annotation.
 **Issue:** #18
 **Depends on:** none
-**Requirements:** REQ-001, REQ-002, REQ-003, REQ-004, REQ-005
+**Requirements:** REQ-001, REQ-002, REQ-003, REQ-004, REQ-005 (all verified, 14/14 must-haves)
 **Workstream:** phase-0-close
 **Canonical spec:** `.planning/roadmap/epistemic-expansion-plan.md` sections 0F, 0G
-**Plans:** 5 plans
-- [ ] 01-01-PLAN.md — frozen.rs module + twox-hash dep + 7 unit tests (TDD, wave 1)
-- [ ] 01-02-PLAN.md — wire verify_frozen_prefix into FilterChain::apply_request (wave 2)
-- [ ] 01-03-PLAN.md — wire FilterChain response methods into proxy.rs SSE loop + OTel span (wave 2)
-- [ ] 01-04-PLAN.md — integration tests + full regression + 53-constraint acceptance check (wave 3)
-- [ ] 01-05-BENCH.md — criterion baselines for compute_checksum + response-chain overhead (wave 3, parallel with 04)
+**Verification:** `.planning/phases/01-pr-3-frozen-prefix-invariant-0f-wire-filterchain-into-respon/01-VERIFICATION.md`
+**Plans:** 5 plans (all complete)
+- [x] 01-01-PLAN.md — frozen.rs module + twox-hash dep + 8 unit tests (TDD, wave 1)
+- [x] 01-02-PLAN.md — wire verify_frozen_prefix into FilterChain::apply_request (wave 2)
+- [x] 01-03-PLAN.md — wire FilterChain response methods into proxy.rs SSE loop + OTel span (wave 2)
+- [x] 01-04-PLAN.md — integration tests + full regression + 53-constraint acceptance check (wave 3)
+- [x] 01-05-PLAN.md — criterion baselines for compute_checksum + response-chain overhead (wave 3, parallel with 04)
 
 #### Phase 2: PR-4 — corpus exporter (`rigor refine export`)
 **Goal:** `rigor refine export` emits training-ready JSONL from the violation log. Unblocks Phase 3E GEPA prompt optimization and Phase 4E Modal discriminator training.
