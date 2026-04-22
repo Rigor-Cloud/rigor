@@ -87,3 +87,7 @@ harness = false
 [[bench]]
 name = "dfquad_scaling"
 harness = false
+
+[[bench]]
+name = "filter_chain_overhead"
+harness = false
