@@ -2682,6 +2682,20 @@ dependencies = [
 [[package]]
 name = "rigor-harness"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum 0.8.8",
+ "bytes",
+ "futures-util",
+ "rcgen",
+ "reqwest",
+ "rustls",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+]
 
 [[package]]
 name = "rigor-test"

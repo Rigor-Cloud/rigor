@@ -1,8 +1,15 @@
 //! Test harness primitives for rigor.
 //!
-//! D.1 ships an empty but buildable crate. Primitives (MockAgent, MockLLM,
-//! TestDaemon, TestGitRepo, MockLSP, EventCapture, fault enums, fixture
-//! loader) are added in Plan D.3.
-//!
-//! See `docs/superpowers/specs/2026-04-15-test-harness-architecture-design.md`
-//! for the full specification.
+//! Provides IsolatedHome, TestCA, MockLlmServer, and SSE helpers
+//! for integration testing without touching real `~/.rigor/` or
+//! requiring live LLM API credentials.
+
+pub mod home;
+pub mod ca;
+pub mod mock_llm;
+pub mod sse;
+
+pub use home::IsolatedHome;
+pub use ca::TestCA;
+pub use mock_llm::{MockLlmServer, MockLlmServerBuilder};
+pub use sse::{SseFormat, parse_sse_events, extract_text_from_sse};
