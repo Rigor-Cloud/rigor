@@ -84,15 +84,15 @@ status: active
 
 ### Workstream: test-infra
 
-#### Phase 7: crates/rigor/tests/ integration test infrastructure
+#### Phase 7: crates/rigor/tests/ integration test infrastructure ✓ COMPLETE 2026-04-24
 **Goal:** Stand up real-TCP, rustls, SSE, `$HOME` isolation harness as a shared library. Precondition for Phases 9–12.
 **Issue:** #8
 **Depends on:** none
 **Requirements:** REQ-015, REQ-016, REQ-017
 **Workstream:** test-infra
-**Plans:** 2 plans
+**Plans:** 2 plans (all complete)
 - [x] 07-01-PLAN.md — IsolatedHome, TestCA, MockLlmServer, SSE helpers (wave 1)
-- [ ] 07-02-PLAN.md — TestProxy, subprocess helpers, smoke integration test (wave 2)
+- [x] 07-02-PLAN.md — TestProxy, subprocess helpers, smoke integration test (wave 2)
 
 #### Phase 8: `$HOME/.rigor` test isolation
 **Goal:** Tests must not touch the real `$HOME/.rigor` (PID file, CA cert, violations log). Use `TempDir` fixtures.

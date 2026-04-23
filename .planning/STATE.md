@@ -4,26 +4,26 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: N/A
-last_updated: "2026-04-23T22:44:00.234Z"
-last_activity: 2026-04-23
+last_updated: "2026-04-23T22:52:42Z"
+last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 07-crates-rigor-tests-integration-test-infrastructure — EXECUTING
+Phase: 07-crates-rigor-tests-integration-test-infrastructure — COMPLETE
 Plan: 2 of 2
-**Status:** Plan 07-01 complete, ready for Plan 07-02
-**Last Completed Phase:** 01 — PR-3 frozen-prefix invariant + FilterChain response wiring (#18)
+**Status:** Phase 7 complete (all 2 plans done)
+**Last Completed Phase:** 07 — Integration test infrastructure (rigor-harness crate)
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 07-01: core harness primitives (IsolatedHome, TestCA, MockLlmServer, SSE helpers)
+**Last Activity Description:** Completed 07-02: TestProxy, subprocess helpers, smoke tests (all 25 tests passing)
 
 ## Milestone Overview
 
@@ -36,7 +36,7 @@ Plan: 2 of 2
 
 **Phases Complete:** 1 / 21 (Phase 1)
 **Plans Complete:** 5 / 5 for Phase 1
-**Phase 7 Progress:** 1 / 2 plans complete
+**Phase 7 Progress:** 2 / 2 plans complete
 
 ## Active Workstream
 
@@ -56,10 +56,12 @@ Plan: 2 of 2
 - No global env mutation: IsolatedHome uses Command::env() only, never std::env::set_var
 - TestCA is purely in-memory, follows production rcgen pattern but skips persistence
 - SSE chunk generation lives in sse.rs, shared by MockLlmServer and test assertions
+- TestProxy uses spawn_blocking + env save/restore for HOME isolation during DaemonState::load
+- Subprocess helpers use runtime binary discovery (not compile-time env! macro) since rigor-harness is a library
 
 ## Session Continuity
 
-**Stopped At:** Completed 07-01-PLAN.md
-**Resume File:** .planning/phases/07-crates-rigor-tests-integration-test-infrastructure/07-02-PLAN.md
+**Stopped At:** Completed 07-02-PLAN.md (Phase 7 complete)
+**Resume File:** None (Phase 7 fully complete)
 
 **Planned Phase:** 7 (crates/rigor/tests/ integration test infrastructure) — 2 plans — 2026-04-23T22:35:34.378Z
