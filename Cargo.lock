@@ -2656,6 +2656,7 @@ dependencies = [
  "regex",
  "regorus",
  "reqwest",
+ "rigor-harness",
  "rust-embed",
  "rustls",
  "sanitize-pii",
