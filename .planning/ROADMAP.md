@@ -90,6 +90,9 @@ status: active
 **Depends on:** none
 **Requirements:** REQ-015, REQ-016, REQ-017
 **Workstream:** test-infra
+**Plans:** 2 plans
+- [ ] 07-01-PLAN.md — IsolatedHome, TestCA, MockLlmServer, SSE helpers (wave 1)
+- [ ] 07-02-PLAN.md — TestProxy, subprocess helpers, smoke integration test (wave 2)
 
 #### Phase 8: `$HOME/.rigor` test isolation
 **Goal:** Tests must not touch the real `$HOME/.rigor` (PID file, CA cert, violations log). Use `TempDir` fixtures.
