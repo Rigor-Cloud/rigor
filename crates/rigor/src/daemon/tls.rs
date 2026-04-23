@@ -17,17 +17,11 @@ use rustls::ServerConfig;
 
 /// Paths for the CA cert and key.
 fn ca_cert_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".rigor")
-        .join("ca.pem")
+    crate::paths::rigor_home().join("ca.pem")
 }
 
 fn ca_key_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".rigor")
-        .join("ca-key.pem")
+    crate::paths::rigor_home().join("ca-key.pem")
 }
 
 /// The rigor CA — generates and caches per-host TLS certificates.
@@ -196,7 +190,7 @@ pub fn install_ca_trust() -> Result<()> {
             "-k",
             &format!(
                 "{}/Library/Keychains/login.keychain-db",
-                dirs::home_dir().unwrap_or_default().display()
+                dirs::home_dir().unwrap_or_default().display() // rigor-home-ok
             ),
             &cert_path.to_string_lossy(),
         ])

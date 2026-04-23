@@ -10,9 +10,7 @@ use tracing_subscriber::EnvFilter;
 /// Gracefully degrades if OTEL collector not configured.
 pub fn init_tracing() -> Result<()> {
     // Ensure log directory exists
-    let log_dir = dirs::home_dir()
-        .map(|h| h.join(".rigor"))
-        .unwrap_or_else(|| std::path::PathBuf::from(".rigor"));
+    let log_dir = crate::paths::rigor_home();
     fs::create_dir_all(&log_dir)?;
 
     let log_path = log_dir.join("rigor.log");

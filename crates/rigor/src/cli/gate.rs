@@ -513,7 +513,7 @@ pub fn hook_status() -> Result<()> {
 }
 
 fn claude_settings_path() -> Result<PathBuf> {
-    let home = std::env::var("HOME")?;
+    let home = std::env::var("HOME")?; // rigor-home-ok
     Ok(PathBuf::from(home).join(".claude").join("settings.json"))
 }
 

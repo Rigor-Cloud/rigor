@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -66,8 +66,7 @@ pub struct MemoryStore {
 
 impl MemoryStore {
     pub fn path() -> Result<PathBuf> {
-        let home = dirs::home_dir().context("Failed to get home directory")?;
-        let dir = home.join(".rigor");
+        let dir = crate::paths::rigor_home();
         fs::create_dir_all(&dir).ok();
         Ok(dir.join("memory.json"))
     }

@@ -11,8 +11,7 @@ use anyhow::Result;
 ///   judge.api_url   — Base URL for judge API (default: https://openrouter.ai/api)
 ///   judge.model     — Model for judge calls (default: anthropic/claude-sonnet-4-6)
 fn config_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".rigor").join("config")
+    crate::paths::rigor_home().join("config")
 }
 
 fn load_config() -> HashMap<String, String> {

@@ -42,8 +42,7 @@ pub struct RefinementHistoryEntry {
 }
 
 fn rigor_dir() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("Failed to get home directory")?;
-    let dir = home.join(".rigor");
+    let dir = crate::paths::rigor_home();
     fs::create_dir_all(&dir).ok();
     Ok(dir)
 }

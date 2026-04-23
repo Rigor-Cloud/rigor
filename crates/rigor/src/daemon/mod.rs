@@ -22,7 +22,7 @@ use axum::Router;
 /// this file + a `kill(pid, 0)` liveness test to decide whether to run at all.
 /// When no rigor-personal daemon is alive, hooks short-circuit to no-op.
 pub fn daemon_pid_file() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".rigor/daemon.pid"))
+    Some(crate::paths::rigor_home().join("daemon.pid"))
 }
 
 /// Write the current process PID to `~/.rigor/daemon.pid`. Called once at the

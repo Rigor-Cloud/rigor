@@ -60,8 +60,7 @@ fn default_threshold() -> usize {
 
 /// Path to `~/.rigor/alerts.json`.
 pub fn alerts_path() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("Failed to get home directory")?;
-    let dir = home.join(".rigor");
+    let dir = crate::paths::rigor_home();
     fs::create_dir_all(&dir).ok();
     Ok(dir.join("alerts.json"))
 }

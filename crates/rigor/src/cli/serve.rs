@@ -27,7 +27,7 @@ use crate::logging::session_registry::{self, SessionEntry};
 /// (which is shared by ground/daemon modes) so that `rigor serve stop` only
 /// ever kills a serve-mode daemon and never a `rigor ground` child.
 pub fn serve_pid_file() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".rigor/serve.pid"))
+    Some(crate::paths::rigor_home().join("serve.pid"))
 }
 
 fn write_serve_pid(pid: u32) -> Result<()> {
@@ -139,9 +139,7 @@ fn run_background(path: Option<PathBuf>, port: u16, name: Option<String>) -> Res
     let exe = std::env::current_exe().context("cannot locate rigor binary for re-exec")?;
 
     // Log file for the background daemon. Users can `tail -f` this.
-    let log_path = dirs::home_dir()
-        .map(|h| h.join(".rigor/serve.log"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/rigor-serve.log"));
+    let log_path = crate::paths::rigor_home().join("serve.log");
     if let Some(parent) = log_path.parent() {
         std::fs::create_dir_all(parent).ok();
     }
