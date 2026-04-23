@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: N/A
-last_updated: "2026-04-23T22:52:42Z"
+status: executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-23T23:55:19.362Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
-  percent: 14
+  completed_phases: 2
+  total_plans: 9
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 ## Current Position
 
 Phase: 8
-Plan: Not started
-**Status:** Ready to plan
+Plan: 1 of 2 complete
+**Status:** Executing
 **Last Completed Phase:** 07 — Integration test infrastructure (rigor-harness crate)
-**Last Activity:** 2026-04-23
-**Last Activity Description:** Completed 07-02: TestProxy, subprocess helpers, smoke tests (all 25 tests passing)
+**Last Activity:** 2026-04-24
+**Last Activity Description:** Completed 08-01: rigor_home() indirection + 17 call site replacements + 4 Category B annotations
 
 ## Milestone Overview
 
@@ -58,10 +58,14 @@ Plan: Not started
 - SSE chunk generation lives in sse.rs, shared by MockLlmServer and test assertions
 - TestProxy uses spawn_blocking + env save/restore for HOME isolation during DaemonState::load
 - Subprocess helpers use runtime binary discovery (not compile-time env! macro) since rigor-harness is a library
+- rigor_home() panics on failure rather than returning Result to avoid cascading signature changes
+- Option<PathBuf> return types preserved with Some(rigor_home()...) wrapping to minimize caller changes
+- Category B HOME usages annotated with // rigor-home-ok for CI grep guard allowlisting
+- rigor_home() panics on failure rather than returning Result to avoid cascading signature changes
 
 ## Session Continuity
 
-**Stopped At:** Completed 07-02-PLAN.md (Phase 7 complete)
-**Resume File:** None (Phase 7 fully complete)
+**Stopped At:** Completed 08-01-PLAN.md
+**Resume File:** .planning/phases/08-home-rigor-test-isolation/08-02-PLAN.md
 
-**Planned Phase:** 7 (crates/rigor/tests/ integration test infrastructure) — 2 plans — 2026-04-23T22:35:34.378Z
+**Planned Phase:** 8 ($HOME/.rigor test isolation) — 2 plans — 2026-04-24
