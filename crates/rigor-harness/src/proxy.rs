@@ -6,6 +6,7 @@ use tokio::sync::oneshot;
 /// A test proxy wrapping the production `build_router` + `DaemonState` on an ephemeral port.
 ///
 /// Uses `IsolatedHome` so `DaemonState::load` never touches real `~/.rigor/`.
+/// Sets `RIGOR_HOME` (not `HOME`) to the isolated `.rigor/` directory.
 /// Shuts down cleanly on Drop via a oneshot channel.
 pub struct TestProxy {
     addr: SocketAddr,
@@ -21,30 +22,30 @@ impl TestProxy {
     /// with HOME pointed at the isolated directory, and binds the production router
     /// to an ephemeral port.
     ///
-    /// HOME isolation: Uses `tokio::task::spawn_blocking` to temporarily set HOME
-    /// for the `DaemonState::load` call (which internally calls `RigorCA::load_or_generate`
-    /// and `judge_config`, both of which read HOME).
+    /// RIGOR_HOME isolation: Uses `tokio::task::spawn_blocking` to temporarily set
+    /// RIGOR_HOME for the `DaemonState::load` call (which internally calls
+    /// `rigor_home()` via `RigorCA::load_or_generate` and `judge_config`).
     pub async fn start(rigor_yaml: &str) -> Self {
         let home = IsolatedHome::new();
         let yaml_path = home.write_rigor_yaml(rigor_yaml);
-        let home_str = home.home_str();
+        let rigor_home_str = home.rigor_dir_str();
 
         let (event_tx, _event_rx) = rigor::daemon::ws::create_event_channel();
 
         let state = {
             let yaml_path = yaml_path.clone();
             let event_tx = event_tx.clone();
-            let home_str = home_str.clone();
+            let rigor_home_str = rigor_home_str.clone();
             tokio::task::spawn_blocking(move || {
-                let original_home = std::env::var("HOME").ok();
-                // Safety: spawn_blocking runs on a dedicated thread. The HOME mutation
+                let original_rigor_home = std::env::var("RIGOR_HOME").ok();
+                // Safety: spawn_blocking runs on a dedicated thread. The RIGOR_HOME mutation
                 // is scoped to this closure and restored immediately after DaemonState::load.
-                unsafe { std::env::set_var("HOME", &home_str) };
+                unsafe { std::env::set_var("RIGOR_HOME", &rigor_home_str) };
                 let result = rigor::daemon::DaemonState::load(yaml_path, event_tx);
-                // Restore original HOME
-                match original_home {
-                    Some(h) => unsafe { std::env::set_var("HOME", h) },
-                    None => unsafe { std::env::remove_var("HOME") },
+                // Restore original RIGOR_HOME
+                match original_rigor_home {
+                    Some(h) => unsafe { std::env::set_var("RIGOR_HOME", h) },
+                    None => unsafe { std::env::remove_var("RIGOR_HOME") },
                 }
                 result.expect("DaemonState::load failed in TestProxy")
             })
@@ -86,7 +87,7 @@ impl TestProxy {
     pub async fn start_with_mock(rigor_yaml: &str, mock_url: &str) -> Self {
         let home = IsolatedHome::new();
         let yaml_path = home.write_rigor_yaml(rigor_yaml);
-        let home_str = home.home_str();
+        let rigor_home_str = home.rigor_dir_str();
         let mock_url = mock_url.to_string();
 
         let (event_tx, _event_rx) = rigor::daemon::ws::create_event_channel();
@@ -94,20 +95,20 @@ impl TestProxy {
         let state = {
             let yaml_path = yaml_path.clone();
             let event_tx = event_tx.clone();
-            let home_str = home_str.clone();
+            let rigor_home_str = rigor_home_str.clone();
             let mock_url = mock_url.clone();
             tokio::task::spawn_blocking(move || {
-                let original_home = std::env::var("HOME").ok();
+                let original_rigor_home = std::env::var("RIGOR_HOME").ok();
                 let original_target = std::env::var("RIGOR_TARGET_API").ok();
                 unsafe {
-                    std::env::set_var("HOME", &home_str);
+                    std::env::set_var("RIGOR_HOME", &rigor_home_str);
                     std::env::set_var("RIGOR_TARGET_API", &mock_url);
                 };
                 let result = rigor::daemon::DaemonState::load(yaml_path, event_tx);
                 // Restore original env
-                match original_home {
-                    Some(h) => unsafe { std::env::set_var("HOME", h) },
-                    None => unsafe { std::env::remove_var("HOME") },
+                match original_rigor_home {
+                    Some(h) => unsafe { std::env::set_var("RIGOR_HOME", h) },
+                    None => unsafe { std::env::remove_var("RIGOR_HOME") },
                 }
                 match original_target {
                     Some(t) => unsafe { std::env::set_var("RIGOR_TARGET_API", t) },
