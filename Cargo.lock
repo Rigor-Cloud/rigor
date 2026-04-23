@@ -2689,6 +2689,7 @@ dependencies = [
  "futures-util",
  "rcgen",
  "reqwest",
+ "rigor",
  "rustls",
  "serde_json",
  "tempfile",
