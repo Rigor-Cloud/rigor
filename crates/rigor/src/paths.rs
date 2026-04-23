@@ -9,7 +9,14 @@ use std::path::PathBuf;
 /// Panics if neither is available. In practice, HOME is always set on
 /// macOS and Linux; RIGOR_HOME is set by test fixtures.
 pub fn rigor_home() -> PathBuf {
-    todo!("implement after RED tests")
+    if let Ok(val) = std::env::var("RIGOR_HOME") {
+        if !val.is_empty() {
+            return PathBuf::from(val);
+        }
+    }
+    dirs::home_dir()
+        .expect("Cannot determine home directory (set RIGOR_HOME or HOME)")
+        .join(".rigor")
 }
 
 #[cfg(test)]
