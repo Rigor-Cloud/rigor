@@ -155,7 +155,7 @@ fn test_dogfood_regorus_subset() {
     let temp = setup_production_config();
     let claims = json!([{
         "id": "c1",
-        "text": "regorus supports streaming evaluation and hot reload watch mode",
+        "text": "regorus supports http.send for outbound HTTP calls from Rego policies",
         "confidence": 0.9,
         "claim_type": "assertion"
     }]);

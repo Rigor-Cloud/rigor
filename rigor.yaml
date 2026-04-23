@@ -50,7 +50,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(garbage.collect|\bgc\b|tracing.gc|mark.sweep|reference.count)`, c.text)
+          regex.match(`(?i)\brust\b[^.!?\n]{0,120}?\b(uses?|has|have|features?|requires?|includes?|provides?|relies on|comes with|is|are|implements?|contains?|calls?|claims?|declares?|supports?|ships?|builds? on|built on|based on|depends on)\b[^.!?\n]{0,120}?(garbage[ -]?collect|tracing[ -]?gc|mark[ -]?sweep|reference[ -]?count)`, c.text)
           not regex.match(`(?i)(no gc|no garbage|doesn.t have|does not have|lacks|without|should not claim|wrong to (say|claim)|not true)`, c.text)
           v := {
             "constraint_id": "rust-no-gc",
@@ -78,7 +78,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(null pointer|null reference|nil\b|nullptr|NullPointerException)`, c.text)
+          regex.match(`(?i)\brust\b[^.!?\n]{0,120}?\b(uses?|has|have|features?|requires?|includes?|provides?|relies on|comes with|is|are|implements?|contains?|calls?|claims?|declares?|supports?|ships?|builds? on|built on|based on|depends on)\b[^.!?\n]{0,120}?(null pointer|null reference|\bnil\b|nullptr|NullPointerException)`, c.text)
           not regex.match(`(?i)(no null|doesn.t have null|does not have null|Option|None|pre.1\.0|before 1\.0|in rust.s history|historically|removed before)`, c.text)
           v := {
             "constraint_id": "rust-no-null",
@@ -106,7 +106,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(try.catch|throw|exception|except|catch.block)`, c.text)
+          regex.match(`(?i)\brust\b[^.!?\n]{0,120}?\b(uses?|has|have|features?|requires?|includes?|provides?|relies on|comes with|is|are|implements?|contains?|calls?|claims?|declares?|supports?|ships?|builds? on|built on|based on|depends on)\b[^.!?\n]{0,120}?(try[ -]?catch|throws?|exceptions?|\bexcept\b|catch[ -]?block)`, c.text)
           not regex.match(`(?i)(no exception|doesn.t have|does not (have|use)|Result|panic|should not claim|wrong to (say|claim)|would be wrong|not true)`, c.text)
           v := {
             "constraint_id": "rust-no-exceptions",
@@ -134,7 +134,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(class inheritance|class.*inherit|extends|superclass|subclass|override method)`, c.text)
+          regex.match(`(?i)\brust\b[^.!?\n]{0,120}?\b(uses?|has|have|features?|requires?|includes?|provides?|relies on|comes with|is|are|implements?|contains?|calls?|claims?|declares?|supports?|ships?|builds? on|built on|based on|depends on)\b[^.!?\n]{0,120}?(class inheritance|class[^\n]{0,40}?inherit|\bextends\b|superclass|subclass|override method)`, c.text)
           not regex.match(`(?i)(no class|no inherit|trait|doesn.t have|does not (have|support)|composition|do not claim|should not claim|wrong to (say|claim)|not true that)`, c.text)
           v := {
             "constraint_id": "rust-no-inheritance",
@@ -162,7 +162,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rust.*(multiple owners|shared ownership|no ownership|copy by default)`, c.text)
+          regex.match(`(?i)\brust\b[^.!?\n]{0,120}?\b(uses?|has|have|features?|requires?|includes?|provides?|relies on|comes with|is|are|implements?|contains?|calls?|claims?|declares?|supports?|ships?|builds? on|built on|based on|depends on)\b[^.!?\n]{0,120}?(multiple owners|shared ownership|no ownership|copy by default)`, c.text)
           not regex.match(`(?i)(Rc|Arc|Clone|shared_ptr)`, c.text)
           v := {
             "constraint_id": "rust-ownership",
@@ -194,8 +194,9 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)regorus.*(supports|provides|enables|can|capable|has)`, c.text)
+          regex.match(`(?i)\bregorus\b[^.!?\n]{0,120}?\b(supports?|provides?|enables?|can|capable|has|have|features?|includes?|implements?)\b[^.!?\n]{0,120}?(http\.send|opa\.runtime|net\.cidr|net\.lookup|crypto\.hmac|full OPA|all of OPA|complete OPA|\bnetwork\b|\bruntime\b built-?ins?)`, c.text)
           regex.match(`(?i)(streaming|async|parallel|hot.reload|watch.mode|interactive|IDE|http\.send|opa\.runtime|net\.cidr)`, c.text)
+          not regex.match(`(?i)(does not|doesn.t|cannot|can.t|lacks|without|no support|not supported|is a subset|policy.evaluation subset|limited to|restricted to)`, c.text)
           v := {
             "constraint_id": "regorus-capabilities",
             "violated": true,
@@ -224,7 +225,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)tokio.*(green.thread|preemptive|os.thread|fiber|goroutine)`, c.text)
+          regex.match(`(?i)\btokio\b[^.!?\n]{0,120}?\b(uses?|has|have|features?|requires?|includes?|provides?|relies on|comes with|is|are|implements?|contains?|calls?|claims?|declares?|supports?|ships?|builds? on|built on|based on|depends on)\b[^.!?\n]{0,120}?(green[ -]?thread|preemptive|os[ -]?thread|\bfibers?\b|goroutines?)`, c.text)
           not regex.match(`(?i)(not|isn.t|doesn.t|unlike)`, c.text)
           v := {
             "constraint_id": "tokio-is-async-runtime",
@@ -252,7 +253,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)axum.*(actix|rocket|warp|tide)`, c.text)
+          regex.match(`(?i)\baxum\b[^.!?\n]{0,120}?\b(is built on|is based on|uses?|wraps?|replaces?|extends|forks?|derives from|built on|based on)\b[^.!?\n]{0,120}?(actix|rocket|warp|tide)`, c.text)
           regex.match(`(?i)(uses|built.on|based.on|wraps|powered.by)`, c.text)
           not regex.match(`(?i)(not built on|not based on|unlike|tower|hyper|is not)`, c.text)
           v := {
@@ -281,7 +282,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)reqwest.*(server|framework|listen|bind|route|handler)`, c.text)
+          regex.match(`(?i)\breqwest\b[^.!?\n]{0,120}?\b(uses?|has|have|features?|requires?|includes?|provides?|relies on|comes with|is|are|implements?|contains?|calls?|claims?|declares?|supports?|ships?|builds? on|built on|based on|depends on)\b[^.!?\n]{0,120}?(\bserver\b|framework|listens?|binds? port|\broutes?\b|\bhandlers?\b)`, c.text)
           not regex.match(`(?i)(client|request|send|get|post)`, c.text)
           v := {
             "constraint_id": "reqwest-is-http-client",
@@ -309,7 +310,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*(rustls|tls).*(aws.lc|openssl|boringssl|native.tls)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?(rustls|tls)[^.!?\n]{0,120}?\b(uses?|has|requires?|relies on|ships with|is backed by|built on|depends on|with|via)\b[^.!?\n]{0,120}?(aws[ -]?lc|openssl|boringssl|native[ -]?tls)`, c.text)
           v := {
             "constraint_id": "rustls-ring-backend",
             "violated": true,
@@ -353,7 +354,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*(hyper).*(0\.14|0\.15|legacy|hyper-util only)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?\bhyper\b[^.!?\n]{0,80}?(0\.14|0\.15|\blegacy\b|hyper-util only)`, c.text)
           v := {
             "constraint_id": "hyper-v1-http1-http2",
             "violated": true,
@@ -380,7 +381,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*(content.store|audit.trail|hash).*(sha.?1|md5|blake2|blake3|sha512)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?(content[ -]?store|audit[ -]?trail|\bhash\b)[^.!?\n]{0,120}?\b(uses?|is|with|via|by|keyed by|addressed by)\b[^.!?\n]{0,120}?(sha[ -]?1|md5|blake2|blake3|sha512)`, c.text)
           v := {
             "constraint_id": "sha2-sha256-content-addressing",
             "violated": true,
@@ -441,7 +442,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*(yaml|configuration|constraints).*(serde_yaml|serde-yaml)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?(yaml|configuration|constraints?)[^.!?\n]{0,120}?\b(uses?|via|with|reads through|deserializes through|parses via|parses? with|loads? (via|with|using|through)|using)\b[^.!?\n]{0,120}?(serde_yaml|serde-yaml)`, c.text)
           not regex.match(`(?i)(serde_yml|not serde_yaml|deprecated)`, c.text)
           v := {
             "constraint_id": "serde-yml-not-serde-yaml",
@@ -589,7 +590,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)RIGOR_FAIL_CLOSED.*(is the default|always on|required|automatic|enabled by default)`, c.text)
+          regex.match(`(?i)\bRIGOR_FAIL_CLOSED\b[^.!?\n]{0,120}?\b(is|are|becomes|gets|means|implies)\b[^.!?\n]{0,120}?(the default|always on|required|automatic|enabled by default)`, c.text)
           not regex.match(`(?i)(fail.open is the default|opt.in|must be.*set|not the default)`, c.text)
           v := {
             "constraint_id": "rigor-env-vars-semantics",
@@ -672,7 +673,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)(dfquad|rigor.graph|argumentation.graph).*(hashmap|random iteration|nondetermin)`, c.text)
+          regex.match(`(?i)\b(dfquad|rigor[ -]?graph|argumentation[ -]?graph)\b[^.!?\n]{0,120}?\b(uses?|is|with|via|backed by|iterates via)\b[^.!?\n]{0,120}?(hashmap|random iteration|nondetermin)`, c.text)
           v := {
             "constraint_id": "dfquad-deterministic-iteration",
             "violated": true,
@@ -720,7 +721,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)(belief|justification|defeater).*base.(strength|weight)`, c.text)
+          regex.match(`(?i)\b(belief|justification|defeater)\b[^.!?\n]{0,120}?\bbase[ -]?(strength|weight)\b[^.!?\n]{0,120}?\b(is|are|equals?|=|set to|defaults? to|has|value)\b`, c.text)
           not regex.match(`(?i)(0\.8|0\.9|0\.7|zero.point)`, c.text)
           v := {
             "constraint_id": "epistemic-base-strengths",
@@ -748,7 +749,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)(block|block.threshold).*(0\.5|0\.6|0\.8|0\.9|strictly.greater)`, c.text)
+          regex.match(`(?i)\b(block|block[ -]?threshold)\b[^.!?\n]{0,120}?\b(is|set to|at|equals?|defaults? to|has)\b[^.!?\n]{0,120}?(0\.5|0\.6|0\.8|0\.9|strictly greater)`, c.text)
           regex.match(`(?i)rigor`, c.text)
           v := {
             "constraint_id": "severity-thresholds-default",
@@ -885,7 +886,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*(daemon|proxy).*port.*(8080|9000|443 on|public)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?(daemon|proxy)[^.!?\n]{0,120}?\b(is|are|at|on|listens? on|binds?|runs on|runs at|exposes?|serves? on)\b[^.!?\n]{0,120}?(\bport\b[^.!?\n]{0,40}?)?(8080|9000|443|\bpublic\b)`, c.text)
           not regex.match(`(?i)(does not bind|doesn.t bind|not.*port 8080|not.*public|127\.0\.0\.1:8787|loopback)`, c.text)
           v := {
             "constraint_id": "rigor-proxy-topology",
@@ -930,7 +931,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*block.*(finish|complete|drain|wait for.stream)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?\bblocks?\b[^.!?\n]{0,120}?\b(finish(es|ed)?|completes?|drains?|waits? for[ -]?stream|allows? to finish)\b`, c.text)
           v := {
             "constraint_id": "block-drops-upstream",
             "violated": true,
@@ -1004,7 +1005,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*(protects|intercepts|blocks|catches|enforces).*(all|every|any).*(LLM|API|claude|openai|call)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?\b(protects?|intercepts?|blocks?|catches|enforces?)\b[^.!?\n]{0,120}?\b(all|every|any)\b[^.!?\n]{0,120}?(LLM|API|claude|openai|calls?)`, c.text)
           not regex.match(`(?i)(ground|HTTPS_PROXY|routed|trust|opt.in|requires|configured)`, c.text)
           v := {
             "constraint_id": "enforcement-requires-traffic-routing",
@@ -1074,7 +1075,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)(compression|verdict)(.store)?.*(1.hour|one.hour|permanent|no.ttl|never.expir|persistent|forever)`, c.text)
+          regex.match(`(?i)\b(compression|verdict)[ -]?(store)?\b[^.!?\n]{0,120}?\b(has|uses?|is|with|ttl|for|at|set to|caches? for)\b[^.!?\n]{0,120}?(1[ -]?hour|one[ -]?hour|permanent|no[ -]?ttl|never expires?|persistent|forever)`, c.text)
           v := {
             "constraint_id": "content-store-categories-ttl",
             "violated": true,
@@ -1122,7 +1123,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*gate.*(timeout|expires).*(30|120|300) (second|s\b)`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?\bgates?\b[^.!?\n]{0,120}?\b(timeout|expires?)\b[^.!?\n]{0,80}?\b(30|120|300) (second|s\b)`, c.text)
           v := {
             "constraint_id": "action-gates-orthogonal",
             "violated": true,
@@ -1170,7 +1171,7 @@ constraints:
       rego: |
         violation contains v if {
           some c in input.claims
-          regex.match(`(?i)rigor.*retr(y|ies).*\b(2|3|5|10|unbound|multiple|infinite|cascading|several)\b`, c.text)
+          regex.match(`(?i)\brigor\b[^.!?\n]{0,120}?\bretr(y|ies)\b[^.!?\n]{0,120}?\b(up to|max|maximum|does|supports?|allows?|can|retries?)?\b[^.!?\n]{0,80}?\b(2|3|5|10|unbound|multiple|infinite|cascading|several)\b`, c.text)
           not regex.match(`(?i)(max 1|at most once|exactly one|only one|capped at 1|never retr)`, c.text)
           v := {
             "constraint_id": "auto-retry-max-one",
