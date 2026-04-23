@@ -91,7 +91,7 @@ status: active
 **Requirements:** REQ-015, REQ-016, REQ-017
 **Workstream:** test-infra
 **Plans:** 2 plans
-- [ ] 07-01-PLAN.md — IsolatedHome, TestCA, MockLlmServer, SSE helpers (wave 1)
+- [x] 07-01-PLAN.md — IsolatedHome, TestCA, MockLlmServer, SSE helpers (wave 1)
 - [ ] 07-02-PLAN.md — TestProxy, subprocess helpers, smoke integration test (wave 2)
 
 #### Phase 8: `$HOME/.rigor` test isolation
