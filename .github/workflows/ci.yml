@@ -78,6 +78,23 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: Guard against raw HOME for .rigor paths
+        run: |
+          # All .rigor/ path resolution must go through crate::paths::rigor_home().
+          # Category B sites (non-.rigor HOME usage) are allowlisted with '// rigor-home-ok'.
+          VIOLATIONS=$(grep -rn 'dirs::home_dir\|env::var("HOME")\|env::var_os("HOME")' \
+            crates/rigor/src/ \
+            --include='*.rs' \
+            | grep -v 'src/paths.rs' \
+            | grep -v 'rigor-home-ok' \
+            || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::Raw HOME access found outside paths.rs. Use crate::paths::rigor_home() instead, or add '// rigor-home-ok' for non-.rigor/ paths."
+            echo ""
+            echo "$VIOLATIONS"
+            exit 1
+          fi
+
   rustfmt:
     name: Format Check
     runs-on: ubuntu-latest
