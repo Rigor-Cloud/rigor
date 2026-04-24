@@ -2743,6 +2743,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "reqwest",
+ "rigor-harness",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
