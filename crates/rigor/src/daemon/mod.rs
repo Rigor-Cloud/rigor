@@ -661,3 +661,175 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/assets/{*path}", get(web::serve_viewer_asset))
         .with_state(state)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    // Serializes tests that toggle the global MITM_ENABLED AtomicBool.
+    static MITM_LOCK: Mutex<()> = Mutex::new(());
+    // Serializes tests that mutate RIGOR_HOME env var.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    // ---- MITM allowlist tests (gap 1: should_mitm_target) ----
+
+    #[test]
+    fn test_mitm_exact_host_match() {
+        let _guard = MITM_LOCK.lock().unwrap();
+        let original = ws::is_mitm_enabled();
+        ws::set_mitm_enabled(true);
+
+        assert!(should_mitm_target("api.anthropic.com:443"));
+
+        ws::set_mitm_enabled(original);
+    }
+
+    #[test]
+    fn test_mitm_suffix_match() {
+        let _guard = MITM_LOCK.lock().unwrap();
+        let original = ws::is_mitm_enabled();
+        ws::set_mitm_enabled(true);
+
+        assert!(should_mitm_target("us-east5-aiplatform.googleapis.com:443"));
+
+        ws::set_mitm_enabled(original);
+    }
+
+    #[test]
+    fn test_mitm_non_llm_host_rejected() {
+        let _guard = MITM_LOCK.lock().unwrap();
+        let original = ws::is_mitm_enabled();
+        ws::set_mitm_enabled(true);
+
+        assert!(!should_mitm_target("github.com:443"));
+
+        ws::set_mitm_enabled(original);
+    }
+
+    #[test]
+    fn test_mitm_disabled_rejects_all() {
+        let _guard = MITM_LOCK.lock().unwrap();
+        let original = ws::is_mitm_enabled();
+        ws::set_mitm_enabled(false);
+
+        assert!(!should_mitm_target("api.anthropic.com:443"));
+
+        ws::set_mitm_enabled(original);
+    }
+
+    #[test]
+    fn test_mitm_empty_target() {
+        let _guard = MITM_LOCK.lock().unwrap();
+        let original = ws::is_mitm_enabled();
+        ws::set_mitm_enabled(true);
+
+        assert!(!should_mitm_target(""));
+
+        ws::set_mitm_enabled(original);
+    }
+
+    #[test]
+    fn test_mitm_host_without_port() {
+        let _guard = MITM_LOCK.lock().unwrap();
+        let original = ws::is_mitm_enabled();
+        ws::set_mitm_enabled(true);
+
+        // When no port is present, split(':').next() returns the whole string
+        assert!(should_mitm_target("api.openai.com"));
+
+        ws::set_mitm_enabled(original);
+    }
+
+    #[test]
+    fn test_mitm_subdomain_suffix_match() {
+        let _guard = MITM_LOCK.lock().unwrap();
+        let original = ws::is_mitm_enabled();
+        ws::set_mitm_enabled(true);
+
+        // "custom.api.anthropic.com" ends_with ".api.anthropic.com" -> true
+        assert!(should_mitm_target("custom.api.anthropic.com:443"));
+
+        ws::set_mitm_enabled(original);
+    }
+
+    // ---- PID lifecycle tests (gap 2: daemon_alive, write_pid_file, remove_pid_file) ----
+
+    /// Helper: save RIGOR_HOME, set to tempdir, run closure, restore.
+    fn with_temp_rigor_home<F: FnOnce(&std::path::Path)>(f: F) {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let original = std::env::var("RIGOR_HOME").ok();
+        let tmp = tempfile::TempDir::new().unwrap();
+        let rigor_dir = tmp.path().join(".rigor");
+        unsafe { std::env::set_var("RIGOR_HOME", &rigor_dir) };
+
+        f(&rigor_dir);
+
+        match original {
+            Some(v) => unsafe { std::env::set_var("RIGOR_HOME", v) },
+            None => unsafe { std::env::remove_var("RIGOR_HOME") },
+        }
+    }
+
+    #[test]
+    fn test_write_pid_file_creates_file() {
+        with_temp_rigor_home(|rigor_dir| {
+            write_pid_file().expect("write_pid_file should succeed");
+            let pid_path = rigor_dir.join("daemon.pid");
+            assert!(pid_path.exists(), "PID file should exist after write_pid_file");
+            let content = std::fs::read_to_string(&pid_path).unwrap();
+            let pid: u32 = content.trim().parse().expect("PID file should contain a number");
+            assert_eq!(pid, std::process::id());
+        });
+    }
+
+    #[test]
+    fn test_remove_pid_file_deletes_file() {
+        with_temp_rigor_home(|rigor_dir| {
+            write_pid_file().unwrap();
+            let pid_path = rigor_dir.join("daemon.pid");
+            assert!(pid_path.exists());
+
+            remove_pid_file();
+            assert!(!pid_path.exists(), "PID file should be gone after remove_pid_file");
+        });
+    }
+
+    #[test]
+    fn test_daemon_alive_returns_true_for_current_process() {
+        with_temp_rigor_home(|_rigor_dir| {
+            write_pid_file().unwrap();
+            assert!(daemon_alive(), "daemon_alive should return true when PID file contains our own PID");
+        });
+    }
+
+    #[test]
+    fn test_daemon_alive_returns_false_when_no_pid_file() {
+        with_temp_rigor_home(|rigor_dir| {
+            // Create the .rigor directory but no PID file
+            std::fs::create_dir_all(rigor_dir).unwrap();
+            assert!(!daemon_alive(), "daemon_alive should return false when no PID file exists");
+        });
+    }
+
+    #[test]
+    fn test_daemon_alive_returns_false_for_dead_pid() {
+        with_temp_rigor_home(|rigor_dir| {
+            std::fs::create_dir_all(rigor_dir).unwrap();
+            let pid_path = rigor_dir.join("daemon.pid");
+            // PID 2000000 is extremely unlikely to be a real running process
+            std::fs::write(&pid_path, "2000000\n").unwrap();
+            assert!(!daemon_alive(), "daemon_alive should return false for a dead/non-existent PID");
+        });
+    }
+
+    #[test]
+    fn test_daemon_alive_returns_false_for_garbage_content() {
+        with_temp_rigor_home(|rigor_dir| {
+            std::fs::create_dir_all(rigor_dir).unwrap();
+            let pid_path = rigor_dir.join("daemon.pid");
+            std::fs::write(&pid_path, "not_a_number\n").unwrap();
+            assert!(!daemon_alive(), "daemon_alive should return false for non-numeric PID file content");
+        });
+    }
+}
