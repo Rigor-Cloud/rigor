@@ -141,6 +141,9 @@ jobs:
       - name: Corpus proxy replay smoke
         run: cargo test -p rigor --test corpus_proxy_replay --release -- --nocapture
 
+      - name: Corpus drift check
+        run: ./target/release/rigor corpus replay --fail-on-drift
+
   cargo-audit:
     name: Security Audit
     runs-on: ubuntu-latest

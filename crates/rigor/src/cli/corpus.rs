@@ -61,6 +61,21 @@ pub enum CorpusCommands {
         #[arg(long, value_enum, default_value_t = StatsFormat::Table)]
         format: StatsFormat,
     },
+    /// Replay corpus through evaluator and check block-rate drift against manifests
+    Replay {
+        /// Directory containing prompt manifests (YAML)
+        #[arg(long, default_value = ".planning/corpus/prompts")]
+        prompts: PathBuf,
+        /// Directory containing recordings
+        #[arg(long, default_value = ".planning/corpus/recordings")]
+        recordings: PathBuf,
+        /// Path to rigor.yaml (auto-detected if omitted)
+        #[arg(long)]
+        rigor_yaml: Option<PathBuf>,
+        /// Exit non-zero if any prompt's block rate falls outside its manifest window
+        #[arg(long)]
+        fail_on_drift: bool,
+    },
     /// Verify integrity (SHA-256, non-empty response) of recorded corpus entries
     Validate {
         /// Directory containing prompt manifests (YAML)
@@ -90,6 +105,12 @@ pub fn run_corpus_command(cmd: CorpusCommands) -> Result<()> {
             rigor_yaml,
             format,
         } => run_stats(recordings, rigor_yaml, format),
+        CorpusCommands::Replay {
+            prompts,
+            recordings,
+            rigor_yaml,
+            fail_on_drift,
+        } => run_replay(prompts, recordings, rigor_yaml, fail_on_drift),
         CorpusCommands::Validate {
             prompts,
             recordings,
@@ -204,6 +225,81 @@ fn run_stats(recordings_dir: PathBuf, rigor_yaml: Option<PathBuf>, format: Stats
         StatsFormat::Table => format_table(&rows, &aggregates),
         StatsFormat::Json => format_json(&rows, &aggregates)?,
         StatsFormat::Csv => format_csv(&rows, &aggregates),
+    }
+
+    Ok(())
+}
+
+fn run_replay(
+    prompts_dir: PathBuf,
+    recordings_dir: PathBuf,
+    rigor_yaml: Option<PathBuf>,
+    fail_on_drift: bool,
+) -> Result<()> {
+    let manifests = crate::corpus::load_prompts(&prompts_dir)?;
+    let recordings = crate::corpus::load_recordings(&recordings_dir)?;
+
+    if recordings.is_empty() {
+        anyhow::bail!("No recordings found in {}", recordings_dir.display());
+    }
+
+    let config_path = match rigor_yaml {
+        Some(p) => p,
+        None => super::find_rigor_yaml(None)?,
+    };
+
+    let mut replay_fn = {
+        let path = config_path.clone();
+        move |sample: &crate::corpus::RecordedSample| -> bool {
+            let config = match crate::constraint::loader::load_rigor_config(&path) {
+                Ok(c) => c,
+                Err(_) => return false,
+            };
+            let mut engine = match crate::policy::PolicyEngine::new(&config) {
+                Ok(e) => e,
+                Err(_) => return false,
+            };
+            let claims =
+                crate::claim::heuristic::extract_claims_from_text(&sample.response_text, 0);
+            let raw = engine
+                .evaluate(&crate::policy::EvaluationInput { claims })
+                .unwrap_or_default();
+            raw.iter().any(|v| v.violated)
+        }
+    };
+
+    let rows = crate::corpus::compute_stats(&recordings, &mut replay_fn);
+    let manifest_map: HashMap<String, _> = manifests.iter().map(|m| (m.id.clone(), m)).collect();
+
+    let mut drifted = Vec::new();
+    for row in &rows {
+        if let Some(manifest) = manifest_map.get(&row.prompt_id) {
+            let expected = &manifest.expected.default;
+            if row.block_rate() < expected.min_block_rate || row.block_rate() > expected.max_block_rate {
+                drifted.push(format!(
+                    "  {} / {}: block_rate={:.2} outside [{:.2}, {:.2}]",
+                    row.prompt_id, row.model, row.block_rate(),
+                    expected.min_block_rate, expected.max_block_rate,
+                ));
+            }
+        }
+    }
+
+    println!(
+        "Replay complete: {} prompts, {} recordings, {} drift violations",
+        manifests.len(),
+        recordings.len(),
+        drifted.len()
+    );
+
+    if !drifted.is_empty() {
+        eprintln!("Drift detected:");
+        for d in &drifted {
+            eprintln!("{}", d);
+        }
+        if fail_on_drift {
+            anyhow::bail!("{} prompt/model pairs drifted outside manifest windows", drifted.len());
+        }
     }
 
     Ok(())
