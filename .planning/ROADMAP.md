@@ -195,6 +195,8 @@ status: active
 **Depends on:** none
 **Requirements:** REQ-033
 **Workstream:** ci-hardening
+**Plans:** 1 plan
+- [ ] 18-01-PLAN.md — Positive/negative fixture corpus + regression test script (wave 1)
 
 #### Phase 19: rigor-validate CI expansion (rigor eval + corpus replay + violation-log cross-check)
 **Goal:** Current rigor-validate only parses rigor.yaml. Extend to actual evaluation flow.
