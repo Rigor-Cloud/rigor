@@ -29,8 +29,11 @@ on:
 
 jobs:
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
     environment: ci-approval
     steps:
       - name: Checkout code
@@ -61,8 +64,11 @@ jobs:
         run: cargo test --release --test egress_integration
 
   clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
+    name: Clippy (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
