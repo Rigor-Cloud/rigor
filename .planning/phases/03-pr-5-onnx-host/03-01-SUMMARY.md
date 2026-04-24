@@ -124,6 +124,15 @@ None - no external service configuration required.
 - Consumers implement `InferenceHost` trait or use `OnnxModelHost` directly
 - GPU acceleration available via `--features onnx-cuda` or `--features onnx-coreml`
 
+## Self-Check: PASSED
+
+- [x] onnx_host.rs exists
+- [x] 03-01-SUMMARY.md exists
+- [x] Commit 43ce633 exists
+- [x] Commit adf6dba exists
+- [x] Default build passes (380 tests)
+- [x] ONNX build passes (9 tests)
+
 ---
 *Phase: 03-pr-5-onnx-host*
 *Completed: 2026-04-24*
