@@ -134,7 +134,7 @@ status: active
 **Requirements:** REQ-021
 **Workstream:** coverage
 **Plans:** 2 plans
-- [ ] 11-01-PLAN.md — TestProxy CONNECT upgrade support + blind-tunnel/MITM handshake E2E tests (wave 1)
+- [x] 11-01-PLAN.md — TestProxy CONNECT upgrade support + blind-tunnel/MITM handshake E2E tests (wave 1)
 - [ ] 11-02-PLAN.md — Stop-hook harness E2E + PID crash recovery lifecycle tests (wave 1)
 
 #### Phase 12: Mock-LLM server harness + B1/B2/B3 integration tests

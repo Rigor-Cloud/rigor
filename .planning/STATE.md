@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-04-24T02:21:26.160Z"
+status: executing
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-04-24T02:50:58Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 6
-  total_plans: 14
-  completed_plans: 14
-  percent: 29
+  completed_phases: 5
+  total_plans: 16
+  completed_plans: 16
+  percent: 100
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 ## Current Position
 
 Phase: 11
-Plan: Not started
-**Status:** Ready to plan
+Plan: 1 / 2
+**Status:** Executing
 **Last Completed Phase:** 10 — unit-coverage-gaps
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 10-03: 10 unit tests (content store TTL/concurrency, action gate lifecycle/timeout) -- 371 total tests pass
+**Last Activity Description:** Completed 11-01: TestProxy upgraded to hyper_util serve_connection_with_upgrades; 2 CONNECT tunnel E2E tests (blind-tunnel + MITM TLS handshake)
 
 ## Milestone Overview
 
@@ -73,10 +73,13 @@ Plan: Not started
 - PID 2000000 as dead-PID sentinel (exceeds typical OS PID ranges)
 - FailingEvaluator test-only struct verifies fail-open contract inside #[cfg(test)] module
 - Instant subtraction for expired gate simulation (macOS-safe)
+- TestProxy upgraded from axum::serve to hyper_util accept loop for CONNECT upgrade support
+- rcgen used for PEM parsing in tests (avoids new rustls-pemfile dependency)
+- MITM test uses raw TCP + TLS handshake for full pipeline validation
 
 ## Session Continuity
 
-**Stopped At:** Completed 10-03-PLAN.md
+**Stopped At:** Completed 11-01-PLAN.md
 **Resume File:** None
 
-**Planned Phase:** 10 (unit-coverage-gaps) -- all 3 plans complete, phase done -- 2026-04-24
+**Planned Phase:** 11 (e2e-coverage-gaps) -- plan 1/2 complete -- 2026-04-24
