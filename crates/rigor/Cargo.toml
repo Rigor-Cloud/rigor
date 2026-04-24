@@ -72,6 +72,17 @@ twox-hash = { version = "2.0", default-features = false, features = ["xxhash64"]
 dashmap = "6"
 moka = { version = "0.12", features = ["sync"] }
 
+# ONNX runtime host (Phase 0H) — optional, behind `onnx` feature flag
+ort = { version = "2.0.0-rc.12", optional = true, default-features = false, features = ["ndarray", "download-binaries"] }
+hf-hub = { version = "0.5", optional = true, default-features = false, features = ["tokio"] }
+ndarray = { version = "0.16", optional = true }
+
+[features]
+default = []
+onnx = ["dep:ort", "dep:hf-hub", "dep:ndarray"]
+onnx-cuda = ["onnx", "ort/cuda"]
+onnx-coreml = ["onnx", "ort/coreml"]
+
 [dev-dependencies]
 tempfile = "3"
 criterion = { version = "0.5", features = ["html_reports"] }
