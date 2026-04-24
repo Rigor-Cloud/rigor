@@ -4,26 +4,26 @@ milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Completed 06-01 (pretty-printed stats table)
-last_updated: "2026-04-24T08:33:50Z"
+last_updated: "2026-04-24T15:31:20Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 13
-  total_plans: 24
-  completed_plans: 25
-  percent: 62
+  completed_phases: 14
+  total_plans: 25
+  completed_plans: 26
+  percent: 67
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 06
-Plan: Not started
+Phase: 13
+Plan: 01 complete
 **Status:** Ready to plan
-**Last Completed Phase:** 06 — pretty-printed-stats-table
+**Last Completed Phase:** 13 — F6 full-proxy corpus replay
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 06-01: --format flag (table/json/csv) for rigor corpus stats
+**Last Activity Description:** Completed 13-01: F6 full-proxy corpus replay via MockLlmServer + TestProxy
 
 ## Milestone Overview
 
@@ -100,10 +100,13 @@ Plan: Not started
 - Content-addressed model cache: <rigor_home>/models/<sha256>/<filename>
 - No external table crate for stats output -- format! with dynamic widths keeps deps minimal
 - Default stats output changed from JSON to table (TTY-friendly); --format json preserves backward compatibility
+- F6 proxy replay uses focused constraint set (rust-no-gc only) for debug-mode performance; full 53-constraint set tested via corpus_replay.rs PolicyEngine path
+- F6 proxy replay omits x-api-key to prevent async LLM-as-judge from consuming MockLlmServer response_sequence entries
+- Default 80-recording smoke mode (1 per prompt/model pair); RIGOR_FULL_CORPUS=1 for all 800
 
 ## Session Continuity
 
-**Stopped At:** Completed 06-01 (pretty-printed stats table)
+**Stopped At:** Completed 13-01 (F6 full-proxy corpus replay)
 **Resume File:** None
 
-**Planned Phase:** 06 complete (pretty-printed-stats-table) -- 1/1 plans -- 2026-04-24
+**Planned Phase:** 13 complete (F6-full-proxy-corpus-replay) -- 1/1 plans -- 2026-04-24

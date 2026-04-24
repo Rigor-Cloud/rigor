@@ -156,12 +156,14 @@ Plans:
 - [x] 12-01-PLAN.md — Enhance MockLlmServer with request tracking + response sequences (wave 1)
 - [x] 12-02-PLAN.md — B1 kill-switch, B2 auto-retry, B3 PII redact integration tests (wave 2)
 
-#### Phase 13: F6 full-proxy corpus replay via mock-LLM
+#### Phase 13: F6 full-proxy corpus replay via mock-LLM ✓ COMPLETE 2026-04-24
 **Goal:** Exercise full MITM → streaming → decision path against recorded corpus bytes.
 **Issue:** #25
 **Depends on:** Phase 5, Phase 12
 **Requirements:** REQ-025
 **Workstream:** coverage
+**Plans:** 1/1 plans complete
+- [x] 13-01 — corpus_proxy_replay.rs: 80/800 recordings through full proxy pipeline (smoke mode)
 
 #### Phase 14: rigor-test e2e harness flesh-out
 **Goal:** Replace "not yet implemented" stubs in rigor-test subcommands with real flows.
