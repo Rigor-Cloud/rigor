@@ -88,7 +88,7 @@ Plans:
 **Depends on:** Phase 4
 **Requirements:** REQ-014
 **Workstream:** corpus-cli
-**Plans:** 1 plan
+**Plans:** 0/0 plans complete
 - [x] 06-01 — StatsFormat enum + --format flag + table/json/csv formatters
 
 ### Workstream: test-infra
