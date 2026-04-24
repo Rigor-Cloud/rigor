@@ -1,4 +1,20 @@
 name: Release
+# -----------------------------------------------------------------------------
+# Release artifact signing (cosign keyless OIDC):
+#
+# Each tarball is signed using Sigstore cosign with GitHub Actions OIDC.
+# No private keys are stored; signing uses ephemeral keys tied to the
+# workflow identity.
+#
+# Verify a release artifact:
+#
+#   cosign verify-blob \
+#     --certificate rigor-0.1.0-aarch64-apple-darwin.tar.gz.pem \
+#     --signature rigor-0.1.0-aarch64-apple-darwin.tar.gz.sig \
+#     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#     --certificate-identity-regexp "github.com/rigor-cloud/rigor" \
+#     rigor-0.1.0-aarch64-apple-darwin.tar.gz
+# -----------------------------------------------------------------------------
 
 on:
   push:
