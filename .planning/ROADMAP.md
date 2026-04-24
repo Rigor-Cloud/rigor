@@ -71,7 +71,7 @@ Plans:
 **Requirements:** REQ-010, REQ-011, REQ-012
 **Workstream:** corpus-cli
 **Plans:** 1 plan
-- [ ] 04-01-PLAN.md — CorpusCommands enum + record/stats/validate handlers + mod.rs wiring
+- [x] 04-01-PLAN.md — CorpusCommands enum + record/stats/validate handlers + mod.rs wiring
 
 #### Phase 5: Seed corpus recording (20 prompts × 4 models × 10 samples)
 **Goal:** Record the baseline PR-2.7 corpus on OpenRouter for reproducible replay. ~$2–5 of inference.
