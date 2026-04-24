@@ -1,0 +1,55 @@
+# cargo-deny configuration for rigor -- see https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+targets = []
+all-features = true
+
+[advisories]
+# Known advisories in current dependency tree -- to be resolved by upgrading deps.
+# Each entry is temporarily ignored so CI is not blocked on pre-existing issues.
+ignore = [
+    { id = "RUSTSEC-2026-0007", reason = "bytes 1.11.0 integer overflow -- awaiting cargo update" },
+    { id = "RUSTSEC-2025-0011", reason = "prost out-of-memory -- awaiting upstream fix" },
+    { id = "RUSTSEC-2025-0074", reason = "rustls-webpki name constraint -- awaiting cargo update" },
+    { id = "RUSTSEC-2025-0075", reason = "rustls-webpki wildcard name constraint -- awaiting cargo update" },
+    { id = "RUSTSEC-2025-0076", reason = "rustls-webpki CRL parsing panic -- awaiting cargo update" },
+    { id = "RUSTSEC-2025-0068", reason = "serde_yml unsound -- migration to alternative planned" },
+    { id = "RUSTSEC-2026-0008", reason = "prost Buf deref UB -- awaiting upstream fix" },
+    { id = "RUSTSEC-2026-0009", reason = "time stack exhaustion DoS -- awaiting cargo update" },
+    { id = "RUSTSEC-2026-0098", reason = "rustls-webpki URI name constraint -- awaiting cargo update" },
+    { id = "RUSTSEC-2026-0099", reason = "rustls-webpki wildcard name constraint -- awaiting cargo update" },
+    { id = "RUSTSEC-2026-0104", reason = "rustls-webpki CRL parsing panic -- awaiting cargo update" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CDLA-Permissive-2.0",
+    "OpenSSL",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+[licenses.private]
+ignore = true
+registries = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
