@@ -114,7 +114,7 @@ status: active
 **Workstream:** coverage
 **Plans:** 2 plans
 - [x] 09-01-PLAN.md — JudgeClient trait seam + unit tests for judge functions (wave 1)
-- [ ] 09-02-PLAN.md — Integration tests for extract_and_evaluate, evaluate_text_inline, proxy_request (wave 2)
+- [x] 09-02-PLAN.md — Integration tests for extract_and_evaluate, evaluate_text_inline, proxy_request (wave 2)
 
 #### Phase 10: Unit coverage gaps (MITM allowlist, daemon lifecycle, TLS CA, SNI, DF-QuAD, content_store TTL, action gates)
 **Goal:** Close listed unit-level gaps to lift coverage floor.
