@@ -166,3 +166,76 @@ jobs:
 
       - name: Run cargo deny
         run: cargo deny check
+
+  coverage:
+    name: Coverage Floor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run coverage
+        run: cargo llvm-cov --workspace --fail-under-lines 60
+
+  bench-gate:
+    name: Bench Regression Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Restore bench baseline
+        uses: actions/cache@v4
+        with:
+          path: target/criterion
+          key: criterion-baseline-${{ runner.os }}-${{ hashFiles('crates/rigor/benches/**') }}
+          restore-keys: |
+            criterion-baseline-${{ runner.os }}-
+
+      - name: Run benchmarks
+        run: cargo bench --bench hook_latency --bench evaluation_only --bench dfquad_scaling --bench filter_chain_overhead -- --output-format bencher 2>&1 | tee bench-output.txt
+
+      - name: Check for regressions
+        run: |
+          # Parse criterion output for regressions.
+          # Criterion reports "regressed" in its comparison output when
+          # performance degrades beyond the noise threshold.
+          if grep -q "regressed" bench-output.txt; then
+            echo "::warning::Benchmark regressions detected -- review bench-output.txt"
+            # Extract regression percentages and fail if any exceed 20%
+            # Criterion outputs lines like: "change: +25.123% (p = 0.00 < 0.05)"
+            REGRESSIONS=$(grep -A2 "regressed" bench-output.txt \
+              | grep -oP '[+-]\d+\.\d+%' \
+              | sed 's/[+%]//g' \
+              | awk '$1 > 20 { found=1 } END { if (found) print "FAIL"; else print "OK" }')
+            if [ "$REGRESSIONS" = "FAIL" ]; then
+              echo "::error::Benchmark regression exceeds 20% threshold"
+              cat bench-output.txt
+              exit 1
+            fi
+            echo "Regressions detected but within 20% tolerance"
+          fi
+
+      - name: Save baseline (main branch only)
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: target/criterion
+          key: criterion-baseline-${{ runner.os }}-${{ hashFiles('crates/rigor/benches/**') }}
