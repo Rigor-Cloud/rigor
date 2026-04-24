@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-04-24T07:57:09.957Z"
+status: planning
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-04-24T08:16:25.251Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
   completed_phases: 11
-  total_plans: 23
-  completed_plans: 22
-  percent: 52
+  total_plans: 24
+  completed_plans: 23
+  percent: 96
 ---
 
 # Project State
@@ -92,10 +92,12 @@ Plan: Not started
 - Keyless OIDC signing (no private keys) via GitHub Actions id-token: write permission
 - Extended cli/refine.rs in-place for corpus exporter rather than creating module directory
 - CLI grammar: rigor refine --apply becomes rigor refine suggest --apply (pre-1.0 acceptable)
+- Used serde_json::json! for stats output since ModelStats/PerModelAggregate lack Serialize derive
+- Validate uses sample.model (original unslugged) for hash recomputation, not reversed slug
 
 ## Session Continuity
 
-**Stopped At:** Completed 02-01-PLAN.md
+**Stopped At:** Completed 04-01-PLAN.md
 **Resume File:** None
 
 **Planned Phase:** 14 complete (rigor-test-e2e-harness-flesh-out) -- 1/1 plans -- 2026-04-24
