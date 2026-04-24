@@ -2,6 +2,7 @@ use crate::home::IsolatedHome;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
+use tower::Service;
 
 // Serializes env var mutations in spawn_blocking across parallel tests.
 // Without this, concurrent start/start_with_mock calls race on RIGOR_HOME/RIGOR_TARGET_API.
@@ -67,12 +68,39 @@ impl TestProxy {
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let handle = tokio::spawn(async move {
-            axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = shutdown_rx.await;
-                })
-                .await
-                .unwrap();
+            let mut shutdown_rx = shutdown_rx;
+            loop {
+                tokio::select! {
+                    result = listener.accept() => {
+                        let (stream, _addr) = match result {
+                            Ok(conn) => conn,
+                            Err(_) => continue,
+                        };
+                        let app = app.clone();
+                        tokio::spawn(async move {
+                            let io = hyper_util::rt::TokioIo::new(stream);
+                            let service = hyper::service::service_fn(
+                                move |req: hyper::Request<hyper::body::Incoming>| {
+                                    let mut app = app.clone();
+                                    async move {
+                                        let (parts, incoming) = req.into_parts();
+                                        let body = axum::body::Body::new(incoming);
+                                        let req = axum::http::Request::from_parts(parts, body);
+                                        let resp = app.call(req).await.unwrap();
+                                        Ok::<_, std::convert::Infallible>(resp)
+                                    }
+                                },
+                            );
+                            let _ = hyper_util::server::conn::auto::Builder::new(
+                                hyper_util::rt::TokioExecutor::new(),
+                            )
+                            .serve_connection_with_upgrades(io, service)
+                            .await;
+                        });
+                    }
+                    _ = &mut shutdown_rx => { break; }
+                }
+            }
         });
 
         Self {
@@ -135,12 +163,39 @@ impl TestProxy {
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let handle = tokio::spawn(async move {
-            axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = shutdown_rx.await;
-                })
-                .await
-                .unwrap();
+            let mut shutdown_rx = shutdown_rx;
+            loop {
+                tokio::select! {
+                    result = listener.accept() => {
+                        let (stream, _addr) = match result {
+                            Ok(conn) => conn,
+                            Err(_) => continue,
+                        };
+                        let app = app.clone();
+                        tokio::spawn(async move {
+                            let io = hyper_util::rt::TokioIo::new(stream);
+                            let service = hyper::service::service_fn(
+                                move |req: hyper::Request<hyper::body::Incoming>| {
+                                    let mut app = app.clone();
+                                    async move {
+                                        let (parts, incoming) = req.into_parts();
+                                        let body = axum::body::Body::new(incoming);
+                                        let req = axum::http::Request::from_parts(parts, body);
+                                        let resp = app.call(req).await.unwrap();
+                                        Ok::<_, std::convert::Infallible>(resp)
+                                    }
+                                },
+                            );
+                            let _ = hyper_util::server::conn::auto::Builder::new(
+                                hyper_util::rt::TokioExecutor::new(),
+                            )
+                            .serve_connection_with_upgrades(io, service)
+                            .await;
+                        });
+                    }
+                    _ = &mut shutdown_rx => { break; }
+                }
+            }
         });
 
         Self {

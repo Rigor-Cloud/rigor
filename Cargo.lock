@@ -2723,6 +2723,8 @@ dependencies = [
  "axum 0.8.8",
  "bytes",
  "futures-util",
+ "hyper",
+ "hyper-util",
  "rcgen",
  "reqwest",
  "rigor",
@@ -2732,6 +2734,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
+ "tower 0.5.3",
 ]
 
 [[package]]
