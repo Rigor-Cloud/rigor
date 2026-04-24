@@ -61,6 +61,8 @@ Plans:
 **Requirements:** REQ-008, REQ-009
 **Workstream:** phase-0-close
 **Canonical spec:** `.planning/roadmap/epistemic-expansion-plan.md` section 0H
+**Plans:** 1 plan
+- [x] 03-01 — InferenceHost trait + OnnxModelHost with HF Hub download + SHA-256 cache + 9 tests
 
 ### Workstream: corpus-cli
 

@@ -3,27 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-04-24T08:16:25.251Z"
+stopped_at: Completed 03-01 (ONNX host)
+last_updated: "2026-04-24T08:25:35Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 12
+  completed_phases: 11
   total_plans: 24
-  completed_plans: 23
-  percent: 57
+  completed_plans: 24
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 07
-Plan: Not started
-**Status:** Ready to plan
-**Last Completed Phase:** 14 — rigor-test-e2e-harness-flesh-out
+Phase: 03
+Plan: 01 complete
+**Status:** Phase 3 complete
+**Last Completed Phase:** 03 — pr-5-onnx-host
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 14-01: Replaced e2e/bench/report stubs with real implementations backed by rigor-harness, 3 smoke tests passing
+**Last Activity Description:** Completed 03-01: ONNX host with InferenceHost trait, OnnxModelHost, HF Hub download, SHA-256 cache, 9 tests
 
 ## Milestone Overview
 
@@ -42,7 +42,7 @@ Plan: Not started
 
 **Name:** phase-0-close
 **Path:** `.planning/workstreams/phase-0-close/`
-**Phases covered:** 1 ✓, 2 (pending), 3 (pending)
+**Phases covered:** 1 ✓, 2 (pending), 3 ✓
 
 ## Context loaded
 
@@ -94,10 +94,14 @@ Plan: Not started
 - CLI grammar: rigor refine --apply becomes rigor refine suggest --apply (pre-1.0 acceptable)
 - Used serde_json::json! for stats output since ModelStats/PerModelAggregate lack Serialize derive
 - Validate uses sample.model (original unslugged) for hash recomputation, not reversed slug
+- ureq (sync) backend for hf-hub: InferenceHost::load is synchronous, no async complexity
+- tls-native for ort build-script downloads: separate from runtime rustls
+- ndarray 0.17 (not 0.16): ort 2.0.0-rc.12 requires ^0.17
+- Content-addressed model cache: <rigor_home>/models/<sha256>/<filename>
 
 ## Session Continuity
 
-**Stopped At:** Completed 04-01-PLAN.md
+**Stopped At:** Completed 03-01 (ONNX host)
 **Resume File:** None
 
-**Planned Phase:** 14 complete (rigor-test-e2e-harness-flesh-out) -- 1/1 plans -- 2026-04-24
+**Planned Phase:** 03 complete (pr-5-onnx-host) -- 1/1 plans -- 2026-04-24
