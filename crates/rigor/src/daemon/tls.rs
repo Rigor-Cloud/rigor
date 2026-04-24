@@ -262,14 +262,13 @@ pub fn generate_tls_config(hosts: &[&str]) -> Result<ServerConfig> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex as StdMutex;
-
-    // Serializes tests that mutate RIGOR_HOME env var.
-    static ENV_LOCK: StdMutex<()> = StdMutex::new(());
-
     /// Helper: save RIGOR_HOME, set to tempdir/.rigor, run closure, restore.
+    /// Uses the crate-wide RIGOR_HOME_TEST_LOCK to serialize across all
+    /// test modules that mutate this env var.
     fn with_temp_rigor_home<F: FnOnce(&std::path::Path)>(f: F) {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = crate::paths::RIGOR_HOME_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let original = std::env::var("RIGOR_HOME").ok();
         let tmp = tempfile::TempDir::new().unwrap();
         let rigor_dir = tmp.path().join(".rigor");
