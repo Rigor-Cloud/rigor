@@ -185,9 +185,9 @@ status: active
 **Depends on:** Phase 15
 **Requirements:** REQ-029, REQ-030, REQ-031, REQ-032
 **Workstream:** ci-hardening
-**Plans:** 2 plans
-- [ ] 17-01-PLAN.md — deny.toml + cargo-audit/cargo-deny/llvm-cov/bench-gate CI jobs (wave 1)
-- [ ] 17-02-PLAN.md — cosign keyless OIDC release signing (wave 1)
+**Plans:** 2/2 plans complete
+- [x] 17-01-PLAN.md — deny.toml + cargo-audit/cargo-deny/llvm-cov/bench-gate CI jobs (wave 1)
+- [x] 17-02-PLAN.md — cosign keyless OIDC release signing (wave 1)
 
 #### Phase 18: pr-injection-scan.yml self-regression corpus
 **Goal:** Add fixture corpus that exercises all 9 regex patterns + 30KB-capped judge path.
