@@ -3,27 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Completed 03-01 (ONNX host)
-last_updated: "2026-04-24T08:25:35Z"
+stopped_at: Completed 06-01 (pretty-printed stats table)
+last_updated: "2026-04-24T08:33:50Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 12
+  completed_phases: 11
   total_plans: 24
-  completed_plans: 24
-  percent: 57
+  completed_plans: 25
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 04
-Plan: Not started
+Phase: 06
+Plan: 01 complete
 **Status:** Ready to plan
-**Last Completed Phase:** 03 — pr-5-onnx-host
+**Last Completed Phase:** 06 — pretty-printed-stats-table
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 03-01: ONNX host with InferenceHost trait, OnnxModelHost, HF Hub download, SHA-256 cache, 9 tests
+**Last Activity Description:** Completed 06-01: --format flag (table/json/csv) for rigor corpus stats
 
 ## Milestone Overview
 
@@ -98,10 +98,12 @@ Plan: Not started
 - tls-native for ort build-script downloads: separate from runtime rustls
 - ndarray 0.17 (not 0.16): ort 2.0.0-rc.12 requires ^0.17
 - Content-addressed model cache: <rigor_home>/models/<sha256>/<filename>
+- No external table crate for stats output -- format! with dynamic widths keeps deps minimal
+- Default stats output changed from JSON to table (TTY-friendly); --format json preserves backward compatibility
 
 ## Session Continuity
 
-**Stopped At:** Completed 03-01 (ONNX host)
+**Stopped At:** Completed 06-01 (pretty-printed stats table)
 **Resume File:** None
 
-**Planned Phase:** 03 complete (pr-5-onnx-host) -- 1/1 plans -- 2026-04-24
+**Planned Phase:** 06 complete (pretty-printed-stats-table) -- 1/1 plans -- 2026-04-24

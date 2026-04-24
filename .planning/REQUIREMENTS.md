@@ -46,7 +46,7 @@ Requirements are grouped by workstream. Every REQ-ID is referenced by at least o
 
 ### Phase 6 — issue #23
 
-- **REQ-014** — `rigor corpus stats` produces aligned TTY output with columns: model, prompt, samples, drift_score, last_recorded.
+- **REQ-014** ✅ — `rigor corpus stats` produces aligned TTY output with columns: model, prompt, samples, drift_score, last_recorded.
 
 ---
 

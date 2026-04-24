@@ -82,12 +82,14 @@ Plans:
 **Requirements:** REQ-013
 **Workstream:** corpus-cli
 
-#### Phase 6: Pretty-printed stats table for `rigor corpus stats`
+#### Phase 6: Pretty-printed stats table for `rigor corpus stats` ✓ COMPLETE 2026-04-24
 **Goal:** Replace JSON-only output with a TTY-friendly aligned table.
 **Issue:** #23
 **Depends on:** Phase 4
 **Requirements:** REQ-014
 **Workstream:** corpus-cli
+**Plans:** 1 plan
+- [x] 06-01 — StatsFormat enum + --format flag + table/json/csv formatters
 
 ### Workstream: test-infra
 
