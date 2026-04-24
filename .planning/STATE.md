@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-04-24T01:29:37.410Z"
+status: executing
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-04-24T02:07:41.356Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 5
-  total_plans: 11
-  completed_plans: 11
-  percent: 24
+  completed_phases: 4
+  total_plans: 14
+  completed_plans: 12
+  percent: 86
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 ## Current Position
 
 Phase: 10
-Plan: Not started
-**Status:** Ready to plan
+Plan: 01 complete, 02 pending
+**Status:** Executing
 **Last Completed Phase:** 08 — HOME/.rigor test isolation
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 09-01: JudgeClient trait seam + 13 unit tests for judge-calling functions
+**Last Activity Description:** Completed 10-01: 26 daemon module unit tests (MITM allowlist, PID lifecycle, TLS CA, SNI edge cases)
 
 ## Milestone Overview
 
@@ -68,10 +68,13 @@ Plan: Not started
 - JudgeClient/JudgeError/ReqwestJudgeClient made pub (not pub(crate)) because DaemonState.judge_client field requires pub trait
 - Concurrency test uses tokio::sync::Barrier + try_acquire (not proptest async wrapper)
 - extract_and_evaluate and evaluate_text_inline tested indirectly through proxy_request via TestProxy because functions are private and proxy.rs modification was prohibited
+- Unified RIGOR_HOME_TEST_LOCK across all test modules to prevent parallel env var races
+- Arc pointer equality used to verify server_config_for_host caching behavior
+- PID 2000000 as dead-PID sentinel (exceeds typical OS PID ranges)
 
 ## Session Continuity
 
-**Stopped At:** Completed 09-02-PLAN.md
+**Stopped At:** Completed 10-01-PLAN.md
 **Resume File:** None
 
-**Planned Phase:** 9 (daemon/proxy.rs hot-path tests) -- plan 01 complete, plan 02 pending -- 2026-04-24
+**Planned Phase:** 10 (unit-coverage-gaps) -- plan 01 complete, plans 02-03 pending -- 2026-04-24
