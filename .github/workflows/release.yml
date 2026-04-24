@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write    # Required for cosign keyless OIDC signing
 
 jobs:
   release:
@@ -71,6 +72,23 @@ jobs:
           (cd dist && shasum -a 256 *.tar.gz) > dist/SHA256SUMS.txt
           cat dist/SHA256SUMS.txt
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign release tarballs (keyless OIDC)
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          for tarball in dist/rigor-${VERSION}-*.tar.gz; do
+            echo "Signing ${tarball}..."
+            cosign sign-blob --yes \
+              --oidc-issuer https://token.actions.githubusercontent.com \
+              --output-signature "${tarball}.sig" \
+              --output-certificate "${tarball}.pem" \
+              "${tarball}"
+          done
+          ls -la dist/*.sig dist/*.pem
+
       - name: Extract release notes from CHANGELOG
         id: notes
         run: |
@@ -108,7 +126,9 @@ jobs:
             ${PRERELEASE_FLAG} \
             "dist/rigor-${VERSION}-aarch64-apple-darwin.tar.gz" \
             "dist/rigor-${VERSION}-x86_64-apple-darwin.tar.gz" \
-            "dist/SHA256SUMS.txt"
+            "dist/SHA256SUMS.txt" \
+            dist/rigor-${VERSION}-*.sig \
+            dist/rigor-${VERSION}-*.pem
 
       - name: Open formula bump PR on Rigor-Cloud/homebrew-rigor
         env:
