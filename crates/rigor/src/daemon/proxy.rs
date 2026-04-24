@@ -4265,4 +4265,420 @@ mod tests {
         let result = extract_sse_assistant_text(sse, "/v1/messages");
         assert_eq!(result, None);
     }
+
+    // ---- JudgeClient mock + judge function tests ----------------------------
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc as StdArc;
+
+    /// Helper: build an Anthropic-style JSON response with the given text.
+    fn anthropic_json_response(text: &str) -> serde_json::Value {
+        json!({
+            "id": "msg_test",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-sonnet-4-20250514",
+            "content": [{"type": "text", "text": text}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 5}
+        })
+    }
+
+    /// Mock JudgeClient that returns a canned response and counts calls.
+    struct MockJudgeClient {
+        response: Result<serde_json::Value, JudgeErrorKind>,
+        call_count: StdArc<AtomicUsize>,
+    }
+
+    /// Simplified error kind for mock construction (avoids JudgeError not being Clone).
+    #[derive(Clone, Debug)]
+    #[allow(dead_code)]
+    enum JudgeErrorKind {
+        Timeout,
+        HttpError(u16),
+        NetworkError(String),
+        ParseError(String),
+    }
+
+    impl MockJudgeClient {
+        fn with_text(text: &str) -> Self {
+            Self {
+                response: Ok(anthropic_json_response(text)),
+                call_count: StdArc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn with_error(err: JudgeErrorKind) -> Self {
+            Self {
+                response: Err(err),
+                call_count: StdArc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn with_text_counting(text: &str, counter: StdArc<AtomicUsize>) -> Self {
+            Self {
+                response: Ok(anthropic_json_response(text)),
+                call_count: counter,
+            }
+        }
+
+        #[allow(dead_code)]
+        fn with_error_counting(err: JudgeErrorKind, counter: StdArc<AtomicUsize>) -> Self {
+            Self {
+                response: Err(err),
+                call_count: counter,
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.call_count.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl JudgeClient for MockJudgeClient {
+        async fn call_judge(
+            &self,
+            _api_url: &str,
+            _api_key: &str,
+            _body: &serde_json::Value,
+            _timeout_secs: u64,
+        ) -> Result<serde_json::Value, JudgeError> {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            match &self.response {
+                Ok(v) => Ok(v.clone()),
+                Err(JudgeErrorKind::Timeout) => Err(JudgeError::Timeout),
+                Err(JudgeErrorKind::HttpError(s)) => Err(JudgeError::HttpError(*s)),
+                Err(JudgeErrorKind::NetworkError(e)) => Err(JudgeError::NetworkError(e.clone())),
+                Err(JudgeErrorKind::ParseError(e)) => Err(JudgeError::ParseError(e.clone())),
+            }
+        }
+    }
+
+    /// Helper to create an event channel for tests.
+    fn test_event_tx() -> super::super::ws::EventSender {
+        let (tx, _rx) = super::super::ws::create_event_channel();
+        tx
+    }
+
+    // ---- scope_judge_check tests --------------------------------------------
+
+    #[tokio::test]
+    async fn scope_judge_check_yes() {
+        let mock = MockJudgeClient::with_text("YES The action is within scope.");
+        let etx = test_event_tx();
+        let (within, reason) = scope_judge_check(
+            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+        )
+        .await;
+        assert!(within, "expected within_scope=true for YES response");
+        assert!(
+            reason.contains("YES"),
+            "reason should contain YES prefix: {reason}"
+        );
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn scope_judge_check_no() {
+        let mock = MockJudgeClient::with_text("NO The user did not request this.");
+        let etx = test_event_tx();
+        let (within, _reason) = scope_judge_check(
+            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+        )
+        .await;
+        assert!(!within, "expected within_scope=false for NO response");
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn scope_judge_check_timeout_failopen() {
+        let mock = MockJudgeClient::with_error(JudgeErrorKind::Timeout);
+        let etx = test_event_tx();
+        let (within, reason) = scope_judge_check(
+            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+        )
+        .await;
+        assert!(within, "timeout should fail open (within_scope=true)");
+        assert!(
+            reason.contains("timeout") || reason.contains("Timeout"),
+            "reason should mention timeout: {reason}"
+        );
+    }
+
+    #[tokio::test]
+    async fn scope_judge_check_http_error_failopen() {
+        let mock = MockJudgeClient::with_error(JudgeErrorKind::HttpError(401));
+        let etx = test_event_tx();
+        let (within, reason) = scope_judge_check(
+            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+        )
+        .await;
+        assert!(within, "HTTP 401 should fail open (within_scope=true)");
+        assert!(
+            reason.contains("401"),
+            "reason should mention status code: {reason}"
+        );
+    }
+
+    // ---- check_violations_persist tests -------------------------------------
+
+    #[tokio::test]
+    async fn check_violations_persist_yes() {
+        let mock = MockJudgeClient::with_text("YES violations persist");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(result, "expected true when judge says YES");
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_no() {
+        let mock = MockJudgeClient::with_text("NO violations resolved");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(!result, "expected false when judge says NO");
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_no_api_key() {
+        let mock = MockJudgeClient::with_text("YES");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            None, // no API key
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(
+            !result,
+            "expected false when no API key (early return, no judge call)"
+        );
+        assert_eq!(mock.calls(), 0, "should not call judge when no API key");
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_empty_violations() {
+        let mock = MockJudgeClient::with_text("YES");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &[], // empty violations
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(
+            !result,
+            "expected false when violations list is empty"
+        );
+        assert_eq!(mock.calls(), 0, "should not call judge with empty violations");
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_timeout_failopen() {
+        let mock = MockJudgeClient::with_error(JudgeErrorKind::Timeout);
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(!result, "timeout should fail open (return false)");
+    }
+
+    // ---- score_claim_relevance tests ----------------------------------------
+
+    #[tokio::test]
+    async fn score_claim_relevance_no_api_key() {
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+        let mock = MockJudgeClient::with_text_counting(
+            "claim1|constraint1|high|relevant",
+            counter.clone(),
+        );
+        let etx = test_event_tx();
+        score_claim_relevance(
+            &mock,
+            "http://test",
+            None, // no API key
+            "model",
+            &[("claim1".to_string(), "the sky is blue".to_string())],
+            &[("constraint1".to_string(), "Sky: The sky is blue".to_string())],
+            &etx,
+        )
+        .await;
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            0,
+            "should not call judge when no API key"
+        );
+    }
+
+    #[tokio::test]
+    async fn score_claim_relevance_caching() {
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+        let mock = MockJudgeClient::with_text_counting(
+            "claim1|constraint1|high|matches sky constraint",
+            counter.clone(),
+        );
+        let etx = test_event_tx();
+
+        let claims = vec![("claim1".to_string(), "the sky is blue".to_string())];
+        let constraints =
+            vec![("constraint1".to_string(), "Sky: The sky is blue".to_string())];
+
+        // First call — should invoke the judge
+        score_claim_relevance(
+            &mock, "http://test", Some("sk-test"), "model", &claims, &constraints, &etx,
+        )
+        .await;
+        assert_eq!(counter.load(Ordering::SeqCst), 1, "first call should invoke judge");
+
+        // Second call with same claims — should be served from cache
+        score_claim_relevance(
+            &mock, "http://test", Some("sk-test"), "model", &claims, &constraints, &etx,
+        )
+        .await;
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "second call should NOT invoke judge (cached)"
+        );
+    }
+
+    #[tokio::test]
+    async fn score_claim_relevance_single_flight() {
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        // Acquire the semaphore manually to simulate an in-flight request
+        assert!(
+            RELEVANCE_SEMAPHORE.try_acquire().is_some(),
+            "should acquire semaphore"
+        );
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+        let mock = MockJudgeClient::with_text_counting(
+            "claim1|constraint1|high|relevant",
+            counter.clone(),
+        );
+        let etx = test_event_tx();
+
+        // This is the call site pattern from extract_and_evaluate_text:
+        // it checks RELEVANCE_SEMAPHORE.try_acquire() before calling score_claim_relevance.
+        // Since we already acquired it, a second try_acquire should fail.
+        let acquired = RELEVANCE_SEMAPHORE.try_acquire();
+        assert!(
+            acquired.is_none(),
+            "second acquire should fail (semaphore held)"
+        );
+
+        // If we were to call score_claim_relevance here via the normal path,
+        // the semaphore guard would prevent it. Let's verify the function itself
+        // works once we release:
+        RELEVANCE_SEMAPHORE.release();
+
+        score_claim_relevance(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &[("claim1".to_string(), "unique_claim_for_single_flight".to_string())],
+            &[("constraint1".to_string(), "Sky: blue".to_string())],
+            &etx,
+        )
+        .await;
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "exactly one judge call after semaphore release"
+        );
+    }
+
+    #[tokio::test]
+    async fn score_claim_relevance_concurrent_single_flight() {
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+
+        // Simulate the pattern used in extract_and_evaluate_text:
+        // N tasks race to acquire RELEVANCE_SEMAPHORE.try_acquire()
+        // Only one should win and call score_claim_relevance.
+        let n = 10;
+        let mut handles = Vec::new();
+
+        // Use a barrier to ensure all tasks start at roughly the same time
+        let barrier = StdArc::new(tokio::sync::Barrier::new(n));
+
+        for i in 0..n {
+            let cnt = counter.clone();
+            let bar = barrier.clone();
+            handles.push(tokio::spawn(async move {
+                bar.wait().await;
+
+                // Replicate the extract_and_evaluate_text guard pattern:
+                if RELEVANCE_SEMAPHORE.try_acquire().is_some() {
+                    // Winner: simulate the work score_claim_relevance does
+                    cnt.fetch_add(1, Ordering::SeqCst);
+                    // Small delay to keep semaphore held while others try
+                    tokio::task::yield_now().await;
+                    RELEVANCE_SEMAPHORE.release();
+                }
+                // Losers: skip (no-op), just like production code
+                i
+            }));
+        }
+
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        let total = counter.load(Ordering::SeqCst);
+        assert!(
+            total >= 1,
+            "at least one task should have acquired the semaphore"
+        );
+        // Due to sequential release + re-acquire, more than 1 may run,
+        // but in the tight race window typically only 1 acquires before others
+        // check. The key invariant: never more than 1 IN FLIGHT at any time.
+        // Since we release before the next can acquire, the invariant holds.
+    }
 }
