@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-04-24T02:50:58Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-04-24T02:59:20Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 16
   completed_plans: 16
   percent: 100
@@ -19,11 +19,11 @@ progress:
 ## Current Position
 
 Phase: 11
-Plan: 1 / 2
-**Status:** Executing
-**Last Completed Phase:** 10 — unit-coverage-gaps
+Plan: 2 / 2
+**Status:** Phase Complete
+**Last Completed Phase:** 11 — e2e-coverage-gaps
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 11-01: TestProxy upgraded to hyper_util serve_connection_with_upgrades; 2 CONNECT tunnel E2E tests (blind-tunnel + MITM TLS handshake)
+**Last Activity Description:** Completed 11-02: 7 E2E tests covering stop-hook constraint evaluation via rigor-harness subprocess helpers and PID file crash recovery lifecycle
 
 ## Milestone Overview
 
@@ -76,10 +76,12 @@ Plan: 1 / 2
 - TestProxy upgraded from axum::serve to hyper_util accept loop for CONNECT upgrade support
 - rcgen used for PEM parsing in tests (avoids new rustls-pemfile dependency)
 - MITM test uses raw TCP + TLS handshake for full pipeline validation
+- Local PID_TEST_LOCK mutex in integration tests since RIGOR_HOME_TEST_LOCK is pub(crate)
+- RIGOR_HOME set to tempdir root (not .rigor subdir) since rigor_home() returns env var as-is
 
 ## Session Continuity
 
-**Stopped At:** Completed 11-01-PLAN.md
+**Stopped At:** Completed 11-02-PLAN.md
 **Resume File:** None
 
-**Planned Phase:** 11 (e2e-coverage-gaps) -- plan 1/2 complete -- 2026-04-24
+**Planned Phase:** 11 (e2e-coverage-gaps) -- plan 2/2 complete -- 2026-04-24
