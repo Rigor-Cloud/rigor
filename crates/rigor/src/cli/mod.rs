@@ -330,15 +330,10 @@ pub enum Commands {
         #[arg(long)]
         compare: bool,
     },
-    /// Analyze violation patterns and suggest constraint refinements.
-    /// Targets constraints with false-positive rate above 30%.
+    /// Analyze violation patterns and suggest constraint refinements, or export training corpus.
     Refine {
-        /// Apply suggested refinements directly to rigor.yaml
-        #[arg(long)]
-        apply: bool,
-        /// Print the diff that would be applied, without modifying rigor.yaml
-        #[arg(long = "dry-run")]
-        dry_run: bool,
+        #[command(subcommand)]
+        command: refine::RefineCommands,
     },
     /// Interactive setup wizard for non-engineers.
     /// Walks through: daemon start, rigor.yaml init, OpenCode plugin install,
@@ -453,7 +448,7 @@ pub fn run_cli() -> Result<()> {
             baseline,
             compare,
         }) => eval::run_eval(report, baseline, compare),
-        Some(Commands::Refine { apply, dry_run }) => refine::run_refine(apply, dry_run),
+        Some(Commands::Refine { command }) => refine::run_refine_command(command),
         Some(Commands::Setup) => setup::run_setup(),
     }
 }

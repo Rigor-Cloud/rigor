@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use clap::Subcommand;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
@@ -245,7 +246,72 @@ fn find_rigor_yaml_path() -> Result<PathBuf> {
     super::find_rigor_yaml(None)
 }
 
-/// Entry point for `rigor refine`.
+#[derive(Subcommand)]
+pub enum RefineCommands {
+    /// Analyze violation patterns and suggest constraint refinements
+    Suggest {
+        /// Apply suggested refinements directly to rigor.yaml
+        #[arg(long)]
+        apply: bool,
+        /// Print the diff that would be applied, without modifying rigor.yaml
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+    },
+    /// Export violations as training-ready JSONL corpus
+    Export {
+        /// Filter to a single constraint ID
+        #[arg(long)]
+        constraint: Option<String>,
+        /// Only include violations at or after this date (YYYY-MM-DD or RFC3339)
+        #[arg(long)]
+        since: Option<String>,
+        /// Output file path (default: stdout)
+        #[arg(long, alias = "output")]
+        out: Option<PathBuf>,
+    },
+}
+
+/// Dispatch subcommand for `rigor refine`.
+pub fn run_refine_command(cmd: RefineCommands) -> Result<()> {
+    match cmd {
+        RefineCommands::Suggest { apply, dry_run } => run_refine(apply, dry_run),
+        RefineCommands::Export {
+            constraint,
+            since,
+            out,
+        } => run_export(constraint, since, out),
+    }
+}
+
+/// Entry point for `rigor refine export`.
+fn run_export(
+    constraint: Option<String>,
+    since: Option<String>,
+    out: Option<PathBuf>,
+) -> Result<()> {
+    let logger = ViolationLogger::new()?;
+    let log_path = logger.log_path().to_path_buf();
+
+    let mut writer: std::io::BufWriter<Box<dyn Write>> = match out {
+        Some(ref path) => std::io::BufWriter::new(Box::new(
+            std::fs::File::create(path)
+                .with_context(|| format!("Failed to create output file: {}", path.display()))?,
+        )),
+        None => std::io::BufWriter::new(Box::new(std::io::stdout().lock())),
+    };
+
+    let count = export_corpus(
+        &log_path,
+        constraint.as_deref(),
+        since.as_deref(),
+        &mut writer,
+    )?;
+
+    eprintln!("Exported {} record(s)", count);
+    Ok(())
+}
+
+/// Entry point for `rigor refine suggest` (original refine behavior).
 pub fn run_refine(apply: bool, dry_run: bool) -> Result<()> {
     let logger = ViolationLogger::new()?;
     let entries = logger.read_all()?;
