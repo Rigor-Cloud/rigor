@@ -1,14 +1,22 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::oneshot;
 use axum::{Router, routing::post, response::sse::{Event, Sse}};
 use futures_util::stream;
 
 use crate::sse::{anthropic_sse_chunks, openai_sse_chunks};
 
+/// A request received by the MockLlmServer, capturing the parsed JSON body.
+#[derive(Debug, Clone)]
+pub struct ReceivedRequest {
+    pub body: serde_json::Value,
+}
+
 /// Builder for configuring a MockLlmServer before starting it.
 pub struct MockLlmServerBuilder {
     chunks: Vec<String>,
+    response_sequence: Option<Vec<Vec<String>>>,
     route_path: String,
 }
 
@@ -19,12 +27,14 @@ pub struct MockLlmServer {
     addr: SocketAddr,
     shutdown_tx: Option<oneshot::Sender<()>>,
     _handle: tokio::task::JoinHandle<()>,
+    received: Arc<Mutex<Vec<ReceivedRequest>>>,
 }
 
 impl MockLlmServerBuilder {
     pub fn new() -> Self {
         Self {
             chunks: Vec::new(),
+            response_sequence: None,
             route_path: "/v1/messages".to_string(),
         }
     }
@@ -47,6 +57,17 @@ impl MockLlmServerBuilder {
         self
     }
 
+    /// Provide a sequence of response chunk sets for per-call-index selection.
+    ///
+    /// When set, each call to the mock server uses the response at the matching
+    /// index. If the call index exceeds the sequence length, the last entry is
+    /// repeated. This is useful for B2 auto-retry tests where call 0 triggers a
+    /// violation and call 1 returns a clean response.
+    pub fn response_sequence(mut self, responses: Vec<Vec<String>>) -> Self {
+        self.response_sequence = Some(responses);
+        self
+    }
+
     /// Set the route path (default: "/v1/messages").
     pub fn route(mut self, path: &str) -> Self {
         self.route_path = path.to_string();
@@ -55,13 +76,38 @@ impl MockLlmServerBuilder {
 
     /// Start the server and return a running MockLlmServer.
     pub async fn build(self) -> MockLlmServer {
-        let chunks = Arc::new(self.chunks);
         let route_path = self.route_path;
+        let received: Arc<Mutex<Vec<ReceivedRequest>>> = Arc::new(Mutex::new(Vec::new()));
+        let received_for_server = received.clone();
 
-        let chunks_clone = chunks.clone();
-        let handler = move || {
-            let chunks = chunks_clone.clone();
+        // Build the list of response sets. When response_sequence is provided,
+        // each call index selects its own chunk set. Otherwise wrap the single
+        // chunks vec so the handler can use the same code path.
+        let all_responses: Arc<Vec<Vec<String>>> = Arc::new(
+            self.response_sequence.unwrap_or_else(|| vec![self.chunks])
+        );
+
+        let call_count = Arc::new(AtomicUsize::new(0));
+
+        let received_clone = received.clone();
+        let handler = move |body: axum::body::Bytes| {
+            let received = received_clone.clone();
+            let responses = all_responses.clone();
+            let counter = call_count.clone();
             async move {
+                // Track received request body
+                let json_body = serde_json::from_slice::<serde_json::Value>(&body)
+                    .unwrap_or(serde_json::Value::Null);
+                received.lock().unwrap().push(ReceivedRequest { body: json_body });
+
+                // Select response by call index; repeat last if index exceeds length
+                let call_idx = counter.fetch_add(1, Ordering::SeqCst);
+                let chunks = if call_idx < responses.len() {
+                    &responses[call_idx]
+                } else {
+                    responses.last().unwrap()
+                };
+
                 let events: Vec<Result<Event, std::convert::Infallible>> = chunks
                     .iter()
                     .map(|data| Ok(Event::default().data(data)))
@@ -92,6 +138,7 @@ impl MockLlmServerBuilder {
             addr,
             shutdown_tx: Some(shutdown_tx),
             _handle: handle,
+            received: received_for_server,
         }
     }
 }
@@ -117,6 +164,14 @@ impl MockLlmServer {
     /// The base URL of the server (e.g. `http://127.0.0.1:12345`).
     pub fn url(&self) -> String {
         format!("http://127.0.0.1:{}", self.addr.port())
+    }
+
+    /// Returns a snapshot of all requests received by this server.
+    ///
+    /// Each entry contains the parsed JSON body (or `Value::Null` if parsing
+    /// failed). The order matches the order requests were received.
+    pub fn received_requests(&self) -> Vec<ReceivedRequest> {
+        self.received.lock().unwrap().clone()
     }
 }
 
@@ -214,5 +269,128 @@ mod tests {
             .send()
             .await;
         assert!(result.is_err(), "connection should fail after server drop");
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_tracks_received_requests() {
+        let server = MockLlmServerBuilder::new()
+            .anthropic_chunks("tracked")
+            .build()
+            .await;
+
+        let client = reqwest::Client::new();
+
+        // Send two POST requests with different JSON bodies
+        let body_a = serde_json::json!({"model": "test-a", "messages": [{"role": "user", "content": "hello"}]});
+        let body_b = serde_json::json!({"model": "test-b", "messages": [{"role": "user", "content": "world"}]});
+
+        client
+            .post(format!("{}/v1/messages", server.url()))
+            .json(&body_a)
+            .send()
+            .await
+            .unwrap();
+
+        client
+            .post(format!("{}/v1/messages", server.url()))
+            .json(&body_b)
+            .send()
+            .await
+            .unwrap();
+
+        let received = server.received_requests();
+        assert_eq!(received.len(), 2, "should have received 2 requests");
+        assert_eq!(received[0].body["model"], "test-a");
+        assert_eq!(received[1].body["model"], "test-b");
+        assert_eq!(received[0].body["messages"][0]["content"], "hello");
+        assert_eq!(received[1].body["messages"][0]["content"], "world");
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_response_sequence() {
+        use crate::sse::{anthropic_sse_chunks, extract_text_from_sse, SseFormat};
+
+        let chunks_a = anthropic_sse_chunks("response alpha");
+        let chunks_b = anthropic_sse_chunks("response beta");
+
+        let server = MockLlmServerBuilder::new()
+            .response_sequence(vec![chunks_a, chunks_b])
+            .build()
+            .await;
+
+        let client = reqwest::Client::new();
+
+        // First request gets response A
+        let resp_a = client
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        // Second request gets response B
+        let resp_b = client
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        let events_a = crate::sse::parse_sse_events(&resp_a);
+        let events_b = crate::sse::parse_sse_events(&resp_b);
+        let text_a = extract_text_from_sse(&events_a, SseFormat::Anthropic);
+        let text_b = extract_text_from_sse(&events_b, SseFormat::Anthropic);
+
+        assert_eq!(text_a, "response alpha", "first call should get response A");
+        assert_eq!(text_b, "response beta", "second call should get response B");
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_response_sequence_repeats_last() {
+        use crate::sse::{anthropic_sse_chunks, extract_text_from_sse, SseFormat};
+
+        let chunks_only = anthropic_sse_chunks("the-only-response");
+
+        let server = MockLlmServerBuilder::new()
+            .response_sequence(vec![chunks_only])
+            .build()
+            .await;
+
+        let client = reqwest::Client::new();
+
+        // Both calls should get the same (only) response
+        let resp_1 = client
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        let resp_2 = client
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        let events_1 = crate::sse::parse_sse_events(&resp_1);
+        let events_2 = crate::sse::parse_sse_events(&resp_2);
+        let text_1 = extract_text_from_sse(&events_1, SseFormat::Anthropic);
+        let text_2 = extract_text_from_sse(&events_2, SseFormat::Anthropic);
+
+        assert_eq!(text_1, "the-only-response", "first call should get the response");
+        assert_eq!(text_2, "the-only-response", "second call should also get the response");
     }
 }
