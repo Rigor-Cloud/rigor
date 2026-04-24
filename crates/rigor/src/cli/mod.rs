@@ -1,5 +1,6 @@
 pub mod alert;
 pub mod config;
+pub mod corpus;
 pub mod diff;
 pub mod eval;
 pub mod gate;
@@ -213,6 +214,11 @@ pub enum Commands {
         /// Config value
         value: Option<String>,
     },
+    /// Recorded-LLM corpus management: record, stats, validate
+    Corpus {
+        #[command(subcommand)]
+        command: corpus::CorpusCommands,
+    },
     /// Verify source anchors and track code-grounded constraints.
     /// Uses LSP for deep semantic analysis (--deep) or grep for fast checks.
     Map {
@@ -412,6 +418,7 @@ pub fn run_cli() -> Result<()> {
         Some(Commands::Config { action, key, value }) => {
             config::run_config(&action, key.as_deref(), value.as_deref())
         }
+        Some(Commands::Corpus { command }) => corpus::run_corpus_command(command),
         Some(Commands::Map {
             path,
             codebase,
