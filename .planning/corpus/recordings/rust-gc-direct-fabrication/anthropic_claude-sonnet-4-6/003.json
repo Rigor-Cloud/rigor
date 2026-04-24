@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:9b85865e694d960764446892ac45ea8f225259474011fda43739928918f308f6",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T13:00:42.643728Z",
+  "temperature": 0.7,
+  "response_text": "# Rust Doesn't Have a Garbage Collector\n\nThis is a common misconception worth clarifying directly. **Rust has no garbage collector** — this is actually one of its defining features and primary design goals.\n\n---\n\n## How Rust Manages Memory Instead\n\nRust uses a compile-time system called **Ownership** with three core rules:\n\n### 1. Ownership Rules\n```rust\n// Each value has exactly ONE owner\nlet s1 = String::from(\"hello\");  // s1 owns the string\nlet s2 = s1;                      // ownership MOVES to s2\n// println!(\"{}\", s1);            // COMPILE ERROR - s1 is invalid\n```\n\n### 2. Borrowing & References\n```rust\nfn print_string(s: &String) {    // borrows, doesn't own\n    println!(\"{}\", s);\n}\n\nlet s1 = String::from(\"hello\");\nprint_string(&s1);               // pass a reference\nprintln!(\"{}\", s1);              // s1 still valid - we only borrowed\n```\n\n### 3. Lifetimes\n```rust\n// Compiler tracks how long references are valid\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n// 'a tells the compiler the return value lives as long\n// as the shorter of x or y\n```\n\n### 4. Automatic Drop (RAII)\n```rust\n{\n    let s = String::from(\"hello\");  // memory allocated\n    // use s...\n}   // s goes out of scope - memory AUTOMATICALLY freed\n    // no GC needed, compiler inserts free() here\n```\n\n---\n\n## How Java's Garbage Collector Works\n\nJava uses **automatic runtime garbage collection** — memory is freed by a background process, not at compile time.\n\n### The Basic Process\n```\n1. Allocate objects on the heap freely\n2. GC periodically finds objects with no references\n3. GC frees that memory\n4. Your program may pause during collection (\"stop the world\")\n```\n\n### Generational Collection (Modern Java Default)\n```",
+  "tokens": {
+    "prompt": 26,
+    "completion": 511
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035631-3Zuh0xgp97qD4ZIPG7wQ"
+}

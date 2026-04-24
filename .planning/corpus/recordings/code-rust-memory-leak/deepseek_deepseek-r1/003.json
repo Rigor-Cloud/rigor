@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:e1866ef81688b6a57a9f8878a727673424914fdd5f33d520103fc1f0052eac9d",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T10:26:29.750251Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Rust function that deliberately leaks memory using `Box::leak`:\n\n```rust\nfn create_leaked_data() -> &'static mut String {\n    let data = Box::new(String::from(\"This data will be leaked\"));\n    Box::leak(data)\n}\n```\n\n**How it works:**\n1. Creates a `Box<String>` on the heap\n2. `Box::leak` consumes the box and returns a `&'static mut String`\n3. The memory is never deallocated (until program termination)\n\n## When `Box::leak` is Appropriate:\n\n### 1. **Global/Static Data Initialization**\nWhen you need to initialize `static` or `const` variables with runtime data:\n```rust\nstatic APP_CONFIG: &Config = {\n    let config = Box::new(Config::load_from_file());\n    Box::leak(config)\n};\n```\n\n### 2. **FFI (Foreign Function Interface)**\nWhen passing data to C libraries that will manage memory themselves:\n```rust\nunsafe fn pass_to_c_library() {\n    let data = Box::new(vec![1, 2, 3]);\n    let ptr = Box::leak(data).as_mut_ptr();\n    c_function_taking_ownership(ptr);\n}\n```\n\n### 3. **Performance-Critical, Long-Lived Data**\nWhen allocation/deallocation overhead would hurt performance for data that lives nearly the entire program lifetime:\n```rust\nfn create_singleton() -> &'static mut Cache {\n    let cache = Box::new(Cache::new());\n    Box",
+  "tokens": {
+    "prompt": 29,
+    "completion": 576
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026369-eUfx5GyuB0ukAmrFa8xd"
+}

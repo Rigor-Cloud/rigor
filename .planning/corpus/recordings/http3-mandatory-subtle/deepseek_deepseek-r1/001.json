@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:53d61d01d1a912652850d02d10810df1b8612c79d90c732d012a95d992dd02a1",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T11:08:07.486037Z",
+  "temperature": 0.7,
+  "response_text": "",
+  "tokens": {
+    "prompt": 30,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028880-VcIA8JkWw9aI3odi3cOa"
+}

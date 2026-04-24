@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:9dd25bb1994545ba1ad4905c448bf649e33fa14eb49c5548dc1340783159ae55",
+  "model": "openai/gpt-4o",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:29:25.175639Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, memory management is handled automatically through the ownership system, but there are cases where you might want to intentionally leak memory. One way to do this is using `Box::leak`. This function takes ownership of a `Box` and converts it into a mutable reference with a `'static` lifetime, effectively preventing the memory from being automatically deallocated. This can be useful in specific scenarios where you want to allocate data that should exist for the entire duration of the program.\n\nHere's a simple example of how you might use `Box::leak` to deliberately leak memory:\n\n```rust\nfn leak_memory() -> &'static mut i32 {\n    let boxed_value = Box::new(42);\n    Box::leak(boxed_value) // Returns a &'static mut i32\n}\n\nfn main() {\n    let leaked_value = leak_memory();\n    println!(\"Leaked value: {}\", leaked_value);\n}\n```\n\n### Explanation\n\nIn this example:\n\n- We create a `Box` containing an `i32` with the value `42`.\n- We then call `Box::leak(boxed_value)`, which converts the `Box<i32>` into a `&'static mut i32`. This reference is now valid for the entire lifetime of the program, as the ownership of the allocated memory is never returned to the Rust allocator for deallocation.\n- The function `leak_memory` returns this leaked reference, and we use it in the main function to print the value.\n\n### When Is This Appropriate?\n\n1. **Global State**: If you need to create some global state that should exist for the duration of the program and you do not want to use unsafe code, `Box::leak` can help you create `'static` references without declaring them as static variables.\n\n2. **FFI Interactions**: When interfacing with foreign code (e.g., C libraries) that expects pointers to data that should not be deallocated, you can use `Box::leak` to ensure that the memory remains valid without worrying about Rust's automatic cleanup.\n\n3. **Singletons**: In some cases, you might be implementing a singleton pattern where an object is initialized once and used throughout the program.\n\n### Caveats\n\n- **Memory Leak**: As the name implies, using `Box::leak` will leak memory. This is generally undesirable unless you have a specific reason for doing so.\n- **Resource Limits**: Leaking memory can eventually exhaust system resources if used excessively or improperly.\n- **",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026559-WIVULYuq6IR1sEXQTBih"
+}

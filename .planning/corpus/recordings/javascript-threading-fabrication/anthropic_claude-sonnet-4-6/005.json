@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:13901fe88a8ee56078ea80b44bbda998f3853a1dc3f3d3728948938995ca3919",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T11:13:37.487788Z",
+  "temperature": 0.7,
+  "response_text": "# JavaScript's Threading Model\n\n## The Short Answer\n\n**JavaScript is single-threaded.** It does not have a built-in multi-threading model in the traditional sense — there is one main thread, one call stack, and one piece of code executing at a time.\n\n---\n\n## The Main Thread Architecture\n\n```\n┌─────────────────────────────────────────┐\n│              JS Engine                  │\n│                                         │\n│  ┌──────────┐    ┌───────────────────┐  │\n│  │Call Stack│    │   Heap (Memory)   │  │\n│  │          │    │                   │  │\n│  │ frame 3  │    │  { objects,       │  │\n│  │ frame 2  │    │    arrays,        │  │\n│  │ frame 1  │    │    closures... }  │  │\n│  └──────────┘    └───────────────────┘  │\n└─────────────────────────────────────────┘\n          │\n          ▼\n┌─────────────────────────────────────────┐\n│           Event Loop                    │\n│                                         │\n│  Microtask Queue  │  Macrotask Queue    │\n│  (Promises, etc.) │  (setTimeout, etc.) │\n└─────────────────────────────────────────┘\n```\n\n```javascript\n// This is NOT parallel — each line waits for the previous\nconsole.log(\"one\");\nconsole.log(\"two\");   // blocks until \"one\" is done\nconsole.log(\"three\"); // blocks until \"two\" is done\n\n// Even this is NOT multi-threaded — it's async/concurrent, not parallel\nsetTimeout(() => console.log(\"timeout\"), 0);\nPromise.resolve().then(() => console.log(\"promise\"));\nconsole.log(\"sync\");\n// Output: sync → promise → timeout\n```\n\n---\n\n## Concurrency vs Parallelism\n\n```\nConcurrency (JS default):        Parallelism (not default JS):\n                                 \nTask A: ██░░██░░██               Task A: ████████",
+  "tokens": {
+    "prompt": 23,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029209-Bgf3PlrX1SSbSrWyoZtr"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:f4176078d1585e5b98b62e695bf420b1181ed036d1a9b849526efce0024e965c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T11:03:30.258725Z",
+  "temperature": 0.7,
+  "response_text": "Here are the most common HTTP status codes, grouped by category:\n\n### **1xx: Informational**\n- **100 Continue**: The server has received the request headers and the client can proceed with the body.\n\n### **2xx: Success**\n- **200 OK**: The request succeeded.\n- **201 Created**: The request succeeded, and a new resource was created (e.g., after a POST).\n- **204 No Content**: The request succeeded, but there’s no content to send back (common after DELETE).\n\n### **3xx: Redirection**\n- **301 Moved Permanently**: The resource has been permanently moved to a new URL.\n- **302 Found (Temporary Redirect)**: The resource is temporarily at a different URL.\n- **304 Not Modified**: Used for caching; the resource hasn’t changed since the last request.\n\n### **4xx: Client Errors**\n- **400 Bad Request**: The server can’t understand the request due to malformed syntax.\n- **401 Unauthorized**: Authentication is required and has failed or not been provided.\n- **403 Forbidden**: The server understands the request but refuses to authorize it.\n- **404 Not Found**: The requested resource could not be found on the server.\n- **405 Method Not Allowed**: The HTTP method used is not supported for the resource.\n- **429 Too Many Requests**: The user has sent too many requests in a given time (rate limiting).\n\n### **5xx: Server Errors**\n- **500 Internal Server Error**: A generic error when the server encounters an unexpected condition.\n- **502 Bad Gateway**: The server, acting as a gateway, received an invalid ",
+  "tokens": {
+    "prompt": 22,
+    "completion": 482
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028593-K4WWrH5YkmEMm5IpMnnd"
+}

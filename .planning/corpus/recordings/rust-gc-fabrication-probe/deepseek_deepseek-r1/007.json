@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:4c9d79ef29930657a2a30091bfeaf8501d7eb8dbdf5c8fc67f428bd6eb0f2513",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T12:41:51.482980Z",
+  "temperature": 0.7,
+  "response_text": "Memory management in Rust revolves around **compile-time ownership rules** that guarantee memory safety without a garbage collector. Here's a breakdown of its core concepts:\n\n## 1. **Ownership Rules**\n- Each value in Rust has a single **owner** (variable).\n- When the owner goes out of scope, the value is automatically dropped.\n- Ownership can be **moved** (transferred) to another variable.\n\n```rust\nlet s1 = String::from(\"hello\");  // s1 owns the String\nlet s2 = s1;                     // Ownership moves to s2\n// println!(\"{}\", s1);          // ERROR: s1 no longer valid\n```\n\n## 2. **Borrowing & References**\nInstead of moving ownership, you can **borrow** values:\n- **Immutable references** (`&T`): Multiple readers allowed\n- **Mutable references** (`&mut T`): Only one exclusive writer allowed\n- References must always point to valid data (no dangling pointers)\n\n```rust\nlet mut s = String::from(\"hello\");\nlet r1 = &s;                    // Immutable borrow OK\nlet r2 = &s;                    // Another immutable borrow OK\n// let r3 = &mut s;             // ERROR: can't mix mutable and immutable\n```\n\n## 3. **Lifetimes**\n- Explicit annotations (`'a`) ensure references don't outlive their data\n- Mostly inferred by the compiler; explicit only in complex cases\n\n```rust\nfn longest<'a>(x: &'a str, y: &'a str) ->",
+  "tokens": {
+    "prompt": 20,
+    "completion": 497
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777034494-6jtm97xPfeGahL8uyMSP"
+}

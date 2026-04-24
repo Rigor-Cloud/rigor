@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:9b85865e694d960764446892ac45ea8f225259474011fda43739928918f308f6",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T13:01:22.244881Z",
+  "temperature": 0.7,
+  "response_text": "# Rust Doesn't Have a Garbage Collector\n\nThis is a common misconception worth clarifying directly. **Rust has no garbage collector** — this is actually one of its defining features and primary design goals.\n\n---\n\n## How Rust Manages Memory\n\nRust uses a compile-time ownership system instead of runtime garbage collection.\n\n### Core Concepts\n\n**Ownership Rules:**\n```rust\nfn main() {\n    let s1 = String::from(\"hello\"); // s1 owns the string\n    let s2 = s1;                    // ownership MOVES to s2\n    // println!(\"{}\", s1);          // COMPILE ERROR - s1 is invalid\n    println!(\"{}\", s2);             // fine\n} // s2 goes out of scope, memory freed automatically\n```\n\n**Borrowing (references without ownership transfer):**\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");\n    \n    let len = calculate_length(&s1); // borrow s1, don't move it\n    \n    println!(\"{} has length {}\", s1, len); // s1 still valid\n}\n\nfn calculate_length(s: &String) -> usize { // s is a reference\n    s.len()\n} // s goes out of scope but doesn't own anything, nothing freed\n```\n\n**Lifetimes (compiler-verified reference validity):**\n```rust\n// Compiler ensures the returned reference can't outlive its source\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n```\n\n### When Memory is Freed\n\nMemory is freed **deterministically** when a value's owner goes out of scope, via the `Drop` trait:\n\n```rust\nstruct MyResource {\n    data: Vec<u8>,\n}\n\nimpl Drop for MyResource {\n    fn drop(&mut self) {\n        println!(\"Freeing resource!\"); // called automatically, predictably\n    }\n}\n\nfn main() {\n    {\n        let r = MyResource { data: vec![1, 2, 3] };\n    } // <- drop() called",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035672-A5TNPji4bEs1WB6xKYBQ"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-compile-fabrication",
+  "prompt_hash": "sha256:e41c1c46e716a2c3886d7d24be00325f4a736eb1fa09e9e2442f6877d4f58897",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T11:45:28.615955Z",
+  "temperature": 0.7,
+  "response_text": "## Python's Ahead-of-Time (AOT) Compilation\n\nI need to clarify a common misconception first: **Python doesn't have a built-in AOT compiler**. The standard CPython implementation uses a different execution model. Let me explain what actually happens and what AOT options exist.\n\n---\n\n## What CPython Actually Does\n\n```\nPython Source (.py)\n       ↓\n   Lexer/Parser\n       ↓\n   AST (Abstract Syntax Tree)\n       ↓\n   Bytecode Compiler\n       ↓\n   .pyc files (bytecode)\n       ↓\n   CPython VM (interprets bytecode at runtime)\n```\n\nThis is **interpreted**, not AOT compiled to native machine code.\n\n---\n\n## Actual AOT Compilation Tools for Python\n\n### 1. Cython\n\n```python\n# example.pyx - Cython source\ndef add_numbers(int x, int y):\n    cdef int result\n    result = x + y\n    return result\n\n# With type annotations, generates C code → compiled to .so/.pyd\n```\n\n```bash\n# Compilation pipeline\ncython example.pyx          # Generates example.c\ngcc -shared example.c -o example.so  # Compiles to native code\n```\n\n**What Cython actually does:**\n```\n.pyx source\n    ↓\nCython compiler analyzes types\n    ↓\nGenerates C code (with CPython API calls)\n    ↓\nC compiler (gcc/clang) → native machine code\n    ↓\nShared library (.so/.pyd)\n```\n\n**Key limitation:** Still interacts with CPython runtime for untyped objects.\n\n---\n\n### 2. Nuitka\n\n```python\n# regular_python.py\ndef fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)\n\nprint(fibonacci(30))\n```\n\n```bash\n# Compile to standalone executable\npython -m nuitka --standalone --onefile regular_python.py\n```\n\n**Nuitka's Pipeline:**\n```\nPython source\n    ↓\nParse to",
+  "tokens": {
+    "prompt": 25,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777031119-60NQH0Neb05JISow0RGM"
+}

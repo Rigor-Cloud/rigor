@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:321c3a00b8f76950fc666090e5578b646f8ddbea6706d6d08c1e88e8a170dea4",
+  "model": "openai/gpt-4o",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T13:21:11.221039Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, the `unsafe` keyword is used to perform operations that the Rust compiler cannot guarantee to be safe. This doesn't mean that using `unsafe` is inherently dangerous, but rather that you, as the programmer, are responsible for upholding Rust's safety guarantees manually. You should use `unsafe` when you need to perform operations that are not allowed in safe Rust, including:\n\n1. **Dereferencing raw pointers**: Raw pointers (`*const T` and `*mut T`) are not checked for validity or nullability. They can be used to interface with C code or to perform manual memory management.\n\n2. **Calling unsafe functions or methods**: Some functions, often part of foreign function interfaces (FFIs) or lower-level system operations, are marked `unsafe` because their correctness cannot be guaranteed by the Rust compiler alone.\n\n3. **Accessing or modifying mutable static variables**: Global mutable variables can lead to data races, so they must be handled carefully.\n\n4. **Implementing unsafe traits**: Some traits have safety invariants that cannot be enforced by the compiler, so implementing them requires manual checks.\n\n5. **Using inline assembly**: Inline assembly is inherently unsafe because it bypasses the Rust compiler's control flow and safety checks.\n\nDespite the additional responsibilities in an `unsafe` block, Rust's compiler still provides several guarantees:\n\n- **Type Safety**: Rust's type system is still in effect. The types of variables, function signatures, and other type-related checks are still enforced.\n- **Memory Safety**: While `unsafe` allows manual memory management, Rust still requires that you correctly manage memory to avoid issues like double frees or invalid memory access. However, you must manually ensure that these guarantees are upheld.\n- **Data Races**: While `unsafe` allows for data races in theory, Rust's aliasing rules and borrow checker are still in effect outside of `unsafe`. This means that you must be careful to avoid data races when using `unsafe`.\n\nIn summary, `unsafe` should be used judiciously and only when absolutely necessary. You should aim to minimize `unsafe` code and encapsulate it in safe abstractions whenever possible, ensuring that the rest of your codebase can benefit from Rust’s safety guarantees.",
+  "tokens": {
+    "prompt": 27,
+    "completion": 457
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036865-8io3UQBdXdmvuBSP4fyV"
+}

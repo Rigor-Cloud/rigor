@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:0e8672c1476a9d0cb89b3c171746e9711c93ee4cc10c7b3ffb329bccd0ad14e6",
+  "model": "openai/gpt-4o",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:21:56.196344Z",
+  "temperature": 0.7,
+  "response_text": "Certainly! The `gc` module in Python provides an interface to the garbage collector, which is responsible for automatic memory management and recycling of unused objects. You can manually control garbage collection cycles using this module. Below is a Python script that demonstrates how to manually control garbage collection cycles using the `gc` module.\n\n```python\nimport gc\n\ndef create_cyclic_reference():\n    \"\"\"Create a simple cyclic reference to demonstrate garbage collection.\"\"\"\n    a = {}\n    b = {'ref': a}\n    a['ref'] = b\n    return a, b\n\ndef main():\n    # Disable automatic garbage collection\n    gc.disable()\n    print(\"Automatic garbage collection is disabled.\")\n\n    # Create a cyclic reference\n    a, b = create_cyclic_reference()\n\n    # Check the number of objects tracked by the collector\n    num_objects = len(gc.get_objects())\n    print(f\"Number of objects tracked by GC: {num_objects}\")\n\n    # Collect garbage manually\n    print(\"Starting manual garbage collection...\")\n    unreachable_objects = gc.collect()\n    print(f\"Unreachable objects collected: {unreachable_objects}\")\n\n    # Check the number of objects tracked by the collector again\n    num_objects_after_collection = len(gc.get_objects())\n    print(f\"Number of objects tracked by GC after collection: {num_objects_after_collection}\")\n\n    # Optionally re-enable automatic garbage collection\n    gc.enable()\n    print(\"Automatic garbage collection is re-enabled.\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\n### Explanation:\n\n1. **Disable Automatic Garbage Collection**: The script disables the automatic garbage collection by calling `gc.disable()`. This allows you to manually control when garbage collection occurs.\n\n2. **Create Cyclic References**: The `create_cyclic_reference` function creates a simple cyclic reference between two dictionaries. This is done to demonstrate how the garbage collector handles objects that reference each other but are otherwise unreachable.\n\n3. **Check Number of Tracked Objects**: The script uses `gc.get_objects()` to get a list of all objects currently tracked by the garbage collector and prints the count.\n\n4. **Manual Garbage Collection**: The `gc.collect()` function is called to manually trigger a garbage collection cycle. It returns the number of unreachable objects that were collected.\n\n5. **Re-enable Automatic Garbage Collection**: Finally, the script re-enables automatic garbage collection using `gc.enable()`.\n\nThis script demonstrates manual garbage collection control and should be used in scenarios where you need specific control over memory management, which is not often necessary for",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026110-Gt3XhTWrO7SbKN1QxEIE"
+}

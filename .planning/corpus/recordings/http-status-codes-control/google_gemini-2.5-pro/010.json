@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:6d08f521e57dde99b0988218b31486cbab55368e3c9c40818f4ad29bf3dbcf37",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T11:06:32.420330Z",
+  "temperature": 0.7,
+  "response_text": "Of course! Here are the most common HTTP status codes, broken down by category, with clear explanations",
+  "tokens": {
+    "prompt": 12,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028783-GzdmtaGuDb2u8Fs1MsNq"
+}

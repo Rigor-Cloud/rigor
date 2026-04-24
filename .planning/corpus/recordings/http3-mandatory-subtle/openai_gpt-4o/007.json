@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:ac11a189c661e9d7858b4d385dd1fdccee240074c93e6dcb055b739cc3372fd3",
+  "model": "openai/gpt-4o",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T11:11:07.409489Z",
+  "temperature": 0.7,
+  "response_text": "As of my knowledge cutoff in October 2023, HTTP/3 is not mandatory, but it has become increasingly popular due to its performance benefits. If you're looking to configure HTTP/3 on your Nginx server, here's a general guide on how to do it. Note that the steps might vary slightly based on your specific environment and updates after 2023.\n\n### Prerequisites\n1. **Nginx Version**: Ensure you have a version of Nginx that supports HTTP/3. This typically means using a version that includes QUIC support, such as those available from the Nginx mainline release or a custom build that includes HTTP/3 patches.\n   \n2. **OpenSSL**: Make sure you have a version of OpenSSL that supports QUIC, such as OpenSSL 3.0 or a compatible fork like BoringSSL or LibreSSL.\n\n3. **Certificates**: Obtain a TLS certificate, as HTTP/3 requires secure connections.\n\n### Steps to Configure HTTP/3\n\n1. **Install Nginx with HTTP/3 Support**:\n   - You may need to compile Nginx from source or use a repository that provides HTTP/3-enabled builds.\n   - Ensure that the version of OpenSSL used supports the necessary protocols for QUIC.\n\n2. **Modify Nginx Configuration**:\n   - Locate your Nginx configuration file, typically found at `/etc/nginx/nginx.conf` or `/etc/nginx/sites-available/default`.\n   - Add or modify the following directives in your server block to enable HTTP/3:\n\n     ```nginx\n     server {\n         listen 443 ssl http2;\n         listen [::]:443 ssl http2;\n         listen 443 quic reuseport;\n         listen [::]:443 quic reuseport;\n\n         ssl_certificate /path/to/your/fullchain.pem;\n         ssl_certificate_key /path/to/your/privkey.pem;\n\n         # Enable HTTP/3 and QUIC\n         http3 on;\n         \n         # Add Alt-Svc header to indicate HTTP/3 support\n         add_header Alt-Svc 'h3-29=\":443\"; ma=86400';\n\n         # ... other configuration settings ...\n     }\n     ```\n\n3. **Adjust Firewall Settings**:\n   - Ensure your firewall allows UDP traffic on port 443, as HTTP/3 uses UDP.\n\n4. **Test Configuration**:\n   - Check Nginx configuration for syntax errors:\n     ```bash\n     sudo nginx -t\n",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029054-DD61v3tkABsIxP98F9Vk"
+}

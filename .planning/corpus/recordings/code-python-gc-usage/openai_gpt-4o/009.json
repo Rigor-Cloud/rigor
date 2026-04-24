@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:0e8672c1476a9d0cb89b3c171746e9711c93ee4cc10c7b3ffb329bccd0ad14e6",
+  "model": "openai/gpt-4o",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T10:22:41.842221Z",
+  "temperature": 0.7,
+  "response_text": "Certainly! The `gc` module in Python provides an interface to the garbage collection facility. You can use it to manually control garbage collection cycles, inspect garbage collection statistics, and manage memory more precisely. Below is a simple script that demonstrates how to use the `gc` module to manually trigger garbage collection, inspect the collected objects, and enable or disable automatic garbage collection.\n\n```python\nimport gc\n\ndef main():\n    # Disable automatic garbage collection\n    gc.disable()\n    print(\"Automatic garbage collection disabled.\")\n\n    # Create some objects for demonstration\n    class MyObject:\n        def __init__(self, name):\n            self.name = name\n\n    obj1 = MyObject(\"Object 1\")\n    obj2 = MyObject(\"Object 2\")\n    obj3 = MyObject(\"Object 3\")\n\n    # Collect garbage manually\n    print(\"Collecting garbage manually...\")\n    unreachable_objects = gc.collect()\n    print(f\"Number of unreachable objects collected: {unreachable_objects}\")\n\n    # Print statistics\n    gc_stats = gc.get_stats()\n    print(\"Garbage Collection Statistics:\")\n    for i, stat in enumerate(gc_stats):\n        print(f\"Generation {i}: {stat}\")\n\n    # Enable automatic garbage collection\n    gc.enable()\n    print(\"Automatic garbage collection enabled.\")\n\n    # Trigger a manual garbage collection cycle\n    print(\"Triggering manual garbage collection...\")\n    unreachable_objects = gc.collect()\n    print(f\"Number of unreachable objects collected: {unreachable_objects}\")\n\n    # List objects tracked by the garbage collector\n    tracked_objects = gc.get_objects()\n    print(f\"Number of objects tracked by the garbage collector: {len(tracked_objects)}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\n### Explanation:\n\n1. **Disabling and Enabling Automatic Garbage Collection**:\n   - `gc.disable()` is used to turn off automatic garbage collection. This means that garbage collection will not occur automatically.\n   - `gc.enable()` re-enables automatic garbage collection.\n\n2. **Creating Objects**:\n   - A simple class `MyObject` is defined and a few instances are created. These objects are used to demonstrate garbage collection.\n\n3. **Manual Garbage Collection**:\n   - `gc.collect()` is called to manually trigger garbage collection. This function returns the number of objects that were unreachable and collected.\n\n4. **Inspecting Garbage Collection Statistics**:\n   - `gc.get_stats()` returns statistics about the collector's work. It provides details for each of the three generations used by the garbage",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026156-8av1g1pSE0OHQpekHVQB"
+}

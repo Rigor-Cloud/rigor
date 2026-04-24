@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:e1866ef81688b6a57a9f8878a727673424914fdd5f33d520103fc1f0052eac9d",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:27:56.703403Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Rust function that deliberately leaks memory using `Box::leak`, along with an explanation of when this is appropriate:\n\n```rust\nfn create_static_string() -> &'static str {\n    let boxed_string = Box::new(\"I will live forever!\".to_string());\n    Box::leak(boxed_string)\n}\n\n// Alternative function with integer\nfn leak_integer() -> &'static i32 {\n    let boxed_int = Box::new(42);\n    Box::leak(boxed_int)\n}\n\nfn main() {\n    let leaked_string = create_static_string();\n    println!(\"Leaked string: {}\", leaked_string);\n    \n    let leaked_int = leak_integer();\n    println!(\"Leaked integer: {}\", leaked_int);\n    \n    // These references are valid for the entire program duration\n    // The memory will never be reclaimed\n}\n```\n\n## What `Box::leak` Does:\n1. Takes ownership of a `Box<T>`\n2. Returns a `&'static mut T` (mutable static reference) or `&'static T` (immutable)\n3. Prevents Rust's automatic deallocation (prevents `Drop` from being called)\n4. The memory remains allocated for the rest of the program's execution\n\n## When `Box::leak` is Appropriate:\n\n### 1. **Creating Static-Lifetime Data**\n```rust\n// Useful for global constants that need initialization at runtime\nlazy_static! {\n    static ref CONFIG: &'static str = {\n        let config = read_config_file(); // Runtime initialization\n       ",
+  "tokens": {
+    "prompt": 29,
+    "completion": 382
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026463-ofwzbXmpJm4oJF9gfjMU"
+}

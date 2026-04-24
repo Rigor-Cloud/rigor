@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:1e215f3e679455341b9954f1984dfea1bd5c8328149959599aac793e1616a09c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T11:16:33.187946Z",
+  "temperature": 0.7,
+  "response_text": "JavaScript's concurrency model is based on **a single-threaded event loop** for its main execution, but it also supports multi-threading via **Web Workers** in browsers and **Worker Threads** in Node.js. However, unlike languages like C++ or Java, JavaScript threads do **not share memory by default**—they communicate via **message passing**.\n\n---\n\n### 1. **Single-Threaded Event Loop (Main Thread)**\n   - JavaScript runs on a single main thread (the UI thread in browsers) using an event-driven, non-blocking model.\n   - Asynchronous operations (like I/O, timers, or network requests) are handled by the browser or Node.js runtime, which delegates tasks to system threads but returns results to the main thread via the event loop.\n\n---\n\n### 2. **Multi-Threading with Web Workers (Browser) / Worker Threads (Node.js)**\n   - **Workers** are separate JavaScript threads that run in parallel to the main thread.\n   - **No Shared Memory by Default**: Each worker has its own isolated memory space, global object, and event loop. They cannot directly access the DOM or variables from the main thread.\n   - **Communication via Message Passing**: Workers and the main thread communicate using `postMessage()` and `onmessage` events, passing **copied data** (structured cloning) or transferring ownership of certain objects (e.g., `ArrayBuffer`).\n\n   **Example (Web Worker):**\n   ```javascript\n   // Main thread\n   const worker = new Worker('worker.js');\n   worker.postMessage({ data:",
+  "tokens": {
+    "prompt": 24,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029376-2QjFI9nNkMskGsLluccj"
+}

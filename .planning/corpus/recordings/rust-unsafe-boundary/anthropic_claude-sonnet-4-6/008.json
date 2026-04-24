@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T13:15:16.503652Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or type system — it unlocks **five specific capabilities** the compiler can't verify automatically.\n\n```rust\nunsafe {\n    // You can now:\n    // 1. Dereference raw pointers\n    // 2. Call unsafe functions/methods\n    // 3. Access/modify mutable static variables\n    // 4. Implement unsafe traits\n    // 5. Access fields of unions\n}\n```\n\n## What the Compiler Still Guarantees Inside unsafe\n\nThis is the critical misunderstanding — **most safety guarantees still hold**:\n\n```rust\nunsafe {\n    let x = 5u32;\n    let y: &str = x; // ❌ Still a compile error — type system still works\n    \n    let s = String::from(\"hello\");\n    drop(s);\n    println!(\"{s}\"); // ❌ Still a compile error — borrow checker still works\n    \n    // Lifetimes, ownership, type inference — all still enforced\n}\n```\n\n**What you're taking responsibility for** is a narrow set of *memory safety invariants* the compiler can't prove.\n\n---\n\n## The Five unsafe Capabilities in Detail\n\n### 1. Dereferencing Raw Pointers\n\n```rust\nlet mut value = 42i32;\nlet ptr: *mut i32 = &mut value;\n\n// Creating raw pointers is safe; dereferencing is not\nunsafe {\n    *ptr += 1;\n    println!(\"{}\", *ptr); // 43\n}\n\n// Why unsafe? The compiler can't verify:\n// - The pointer isn't null\n// - The pointer is properly aligned\n// - The memory is still valid (not freed/moved)\n// - No aliasing violations exist\n```\n\n### 2. Calling unsafe Functions\n\n```rust\n// Declaring a function unsafe means callers must uphold invariants\nunsafe fn dangerous_slice(ptr: *const u8, len: usize) -> &'static [u8] {\n    std::slice::from_raw_parts(ptr, len) // also unsafe internally\n}\n\n// Must call inside unsafe block\nlet data = vec",
+  "tokens": {
+    "prompt": 29,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036503-CXjKeeLkWTREf3S4nTag"
+}

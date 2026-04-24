@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:ac11a189c661e9d7858b4d385dd1fdccee240074c93e6dcb055b739cc3372fd3",
+  "model": "openai/gpt-4o",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T11:10:32.847249Z",
+  "temperature": 0.7,
+  "response_text": "As of my last update, HTTP/3 is not mandatory for all web servers, but if this changes in the future, it's good to be prepared. HTTP/3 is based on the QUIC protocol and offers improvements over HTTP/2, such as reduced latency and improved performance on unreliable networks. Configuring HTTP/3 support in Nginx involves a few steps.\n\nHere's a general guide on how to configure your Nginx instance to support HTTP/3:\n\n### 1. Ensure Nginx Version Supports HTTP/3\n\nFirst, make sure you're running a version of Nginx that supports HTTP/3. As of my knowledge cutoff, official support is available in the Nginx mainline version and requires compiling from source or using a prebuilt package that includes HTTP/3 support.\n\n### 2. Install Dependencies\n\nHTTP/3 requires QUIC and TLS 1.3 support. Make sure you have the following:\n\n- **OpenSSL** (version 1.1.1 or later) compiled with QUIC support.\n- **BoringSSL** can also be an option, but it requires more complex management.\n\n### 3. Compile Nginx with HTTP/3 Support\n\nIf you're compiling from source, you'll need to include the `ngx_http_v3_module`. Here's a simplified example of how to compile Nginx with HTTP/3 support:\n\n```bash\n# Clone the Nginx source\ngit clone https://github.com/nginx/nginx.git\n\n# Change to the Nginx directory\ncd nginx\n\n# Configure with HTTP/3 module\n./configure --with-http_v3_module --with-openssl=/path/to/openssl \\\n            --with-http_ssl_module --with-http_v2_module\n\n# Compile and install\nmake\nmake install\n```\n\n### 4. Update Nginx Configuration\n\nModify your Nginx configuration files to enable HTTP/3. Here's a basic example:\n\n```nginx\nserver {\n    listen 443 ssl http2;\n    listen [::]:443 ssl http2;\n\n    # Enable QUIC and HTTP/3\n    listen 443 quic reuseport;\n    listen [::]:443 quic reuseport;\n\n    ssl_certificate /path/to/your/certificate.crt;\n    ssl_certificate_key /path/to/your/private.key;\n\n    # Specify supported protocols\n    ssl_protocols TLSv1.3;\n\n    # Use a strong cipher suite\n    ssl_ciphers 'TLS_AES_128_GCM_SHA256:",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029025-lu47iPgTFVw1b8qGZ2jX"
+}

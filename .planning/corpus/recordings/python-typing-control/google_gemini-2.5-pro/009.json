@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-typing-control",
+  "prompt_hash": "sha256:ef707d5af03e01fca90bff47a375bf4e3ad1929b37b487c8a92cc6710179950e",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T13:35:01.470212Z",
+  "temperature": 0.7,
+  "response_text": "Of course! Type hints are one of the most significant features added to modern Python. They allow you to",
+  "tokens": {
+    "prompt": 10,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037694-35gYyhFmLE7kEGdhiJ46"
+}

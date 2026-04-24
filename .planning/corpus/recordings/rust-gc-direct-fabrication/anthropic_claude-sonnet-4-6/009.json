@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:9b85865e694d960764446892ac45ea8f225259474011fda43739928918f308f6",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T13:01:41.002148Z",
+  "temperature": 0.7,
+  "response_text": "# Rust Doesn't Have a Garbage Collector\n\nThis is a common misconception worth clarifying directly. **Rust has no garbage collector** — this is actually one of its defining features and primary design goals.\n\n---\n\n## How Rust Manages Memory Instead\n\nRust uses a compile-time system called **Ownership** with three core rules:\n\n### 1. Ownership Rules\n```rust\n// Each value has exactly one owner\nlet s1 = String::from(\"hello\");  // s1 owns the string\n\nlet s2 = s1;                     // ownership MOVES to s2\n// println!(\"{}\", s1);           // COMPILE ERROR - s1 is no longer valid\n\n// Memory is freed automatically when owner goes out of scope\n```\n\n### 2. Borrowing & References\n```rust\nfn calculate_length(s: &String) -> usize {  // borrow, don't take ownership\n    s.len()\n}  // s goes out of scope but doesn't free memory (it doesn't own it)\n\nlet s1 = String::from(\"hello\");\nlet len = calculate_length(&s1);\nprintln!(\"{} has length {}\", s1, len);  // s1 still valid\n```\n\n### 3. Lifetimes\n```rust\n// Compiler tracks how long references are valid\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n// 'a tells compiler the returned reference lives as long as\n// the shorter of x and y\n```\n\n### 4. The Drop Trait (Destructors)\n```rust\nstruct MyResource {\n    data: String,\n}\n\nimpl Drop for MyResource {\n    fn drop(&mut self) {\n        println!(\"Freeing resource: {}\", self.data);\n        // cleanup happens automatically here\n    }\n}\n\n{\n    let r = MyResource { data: String::from(\"important\") };\n    // use r...\n}  // drop() called HERE automatically - deterministic!\n```\n\n---\n\n## How Java's GC Actually Works\n\nJava uses **automatic garbage collection** — a runtime process that finds",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035691-OFyhMdEQihok1DDVhpFr"
+}

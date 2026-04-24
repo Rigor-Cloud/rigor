@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:7cc5fd16c527ec48cb611c9c299013d74b7ed08d649f5726791be74b8f628f35",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T12:52:09.648214Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Management in Rust\n\nRust uses a unique approach that provides memory safety **without a garbage collector**, through a system of ownership, borrowing, and lifetimes enforced at compile time.\n\n---\n\n## Core Concepts\n\n### 1. Ownership\nEvery value has exactly one owner, and the value is dropped when the owner goes out of scope.\n\n```rust\nfn main() {\n    let s = String::from(\"hello\"); // s owns the string\n    println!(\"{}\", s);\n} // s goes out of scope, memory is freed automatically\n```\n\n**Ownership Transfer (Move)**\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1;           // ownership moves to s2\n// println!(\"{}\", s1); // ERROR: s1 is no longer valid\nprintln!(\"{}\", s2);    // OK\n```\n\n**Stack types are copied, not moved:**\n```rust\nlet x = 5;\nlet y = x;  // integers implement Copy, so x is still valid\nprintln!(\"{} {}\", x, y); // OK\n```\n\n---\n\n### 2. Borrowing\nInstead of transferring ownership, you can *borrow* a reference.\n\n**Immutable Borrow (`&T`)**\n```rust\nfn print_length(s: &String) {\n    println!(\"Length: {}\", s.len());\n}\n\nlet s = String::from(\"hello\");\nprint_length(&s); // borrow s\nprintln!(\"{}\", s); // s still valid here\n```\n\n**Mutable Borrow (`&mut T`)**\n```rust\nfn append(s: &mut String) {\n    s.push_str(\" world\");\n}\n\nlet mut s = String::from(\"hello\");\nappend(&mut s);\nprintln!(\"{}\", s); // \"hello world\"\n```\n\n**Key Borrowing Rules (enforced at compile time):**\n| Rule | Reason |\n|------|--------|\n| Many immutable borrows OR one mutable borrow | Prevents data races |\n| Borrows must not outlive the owner | Prevents dangling references |\n\n```rust\nlet mut s = String::from(\"hello\");\nlet r1 = &s;\nlet",
+  "tokens": {
+    "prompt": 18,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035121-VKCaxqhvZDh3bg02BWSY"
+}

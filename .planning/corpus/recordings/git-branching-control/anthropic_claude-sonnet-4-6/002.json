@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:38:12.925181Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## The Core Philosophy Difference\n\n```\nGitFlow: Multiple long-lived branches, structured releases\nTrunk-Based: Everyone integrates to one branch frequently\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain (production)\n├── develop (integration)\n│   ├── feature/user-auth\n│   ├── feature/payment-system\n│   └── feature/notifications\n├── release/1.2.0\n├── hotfix/critical-bug\n└── (tags: v1.0.0, v1.1.0, v1.2.0)\n```\n\n### Branch Roles\n```\n┌─────────────┬──────────────────────────────────────────┐\n│ Branch      │ Purpose                                  │\n├─────────────┼──────────────────────────────────────────┤\n│ main        │ Production-ready code only               │\n│ develop     │ Integration branch for features          │\n│ feature/*   │ Individual features (from develop)       │\n│ release/*   │ Release prep, bug fixes only             │\n│ hotfix/*    │ Emergency production fixes               │\n└─────────────┴──────────────────────────────────────────┘\n```\n\n### Typical GitFlow Lifecycle\n```bash\n# 1. Start a feature\ngit checkout develop\ngit checkout -b feature/user-authentication\n\n# 2. Work on feature\ngit add .\ngit commit -m \"Add login endpoint\"\ngit commit -m \"Add JWT token handling\"\ngit commit -m \"Add session management\"\n\n# 3. Merge feature back to develop\ngit checkout develop\ngit merge --no-ff feature/user-authentication\ngit branch -d feature/user-authentication\n\n# 4. Create release branch\ngit checkout -b release/1.2.0\n\n# 5. Release prep (version bumps, minor fixes only)\ngit commit -m \"Bump version to 1.2.0\"\ngit commit -m \"Fix release notes typo\"\n\n# 6. Finish release - merge to BOTH main and develop\ngit checkout main\ngit",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027083-9j9RRCxEgnOd5MDDHHaC"
+}

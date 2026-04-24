@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-jit-subtle-fabrication",
+  "prompt_hash": "sha256:e6f85812731d81ae11019597265b6652c83298124b343c6afcbc47097834ddb8",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T11:51:22.469948Z",
+  "temperature": 0.7,
+  "response_text": "Python 3.13 does **not** ship with a production-ready JIT compiler. This is a common misconception worth correcting.\n\n## What Python 3.13 Actually Has\n\nPython 3.13 includes an **experimental, opt-in JIT** based on a \"copy-and-patch\" technique that:\n- Must be explicitly enabled at **compile time** with `--enable-experimental-jit`\n- Is **not enabled by default**\n- Is explicitly labeled **experimental**\n- Shows **modest or mixed performance results** in benchmarks\n\n## Realistic Performance Picture\n\nThe experimental JIT in 3.13 showed roughly:\n- **0-5% improvement** in some benchmarks\n- **Regressions in others**\n- Not competitive with PyPy or other mature JIT implementations\n\n## What Python 3.13 Actually Improved\n\nMore impactful real changes include:\n- **Free-threaded mode** (no GIL, experimental) via `--disable-gil`\n- Incremental garbage collector improvements\n- General interpreter optimizations continuing from 3.11/3.12\n\n## Where Significant Python Speedups Actually Came From\n\n| Version | Notable Gain |\n|---------|-------------|\n| 3.11 | ~25% faster via adaptive interpreter |\n| 3.12 | Further interpreter improvements |\n| 3.13 | Modest gains, groundwork for future JIT |\n\n## If You Need Real JIT Performance Now\n\n- **PyPy** - mature, production JIT, often 5-10x faster\n- **Numba** - JIT for numerical code\n- **Cython** - compiled extensions\n\nThe Python JIT is promising groundwork but not yet a performance solution you should rely on.",
+  "tokens": {
+    "prompt": 31,
+    "completion": 400
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777031467-I8l9nxoWpuz1IEIYeVaj"
+}

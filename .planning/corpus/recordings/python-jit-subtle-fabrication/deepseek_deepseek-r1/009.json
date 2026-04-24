@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-jit-subtle-fabrication",
+  "prompt_hash": "sha256:20794700575129f01fa3fa321e21241318a01663eab050cca8c8a2614f698af8",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T12:48:05.259636Z",
+  "temperature": 0.7,
+  "response_text": "",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777034876-BodANzjfXOQKpylXCxQI"
+}

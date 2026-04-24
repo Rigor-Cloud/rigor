@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:321c3a00b8f76950fc666090e5578b646f8ddbea6706d6d08c1e88e8a170dea4",
+  "model": "openai/gpt-4o",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T13:21:05.403081Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, the `unsafe` keyword is used to perform operations that the Rust compiler cannot guarantee to be safe. This doesn't mean the code should be inherently dangerous, but rather that you're taking responsibility for ensuring certain safety guarantees that Rust's borrow checker and type system usually enforce automatically. Here are some scenarios where you might need to use `unsafe`:\n\n1. **Dereferencing Raw Pointers**: Safe Rust uses references (`&` and `&mut`) which are always guaranteed to be valid. If you're dealing with raw pointers (`*const T` and `*mut T`), you'll need to use `unsafe` to dereference them, as raw pointers can point to any memory and might not be valid.\n\n2. **Calling Unsafe Functions or Methods**: Some functions are marked as `unsafe` because they have preconditions that the compiler cannot verify. To call these functions, you need to wrap the call in an `unsafe` block.\n\n3. **Accessing or Modifying Mutable Static Variables**: Static variables in Rust are shared across threads and need to be accessed in an `unsafe` block because they can introduce data races.\n\n4. **Implementing Unsafe Traits**: Some traits are marked as `unsafe` because their implementations must uphold certain invariants that the compiler cannot check. Implementing these traits requires an `unsafe` block.\n\n5. **Using Inline Assembly**: Inline assembly (`asm!`) is inherently unsafe because it involves executing raw machine instructions.\n\n6. **FFI (Foreign Function Interface) Calls**: When interfacing with other languages like C, you often use `unsafe` blocks because the Rust compiler cannot guarantee the safety of foreign code.\n\nInside `unsafe` blocks, the Rust compiler still provides some guarantees:\n\n- **Type Safety**: Types remain enforced, so you can't perform operations that violate type constraints.\n- **Memory Safety**: Although you can perform actions that could result in memory safety issues (like dereferencing raw pointers), the compiler still ensures memory safety with respect to type size and layout. You still have to manually ensure that all memory operations are safe.\n- **No Data Races**: While the borrow checker is relaxed inside `unsafe` blocks, Rust still prevents data races at the type system level by ensuring that only one mutable reference exists at a time, or only immutable references exist.\n- **Lifetime Annotations**: Lifetimes still apply, and the compiler enforces them to some extent to ensure references are valid for their intended scope.\n\nUsing `unsafe` should be limited and localized",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036858-G0aeFlEORkMY2XQTPaDY"
+}

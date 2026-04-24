@@ -1,0 +1,15 @@
+{
+  "prompt_id": "hedged-python-compile",
+  "prompt_hash": "sha256:9f150881c56d2dcf2814d4f31e4306ffd7662d807c20fad80a36dfc9785c6d72",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:54:34.499710Z",
+  "temperature": 0.7,
+  "response_text": "## Python Compilation: The Reality\n\nThe claim is **mostly misleading**. Here's what actually happens:\n\n### Standard CPython (the common implementation)\n\n```\nYour .py file → Bytecode (.pyc) → Interpreted by CPython VM\n```\n\n- Python compiles to **bytecode**, not native machine code\n- Bytecode runs on the **CPython virtual machine**, not directly on hardware\n- This is similar to Java's JVM approach, but **without a JIT compiler**\n- The `.pyc` files in `__pycache__` are this bytecode\n\n### Why It Feels Like \"Native Code\"\n\n- The CPython VM itself is written in C and **is** compiled to native code\n- So Python runs *on top of* native code, but isn't compiled *to* native code\n\n---\n\n### Tools That Actually Produce Native Code\n\n| Tool | Approach | Caveats |\n|------|----------|---------|\n| **Cython** | Compiles to C, then native | Requires type annotations for real gains |\n| **Nuitka** | Compiles Python to C++ | Good compatibility, real speedups |\n| **PyPy** | JIT compilation | Different runtime, not CPython |\n| **mypyc** | Uses type hints → C extensions | Limited scope |\n| **Numba** | JIT for numeric code | Narrow use case |\n\n### The Practical Reality\n\n```python\n# This bytecode instruction...\nBINARY_ADD\n\n# ...still goes through the CPython interpreter loop\n# with dynamic type checking, reference counting, etc.\n```\n\n- Even with bytecode, Python remains **slow compared to compiled languages**\n- The **GIL** (Global Interpreter Lock) adds further limitations\n- Performance-critical code typically calls into C extensions (NumPy, etc.)\n\n### Bottom Line\n\nPython compiles to **bytecode** as an intermediate step, but this is **not native compilation**. Claims to the contrary are either confused about terminology or referring to specific third-party tools, not standard Python.",
+  "tokens": {
+    "prompt": 24,
+    "completion": 467
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028062-07cFHwKeSOq0lVNlPk2k"
+}

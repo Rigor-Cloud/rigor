@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:7cc5fd16c527ec48cb611c9c299013d74b7ed08d649f5726791be74b8f628f35",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T12:51:25.662727Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Management in Rust\n\nRust uses a unique approach that provides memory safety **without a garbage collector**, catching errors at compile time rather than runtime.\n\n## Core Concepts\n\n### 1. Ownership\nEvery value has exactly one owner, and the value is dropped when the owner goes out of scope.\n\n```rust\nfn main() {\n    let s = String::from(\"hello\");  // s owns the String\n    // s is valid here\n}   // s goes out of scope, memory is freed automatically\n```\n\n### 2. Move Semantics\nAssigning a value to another variable **transfers ownership** (for heap-allocated types).\n\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1;        // ownership moves to s2\n\nprintln!(\"{}\", s1); // ERROR: s1 is no longer valid\nprintln!(\"{}\", s2); // OK\n```\n\n> Stack-allocated types (like integers) implement `Copy`, so they're duplicated instead of moved.\n\n### 3. Borrowing\nYou can reference a value without taking ownership using `&`.\n\n```rust\nfn print_string(s: &String) {   // borrows, doesn't own\n    println!(\"{}\", s);\n}   // s is NOT dropped here\n\nfn main() {\n    let s = String::from(\"hello\");\n    print_string(&s);           // pass a reference\n    println!(\"{}\", s);          // s still valid here\n}\n```\n\n### 4. Borrow Rules (enforced at compile time)\n| Rule | Description |\n|------|-------------|\n| One mutable reference | Only **one** `&mut` reference at a time |\n| OR many immutable | Multiple `&` references are fine |\n| No dangling references | References must always be valid |\n\n```rust\nlet mut s = String::from(\"hello\");\n\nlet r1 = &s;        // OK\nlet r2 = &s;        // OK - multiple immutable refs allowed\nlet r3 = &mut s;    // ERROR: can't borrow mutably while immutably borrowed\n\nprintln!(\"{}, {}, {}\", r1, r2, r3);\n```\n\n---\n\n## The Stack vs Heap\n\n```\nStack",
+  "tokens": {
+    "prompt": 18,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035076-hQ4ceaU3VDjiTqkpg27m"
+}

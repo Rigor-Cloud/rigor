@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:0e6d2b4b0896e33752b261708f78f3584d703a57d9ed28c93a7cae6a5ff00881",
+  "model": "openai/gpt-4o",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T10:36:12.835800Z",
+  "temperature": 0.7,
+  "response_text": "Comparing floating-point numbers using `==` in IEEE 754 can be problematic due to the way floating-point arithmetic works. Floating-point numbers are an approximation of real numbers, which means they can have rounding errors. These errors occur because not all decimal fractions can be represented exactly in binary form, which is how computers store floating-point numbers.\n\nWhen you perform arithmetic operations on floating-point numbers, these rounding errors can accumulate, leading to results that are slightly off from what you might expect. If you then compare these results using `==`, you might find that two numbers you expect to be equal are not, due to these small inaccuracies.\n\n### When is it safe?\n\n- **Exact Values**: If you're dealing with numbers that can be exactly represented in floating-point format (like small integers or powers of two), using `==` can be safe.\n- **Controlled Calculations**: If you have complete control over the calculations and know they won't introduce rounding errors (e.g., simple integer arithmetic within the representable range), then `==` might be safe.\n\n### When is it unsafe?\n\n- **Results of Arithmetic Operations**: Comparing the results of arithmetic operations directly using `==` can lead to unexpected results due to potential rounding errors.\n- **Different Computation Paths**: If two numbers are the result of different computational paths, even if they are logically equivalent, they might not be exactly equal in floating-point representation.\n\n### Recommended Approach\n\nInstead of using `==`, it's generally recommended to check if the numbers are \"close enough\" by using an epsilon value. This involves checking if the absolute difference between the numbers is smaller than a chosen threshold:\n\n```python\nimport math\n\ndef are_close(a, b, epsilon=1e-9):\n    return math.isclose(a, b, abs_tol=epsilon)\n```\n\nThis approach is more robust against the small inaccuracies inherent in floating-point arithmetic. The choice of epsilon depends on the precision you need for your specific application.",
+  "tokens": {
+    "prompt": 22,
+    "completion": 398
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026966-janeojcZDsVLAiUoAzlO"
+}

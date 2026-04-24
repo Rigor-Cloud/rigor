@@ -1,0 +1,15 @@
+{
+  "prompt_id": "hedged-python-compile",
+  "prompt_hash": "sha256:9f150881c56d2dcf2814d4f31e4306ffd7662d807c20fad80a36dfc9785c6d72",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:53:05.011201Z",
+  "temperature": 0.7,
+  "response_text": "## Python Compilation: The Reality\n\nThe claim that Python \"compiles to native code\" is **mostly false**, with some nuance worth understanding.\n\n---\n\n## What Python Actually Does\n\n### Standard CPython (the reference implementation)\n1. **Source code → Bytecode** (`.pyc` files)\n   - This is compilation, but to an **intermediate bytecode**, not native machine code\n   - The bytecode runs on the **CPython virtual machine**\n   - Similar to how Java compiles to JVM bytecode\n\n2. **Bytecode → Execution**\n   - The CPython interpreter executes bytecode instructions one at a time\n   - This is fundamentally **interpreted execution**\n   - No JIT (Just-In-Time) compilation in standard CPython\n\n---\n\n## Tools That DO Compile Python to Native Code\n\n| Tool | Approach | Limitations |\n|------|----------|-------------|\n| **Cython** | Transpiles to C, then compiles | Requires type annotations for speed |\n| **Nuitka** | Compiles to C++ executable | Not always faster |\n| **PyPy** | JIT compilation | Separate implementation, compatibility issues |\n| **mypyc** | Compiles typed Python to C | Requires type hints |\n| **Numba** | JIT for numeric code | Limited to specific use cases |\n\n---\n\n## Common Misconceptions\n\n- `.pyc` files are **not** native code - they're bytecode\n- Python being \"compiled\" to bytecode doesn't make it comparable to C/C++ compilation\n- CPython has **no JIT compiler** (unlike V8 for JavaScript or the JVM)\n\n---\n\n## The Practical Implication\n\n```python\n# This runs through the interpreter on every execution\ndef add(a, b):\n    return a + b\n```\n\nEach operation involves:\n- Bytecode dispatch\n- Python object overhead\n- Reference counting\n- Dynamic type checking\n\n...which is why Python is typically **10-100x slower** than equivalent C code.\n\n---\n\n## Summary\n\n> Standard Python compiles to **bytecode**, not native machine code. True native compilation requires additional tools, each with trade-offs. The statement is misleading at best.",
+  "tokens": {
+    "prompt": 24,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027973-MMFBXL8B1MrG1ymiQbrc"
+}

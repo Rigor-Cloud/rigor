@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:dfd7dac20f70eae2b5b68de15d34494541de4d01147bdf670918498947afe84b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T11:00:18.038993Z",
+  "temperature": 0.7,
+  "response_text": "# Common HTTP Status Codes\n\n## 2xx — Success\n| Code | Name | Meaning |\n|------|------|---------|\n| **200** | OK | Request succeeded |\n| **201** | Created | Resource successfully created |\n| **204** | No Content | Success, but no body returned |\n\n## 3xx — Redirection\n| Code | Name | Meaning |\n|------|------|---------|\n| **301** | Moved Permanently | Resource has a new permanent URL |\n| **302** | Found | Temporary redirect |\n| **304** | Not Modified | Cached version is still valid |\n\n## 4xx — Client Errors\n| Code | Name | Meaning |\n|------|------|---------|\n| **400** | Bad Request | Malformed or invalid request |\n| **401** | Unauthorized | Authentication required |\n| **403** | Forbidden | Authenticated but no permission |\n| **404** | Not Found | Resource doesn't exist |\n| **405** | Method Not Allowed | HTTP method not supported |\n| **409** | Conflict | Request conflicts with current state |\n| **422** | Unprocessable Entity | Validation errors |\n| **429** | Too Many Requests | Rate limit exceeded |\n\n## 5xx — Server Errors\n| Code | Name | Meaning |\n|------|------|---------|\n| **500** | Internal Server Error | Generic server failure |\n| **502** | Bad Gateway | Invalid response from upstream server |\n| **503** | Service Unavailable | Server temporarily down |\n| **504** | Gateway Timeout | Upstream server timed out |\n\n## Key Distinctions Worth Noting\n- **401 vs 403** — \"You need to log in\" vs \"You're logged in but not allowed\"\n- **301 vs 302** — Permanent redirect (update your bookmarks) vs temporary\n- **502 vs 503** — Upstream problem vs this server is down",
+  "tokens": {
+    "prompt": 19,
+    "completion": 451
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028409-gbJMg2PTwNTDWKZzp8Bw"
+}

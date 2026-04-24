@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:463323a123a4a0f63997aef3baa4d784f971db995d00824260af8dc6779c99d8",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:39:49.756355Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question! Git branching strategies define how teams structure their workflows for collaboration, releases, and stability. **GitFlow** and **Trunk-Based Development (TBD)** represent two fundamentally different philosophies. Let's break them down.\n\n### The Core Philosophy Difference\n*   **GitFlow** is about **structured, parallel development** with long-lived branches for specific purposes. It's like a multi-lane highway with dedicated lanes for features, releases, and hotfixes.\n*   **Trunk-Based Development** is about **continuous integration and minimal branching**. The main branch (`trunk` or `main`) is always deployable, and developers integrate small changes frequently. It's like a single, fast-moving train where everyone gets on and off quickly.\n\n---\n\n## 1. GitFlow\nCreated by Vincent Driessen in 2010, GitFlow is a rigorous, feature-branch model designed for projects with scheduled release cycles (e.g., v1.0, v1.1).\n\n### Key Branches (Long-lived):\n*   **`main`/`master`:** Represents the official release history. Every commit here is a production release.\n*   **`develop`:** The integration branch for features. This is where the \"next release\" takes shape.\n\n### Supporting Branches (Short-lived):\n*   **Feature branches (`feature/`):** Branched from `develop`. For developing new features. Merged back into `develop`.\n*   **Release branches (`release/`):** Branched from `develop` when it's ready for a new release. Used for final bug",
+  "tokens": {
+    "prompt": 21,
+    "completion": 496
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027171-UfkB3l6sXWb6EqPcLU8x"
+}

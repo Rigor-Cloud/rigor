@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:e7c77fff5e17f6e6e96df375b5cff86eb93b05970af2ec1e489f66d3aebacd3c",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T10:31:34.631464Z",
+  "temperature": 0.7,
+  "response_text": "## Comparing Floating Point Numbers with `==` in IEEE 754\n\nThe short answer is: **it depends on the situation**.\n\n---\n\n## When `==` is UNSAFE\n\n### Computed/calculated values\n```python\n# Rounding errors make this unpredictable\n0.1 + 0.2 == 0.3        # False! (0.1 + 0.2 = 0.30000000000000004)\nsqrt(2.0) * sqrt(2.0) == 2.0  # May be False\nsin(pi) == 0.0          # False (result is ~1.2e-16)\n```\n\n### Iterative/accumulated calculations\n```python\ntotal = 0.0\nfor _ in range(10):\n    total += 0.1\ntotal == 1.0  # False\n```\n\n---\n\n## When `==` is SAFE\n\n### Integers stored as floats (within precision limits)\n```python\n1.0 == 1.0   # Safe - exact representation\n2.0 + 2.0 == 4.0  # Safe - exact arithmetic\n```\n\n### Direct assignment comparison\n```python\nx = 3.14\ny = x\nx == y  # Safe - same bits, no computation\n```\n\n### Special values (IEEE 754 guarantees)\n```python\nfloat('inf') == float('inf')   # True  ✓\nfloat('-inf') == float('-inf') # True  ✓\nfloat('nan') == float('nan')   # FALSE ✗  (NaN != everything, including itself)\n```\n\n---\n\n## The NaN Trap\n```c\ndouble x = NAN;\nx == x;  // Always FALSE - use isnan(x) instead\n```\n**NaN is the only value not equal to itself** — this is actually useful for detecting NaN.\n\n---\n\n## Safe Alternatives\n\n### Epsilon (absolute tolerance)\n```python\nabs(a - b) < 1e-9\n```\n⚠️ Breaks down for very large or very small numbers.\n\n### Relative tolerance\n```python\nabs(a - b) / max(abs(a), abs(b",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026685-8KPxV62w8g09JrX5bDzH"
+}

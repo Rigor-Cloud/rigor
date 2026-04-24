@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:463323a123a4a0f63997aef3baa4d784f971db995d00824260af8dc6779c99d8",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:43:55.955197Z",
+  "temperature": 0.7,
+  "response_text": "## Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n### **GitFlow**  \nA structured, multi-branch model designed for projects with formal release cycles (e.g., enterprise software, versioned products).\n\n**Key Branches:**\n- `main/master` → Production-ready code.\n- `develop` → Integration branch for features.\n- Feature branches (`feature/*`) → For new functionality.\n- Release branches (`release/*`) → For final testing and bug fixes.\n- Hotfix branches (`hotfix/*`) → For urgent production fixes.\n\n**Workflow:**\n1. Features are developed in isolation on `feature/*` branches.\n2. Merged into `develop` for integration.\n3. A `release/*` branch is created for stabilization.\n4. Once ready, merged into both `main` (for deployment) and `develop` (to sync).\n\n**Pros:**\n- Clear structure, ideal for versioned releases.\n- Parallel development and release phases.\n- Isolated hotfixes.\n\n**Cons:**\n- Complexity; long-lived branches can cause merge conflicts.\n- Slower feedback loop; integration happens late.\n\n---\n\n### **Trunk-Based Development**  \nA minimalist approach where developers work in short-lived branches (or directly) on a single main branch (`trunk`/`main`).\n\n**Core Principles:**\n- All developers commit to a single branch (`main`).\n- Branches are short-lived (hours/days, not weeks).\n- Continuous integration via small, frequent commits.\n- Feature flags often used to hide incomplete work.\n\n**Workflow:**\n1. Developers sync ",
+  "tokens": {
+    "prompt": 21,
+    "completion": 488
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027418-CHwdeZ5HcPfEarzJIFw7"
+}

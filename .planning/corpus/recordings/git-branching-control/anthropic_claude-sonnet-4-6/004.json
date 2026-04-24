@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T10:38:30.628629Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## The Core Philosophy Difference\n\n```\nGitFlow: Multiple long-lived branches, structured releases\nTrunk-Based: Everyone integrates to main frequently, short-lived branches\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain (production)\n│\n├── develop (integration branch)\n│   │\n│   ├── feature/user-auth        ← feature branches\n│   ├── feature/payment-system\n│   │\n│   └── ── release/1.2.0         ← release branches\n│           │\n│           └── ── main          ← merge to main + tag\n│\n└── hotfix/critical-bug-fix      ← branches from main\n```\n\n### Branch Types & Lifecycle\n\n```bash\n# 1. FEATURE BRANCHES\n# Branch from: develop\n# Merge to: develop\ngit checkout develop\ngit checkout -b feature/user-authentication\n\n# ... work for days/weeks ...\n\ngit checkout develop\ngit merge --no-ff feature/user-authentication\ngit branch -d feature/user-authentication\n\n\n# 2. RELEASE BRANCHES\n# Branch from: develop\n# Merge to: main AND develop\ngit checkout develop\ngit checkout -b release/1.2.0\n\n# Only bug fixes, docs, release prep here\ngit commit -m \"Bump version to 1.2.0\"\ngit commit -m \"Fix last-minute release bug\"\n\n# When ready:\ngit checkout main\ngit merge --no-ff release/1.2.0\ngit tag -a v1.2.0 -m \"Release version 1.2.0\"\n\ngit checkout develop\ngit merge --no-ff release/1.2.0\ngit branch -d release/1.2.0\n\n\n# 3. HOTFIX BRANCHES\n# Branch from: main\n# Merge to: main AND develop\ngit checkout main\ngit checkout -b hotfix/security-vulnerability\n\ngit commit -m \"Fix SQL injection vulnerability\"\n\ngit checkout main\ngit merge --no-ff hotfix/security-vulnerability\ngit tag -a v1.2.1\n\ngit checkout develop\ngit merge --no-ff hotfix/security-",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027102-1PfDxH5bnLL42bvAElmQ"
+}

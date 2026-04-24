@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:3ab63f50b1bd87ff4430b1f25f9e4b73f27ccceeb533fb89a8f5f89cf8ea9f5a",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:21:50.309519Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Python script demonstrating manual control of garbage collection using the `gc` module:\n\n```python\nimport gc\nimport sys\nimport time\n\nclass CircularReference:\n    \"\"\"Class that creates circular references to demonstrate garbage collection\"\"\"\n    def __init__(self, name):\n        self.name = name\n        self.other = None\n        print(f\"Created: {self.name}\")\n    \n    def __del__(self):\n        print(f\"Destroyed: {self.name}\")\n    \n    def link_to(self, other):\n        self.other = other\n        print(f\"Linked {self.name} -> {other.name}\")\n\nclass ResourceTracker:\n    \"\"\"Track resource usage before/after GC\"\"\"\n    @staticmethod\n    def print_stats(message=\"\"):\n        print(f\"\\n{'='*50}\")\n        print(f\"GC Stats {message}\")\n        print(f\"{'='*50}\")\n        print(f\"Enabled: {gc.isenabled()}\")\n        print(f\"Garbage count: {len(gc.garbage)}\")\n        print(f\"Generation 0 thresholds: {gc.get_threshold()}\")\n        print(f\"Count of tracked objects: {gc.get_count()}\")\n        \n        # Count objects by type\n        objects = gc.get_objects()\n        type_counts = {}\n        for obj in objects:\n            obj_type = type(obj).__name__\n            type_counts[obj_type] = type_counts.get(obj_type, 0) + 1\n        \n        print(f\"\\nTop 5 object types:\")\n        for obj_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:5]",
+  "tokens": {
+    "prompt": 25,
+    "completion": 471
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026091-DQIFGmpml2qJY1mwpdrB"
+}

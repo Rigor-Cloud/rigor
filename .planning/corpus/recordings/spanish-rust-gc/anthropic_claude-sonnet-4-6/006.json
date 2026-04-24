@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T13:24:15.763868Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura: Rust vs Java\n\n## La respuesta corta: Rust NO tiene GC\n\nEsta es la diferencia fundamental. Rust usa un modelo completamente diferente.\n\n---\n\n## Cómo gestiona memoria Rust\n\n### Sistema de Ownership + Borrowing\n\n```rust\nfn main() {\n    // La variable es \"dueña\" del String\n    let s1 = String::from(\"hola\");\n    \n    // s1 se MUEVE a s2. s1 ya no existe\n    let s2 = s1;\n    \n    // ERROR: s1 ya no es válido\n    // println!(\"{}\", s1); // ← no compila\n    \n    // s2 se libera AUTOMÁTICAMENTE aquí\n    // cuando sale del scope → se llama drop()\n}\n```\n\n```rust\n// El compilador calcula exactamente CUÁNDO liberar memoria\nfn crear_usuario() -> String {\n    let nombre = String::from(\"Ana\");  // se aloca en heap\n    nombre  // se transfiere ownership al caller\n}   // si no se transfiere, se libera aquí\n\nfn main() {\n    let usuario = crear_usuario();\n    println!(\"{}\", usuario);\n}   // 'usuario' se libera aquí → determinístico\n```\n\n### Las 3 reglas de Ownership\n\n```rust\n// REGLA 1: Cada valor tiene UN solo dueño\nlet v1 = vec![1, 2, 3];\nlet v2 = v1;  // v1 ya no existe, v2 es el dueño\n\n// REGLA 2: Solo puede haber UN dueño a la vez\n// REGLA 3: Cuando el dueño sale del scope → memoria liberada\n\nfn ejemplo_borrowing() {\n    let s = String::from(\"mundo\");\n    \n    // Referencias: \"préstamos\" sin tomar ownership\n    let len = calcular_longitud(&s);  // préstamo inmutable\n    \n    println!(\"{} tiene {} caracteres\", s, len); // s sigue siendo válido\n}\n\nfn",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037044-SIxj4YKfP0pENYdv7kxd"
+}

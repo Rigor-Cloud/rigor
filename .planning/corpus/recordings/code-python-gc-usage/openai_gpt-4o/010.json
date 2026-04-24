@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:0e8672c1476a9d0cb89b3c171746e9711c93ee4cc10c7b3ffb329bccd0ad14e6",
+  "model": "openai/gpt-4o",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:22:47.143100Z",
+  "temperature": 0.7,
+  "response_text": "The `gc` module in Python provides an interface to the garbage collection facility. By default, Python uses automatic garbage collection to manage memory for objects that are no longer in use. However, you can manually control garbage collection cycles using the `gc` module if needed. Here's a simple script demonstrating how to use the `gc` module to manually control garbage collection:\n\n```python\nimport gc\n\ndef create_circular_reference():\n    \"\"\"Create a circular reference for demonstration purposes.\"\"\"\n    class CircularReference:\n        def __init__(self):\n            self.ref = self\n\n    obj = CircularReference()\n    return obj\n\ndef main():\n    # Disable automatic garbage collection\n    gc.disable()\n    print(\"Garbage collection is disabled.\")\n\n    # Create a circular reference\n    obj = create_circular_reference()\n\n    # Check if the object is collected\n    print(f\"Number of unreachable objects before collection: {len(gc.garbage)}\")\n\n    # Manually trigger garbage collection\n    collected = gc.collect()\n    print(f\"Garbage collector: collected {collected} objects.\")\n\n    # Check if the object is collected\n    print(f\"Number of unreachable objects after collection: {len(gc.garbage)}\")\n\n    # Re-enable automatic garbage collection\n    gc.enable()\n    print(\"Garbage collection is re-enabled.\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\n### Explanation:\n\n1. **Disable Garbage Collection:**\n   - We disable the automatic garbage collection using `gc.disable()`. This stops Python from automatically collecting garbage, allowing us to manually control it.\n\n2. **Circular Reference:**\n   - A circular reference is created with the `CircularReference` class, where the object references itself. This is a typical scenario where garbage collection is required, as reference counting alone cannot resolve it.\n\n3. **Manual Garbage Collection:**\n   - We check the number of unreachable objects using `len(gc.garbage)` before collecting garbage.\n   - We manually trigger garbage collection using `gc.collect()`, which returns the number of objects it collected and freed.\n   - We check the number of unreachable objects again after collection.\n\n4. **Re-enable Garbage Collection:**\n   - After demonstrating manual control, we re-enable automatic garbage collection using `gc.enable()`.\n\nThis script provides a basic demonstration of how to manually control garbage collection in Python using the `gc` module. In most cases, you would let Python handle garbage collection automatically, but understanding these controls can be useful in performance-critical applications or debugging memory leaks",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026161-GfWVhcgnuPRdltGzglhb"
+}

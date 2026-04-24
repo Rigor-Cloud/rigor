@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:18:40.620540Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n```python\n\"\"\"\nPython script demonstrating manual control of garbage collection cycles\nusing the gc module. Covers enabling/disabling GC, tuning thresholds,\ntracking objects, detecting cycles, and forcing collection.\n\"\"\"\n\nimport gc\nimport sys\nimport weakref\nimport time\nimport logging\nfrom typing import Optional\n\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# 1. Helper utilities\n# ─────────────────────────────────────────────\n\ndef separator(title: str = \"\") -> None:\n    width = 60\n    if title:\n        print(f\"\\n{'─' * 5} {title} {'─' * (width - len(title) - 7)}\")\n    else:\n        print(\"─\" * width)\n\n\ndef gc_stats() -> None:\n    \"\"\"Print current GC state and statistics.\"\"\"\n    print(f\"  GC enabled          : {gc.isenabled()}\")\n    print(f\"  Collection counts   : {gc.get_count()}\")\n    print(f\"  Thresholds          : {gc.get_thresholds()}\")\n    print(f\"  Tracked objects     : {len(gc.get_objects())}\")\n    if hasattr(gc, \"get_stats\"):          # Python 3.4+\n        for i, stat in enumerate(gc.get_stats()):\n            print(f\"  Generation {i} stats  : {stat}\")\n\n\n# ─────────────────────────────────────────────\n# 2. Classes that form reference cycles\n# ─────────────────────────────────────────────\n\nclass Node:\n    \"\"\"A node that can form circular references.\"\"\"\n\n    _instance_count = 0\n\n    def __init__(self, name: str) -> None:\n        self.name = name\n        self.children: list[\"Node\"] = []\n        self.parent: Optional[\"Node\"] = None\n        Node._instance_count += 1\n        logger",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025912-yMnlxaNQ3l3HfOHJ6kFR"
+}

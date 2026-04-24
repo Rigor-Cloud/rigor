@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:13901fe88a8ee56078ea80b44bbda998f3853a1dc3f3d3728948938995ca3919",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T11:14:05.282700Z",
+  "temperature": 0.7,
+  "response_text": "# JavaScript's Concurrency Model\n\n## The Direct Answer\n\n**JavaScript has no built-in multi-threading.** It is fundamentally **single-threaded** — there is one call stack, one memory heap, and one thread of execution per JavaScript environment (browser tab, Node.js process, etc.).\n\n---\n\n## The Actual Model: Event Loop + Concurrency Illusion\n\n```\n┌─────────────────────────────────────────────────────┐\n│                  JS Engine (Single Thread)           │\n│                                                      │\n│  ┌──────────────┐    ┌─────────────────────────┐    │\n│  │  Call Stack  │    │       Memory Heap        │    │\n│  │              │    │  (objects, closures...)  │    │\n│  │  main()      │    │                          │    │\n│  │  setTimeout  │    └─────────────────────────┘    │\n│  │  ...         │                                    │\n│  └──────┬───────┘                                    │\n│         │                                            │\n└─────────┼────────────────────────────────────────────┘\n          │\n          ▼\n┌─────────────────────────────────────────────────────┐\n│                    Event Loop                        │\n│                                                      │\n│   Microtask Queue        Macrotask Queue             │\n│  ┌──────────────┐       ┌──────────────┐            │\n│  │ Promise.then │       │ setTimeout   │            │\n│  │ queueMicro.. │       │ setInterval  │            │\n│  │ MutationObs  │       │ I/O events   │            │\n│  └──────────────┘       └──────────────┘            │\n└─────────────────────────────────────────────────────┘\n```\n\n### How the Event Loop Works\n\n```javascript\nconsole.log(\"1 - sync\");                          // Runs immediately\n\nsetTimeout(() => console.log(\"2 - macrotask\"), 0); // Que",
+  "tokens": {
+    "prompt": 23,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029236-QMiEGc6yqCa3kgo0n0SN"
+}

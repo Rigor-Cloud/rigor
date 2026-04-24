@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T13:23:23.393595Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura: Rust vs Java\n\n## La respuesta corta: Rust NO tiene GC tradicional\n\nEsta es la diferencia fundamental. Rust usa un modelo completamente distinto.\n\n---\n\n## Cómo gestiona la memoria Rust\n\n### El sistema de Ownership (Propiedad)\n\n```rust\nfn main() {\n    // 's' es el ÚNICO dueño de este String\n    let s = String::from(\"hola\");\n    \n    // La memoria se libera AQUÍ automáticamente\n    // cuando 's' sale del scope → se llama a 'drop()'\n} // ← drop() se ejecuta en tiempo de COMPILACIÓN\n```\n\n### Las 3 reglas de Ownership\n\n```\n1. Cada valor tiene UN único dueño\n2. Solo puede haber UN dueño a la vez\n3. Cuando el dueño sale de scope → memoria liberada\n```\n\n### Move vs Clone\n\n```rust\nfn main() {\n    let s1 = String::from(\"hola\");\n    let s2 = s1; // s1 se MUEVE a s2, s1 ya no existe\n    \n    // println!(\"{}\", s1); // ❌ ERROR en compilación\n    println!(\"{}\", s2);    // ✅ OK\n    \n    // Para copiar explícitamente:\n    let s3 = s2.clone();   // Copia profunda explícita\n    println!(\"{} {}\", s2, s3); // ✅ Ambos válidos\n}\n```\n\n### Borrowing (Préstamos)\n\n```rust\nfn main() {\n    let s = String::from(\"hola\");\n    \n    // Préstamo inmutable → puedes tener MUCHOS\n    let r1 = &s;\n    let r2 = &s;\n    println!(\"{} {}\", r1, r2); // ✅\n    \n    // Préstamo mutable → solo UNO a la vez\n    let mut s2 = String::from(\"mundo\");\n    let r3 = &mut s2;\n    ",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036992-u6Tp6jqvaowz4UuWGUwN"
+}

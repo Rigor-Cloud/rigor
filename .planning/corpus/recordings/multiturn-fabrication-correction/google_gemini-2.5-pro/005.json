@@ -1,0 +1,15 @@
+{
+  "prompt_id": "multiturn-fabrication-correction",
+  "prompt_hash": "sha256:25e35600f3a77874a8007fded9b55d62b331c344dec18778576f26d71ecb1b61",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T11:35:34.417497Z",
+  "temperature": 0.7,
+  "response_text": "That is an excellent and very important question. It highlights a common point of confusion, and I must start",
+  "tokens": {
+    "prompt": 20,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777030527-2ddLfvdNsDNlI2bUGlhP"
+}

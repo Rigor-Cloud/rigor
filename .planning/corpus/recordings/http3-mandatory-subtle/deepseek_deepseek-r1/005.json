@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:53d61d01d1a912652850d02d10810df1b8612c79d90c732d012a95d992dd02a1",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T11:09:09.355322Z",
+  "temperature": 0.7,
+  "response_text": "That's not accurate—HTTP/3 is **not mandatory** for web servers as of 2025. While HTTP/3 (based on QUIC) is growing in adoption and supported by major browsers and CDNs, it remains an **optional enhancement**, not a requirement.\n\nHowever, if you'd like to enable HTTP/3 in Nginx, here’s how:\n\n---\n\n### **Prerequisites**\n1. **Nginx 1.25.0+** (earlier versions need a custom build with the `http_v3` patch).\n2. **OpenSSL 1.1.1+** or **BoringSSL** (QUIC support requires a compatible TLS library).\n3. **Firewall**: Allow **UDP 443** (QUIC uses UDP, unlike TCP for HTTP/1-2).\n\n---\n\n### **Step-by-Step Configuration**\n\n#### 1. **Build Nginx with HTTP/3 Support**  \nIf your package manager doesn’t provide an `http_v3` enabled build, compile manually:\n\n```bash\n# Download the latest Nginx (with QUIC patches) from the official repository\ngit clone --branch release-1.25.4 https://github.com/nginx/nginx-quic.git\ncd nginx-quic\n\n# Configure with QUIC and SSL\n./configure \\\n  --with-http_v3_module \\\n  --with-http_ssl_module \\\n  --with-http_v2_module \\\n  --with-openssl=/path/to/openssl # Or use BoringSSL\n\nmake && sudo make install\n```\n\n#### 2. ",
+  "tokens": {
+    "prompt": 35,
+    "completion": 579
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028929-nJyphIDy5o5ivBaTH1jG"
+}

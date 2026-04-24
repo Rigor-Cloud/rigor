@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:f4176078d1585e5b98b62e695bf420b1181ed036d1a9b849526efce0024e965c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T11:03:48.682572Z",
+  "temperature": 0.7,
+  "response_text": "Here are the most common HTTP status codes grouped by category, along with their meanings:\n\n---\n\n### **Quick Reference (Top 10 Most Common)**\n1. **200 OK** – Request succeeded.\n2. **404 Not Found** – Resource not found.\n3. **500 Internal Server Error** – Server-side error.\n4. **302 Found** – Temporary redirect.\n5. **403 Forbidden** – Access denied.\n6. **400 Bad Request** – Malformed request.\n7. **401 Unauthorized** – Authentication required.\n8. **304 Not Modified** – Cached version is still valid.\n9. **201 Created** – Resource created successfully.\n10. **503 Service Unavailable** – Server overloaded/maintenance.\n\n---\n\n### **1xx – Informational**\n- **100 Continue** – Client should continue the request.\n- **101 Switching Protocols** – Server agrees to switch protocols (e.g., to WebSocket).\n\n---\n\n### **2xx – Success**\n- **200 OK** – Standard response for successful requests.\n- **201 Created** – Request succeeded, and a new resource was created (e.g., after a `POST`).\n- **204 No Content** – Request succeeded, but no content is returned (common after `DELETE`).\n- **206 Partial Content** – Server delivers part of the resource (used for large files or streaming).\n\n---\n\n### **3xx – Redirection**\n- **301 Moved Permanently** – Resource has a new permanent URL; browsers cache this.\n- **302 Found** – Temporary redirect (often used for short-term moves).\n- **304 Not Modified** –",
+  "tokens": {
+    "prompt": 22,
+    "completion": 535
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028610-MOc6YXMbezqpLq2eYNJZ"
+}

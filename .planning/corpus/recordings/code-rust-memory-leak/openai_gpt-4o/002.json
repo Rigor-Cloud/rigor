@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:9dd25bb1994545ba1ad4905c448bf649e33fa14eb49c5548dc1340783159ae55",
+  "model": "openai/gpt-4o",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:28:47.220642Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, memory management is typically handled automatically through the ownership system, which ensures that memory is properly allocated and deallocated. However, there are certain cases where you might want to deliberately leak memory, meaning you don't intend for it to be deallocated during the normal execution of a program. This can be done using `Box::leak`.\n\nThe `Box::leak` function converts a `Box<T>` into a `'static` mutable reference `&'static mut T`, effectively \"leaking\" the memory and bypassing Rust's automatic memory management. Here's how you might implement such a function:\n\n```rust\nfn leak_memory() -> &'static mut String {\n    let my_string = Box::new(String::from(\"This is a leaked string\"));\n    Box::leak(my_string)\n}\n\nfn main() {\n    let leaked_string = leak_memory();\n    println!(\"{}\", leaked_string);\n}\n```\n\n### Explanation\n\n1. **Creating a Box**: We first create a `Box<String>`, which allocates a `String` on the heap.\n\n2. **Leaking the Memory**: We then call `Box::leak` on the `Box<String>`, which converts it into a `'static` reference. This means that the memory for the string is no longer managed by Rust's ownership system and will not be automatically deallocated when it goes out of scope.\n\n3. **Using the Leaked Memory**: The returned reference can be used throughout the program, and since it's `'static`, it essentially lives for the duration of the program.\n\n### When is this Appropriate?\n\n1. **Global State**: Sometimes, you need to set up global state at the start of a program that should remain available throughout its execution. Since Rust does not have a direct mechanism for global mutable state, leaking memory can be a workaround.\n\n2. **Long-lived Data**: If you are certain that some data should live for the entire duration of the program and you want to avoid the overhead of manually managing its lifetime, leaking the memory can be a solution.\n\n3. **Interoperability**: When interfacing with C libraries or other external systems that expect to own and manage memory, you might leak memory to hand over ownership in a way that prevents Rust from reclaiming it.\n\n### Caveats\n\n- **Memory Leak**: By definition, leaking memory means it won't be reclaimed until the program exits. It can lead to increased memory usage if not used judiciously.\n\n- **Safety**: While `Box::leak",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026520-5UITI2j5XWIaLLfaZ2fU"
+}

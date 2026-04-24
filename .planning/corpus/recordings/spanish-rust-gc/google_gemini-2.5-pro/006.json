@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:4bad3e4d42dd306a20afc5dd55aefa70004339020eaeece05429aa2c7a9789aa",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T13:32:22.469517Z",
+  "temperature": 0.7,
+  "response_text": "¡Excelente pregunta! Es un tema fundamental que diferencia profundamente a ambos lenguajes.\n\nLa",
+  "tokens": {
+    "prompt": 20,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037535-5VY4AKiXszHTHiZtLd8V"
+}

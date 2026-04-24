@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:8e4137111cf504168cf0c2f92cddfe1b332bd2e7478dda27b918e9fe20eb6040",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T11:28:39.907093Z",
+  "temperature": 0.7,
+  "response_text": "Of course. This is an excellent and often misunderstood topic in JavaScript. The key takeaway is that JavaScript'",
+  "tokens": {
+    "prompt": 16,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777030112-5F0caKPvFiCBhutxryff"
+}

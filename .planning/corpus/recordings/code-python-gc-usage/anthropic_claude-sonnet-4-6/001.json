@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:17:18.449442Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n## Overview\nThis script demonstrates manual control of Python's garbage collection using the `gc` module, including cycle detection, threshold management, and memory leak debugging.\n\n```python\n\"\"\"\nPython Garbage Collection Control Script\nDemonstrates manual GC management, cycle detection, and memory debugging.\n\"\"\"\n\nimport gc\nimport sys\nimport weakref\nimport logging\nfrom typing import Optional\nfrom dataclasses import dataclass, field\nfrom contextlib import contextmanager\n\n# Configure logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# 1. Helper: GC Stats Snapshot\n# ─────────────────────────────────────────────\n\n@dataclass\nclass GCSnapshot:\n    \"\"\"Captures a snapshot of GC state.\"\"\"\n    counts: tuple        # Objects in each generation\n    thresholds: tuple    # Collection thresholds\n    collected: list      # Unreachable objects found\n    garbage: list        # Uncollectable objects (gc.garbage)\n    enabled: bool        # Whether GC is enabled\n\n    @classmethod\n    def capture(cls) -> \"GCSnapshot\":\n        return cls(\n            counts=gc.get_count(),\n            thresholds=gc.get_threshold(),\n            collected=[],\n            garbage=list(gc.garbage),\n            enabled=gc.isenabled(),\n        )\n\n    def report(self) -> None:\n        print(\"\\n── GC Snapshot ─────────────────────────────\")\n        print(f\"  Enabled     : {self.enabled}\")\n        print(f\"  Counts      : Gen0={self.counts[0]}, \"\n              f\"Gen1={self.counts[1]}, Gen2={self.counts[2]}\")\n        print(f\"  Thresholds  : {self.thresholds}\")\n        print(f\"  Garbage list: {len(self.garbage)} uncollectable object(s)\")\n        if self.garbage:\n            for obj in self.garbage:",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025830-nQHpTP4wVd9rvrsIRQfS"
+}

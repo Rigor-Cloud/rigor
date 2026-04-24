@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T13:14:53.047092Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or type system — it unlocks **five specific capabilities** while keeping everything else checked.\n\n```rust\nunsafe {\n    // You can now:\n    // 1. Dereference raw pointers\n    // 2. Call unsafe functions/methods\n    // 3. Access/modify mutable static variables\n    // 4. Implement unsafe traits\n    // 5. Access fields of unions\n}\n```\n\n## What the Compiler Still Guarantees Inside `unsafe`\n\n```rust\nunsafe {\n    let x = 5u32;\n    // ✅ Type checking still works\n    // let y: &str = x;  // Won't compile — type error\n\n    // ✅ Borrow checker still runs\n    let s = String::from(\"hello\");\n    let r1 = &s;\n    let r2 = &s;\n    println!(\"{r1} {r2}\");  // Fine\n    // drop(s);  // Won't compile — s is borrowed\n\n    // ✅ Move semantics still enforced\n    // ✅ Lifetimes still checked\n    // ✅ Pattern matching exhaustiveness\n    // ✅ Integer overflow in debug mode\n}\n```\n\n## The Five Unsafe Superpowers\n\n### 1. Dereferencing Raw Pointers\n```rust\nlet mut val = 42i32;\nlet raw_ptr: *mut i32 = &mut val;\n\n// Creating raw pointers is safe; dereferencing is not\nunsafe {\n    *raw_ptr += 1;\n    println!(\"{}\", *raw_ptr); // 43\n}\n\n// Why dangerous: raw pointers can be:\n// - null\n// - dangling (pointing to freed memory)\n// - misaligned\n// - aliased mutably (multiple *mut to same location)\n```\n\n### 2. Calling Unsafe Functions\n```rust\nunsafe fn dangerous_operation(ptr: *const u8, len: usize) -> &'static [u8] {\n    // Caller must guarantee ptr is valid for len bytes\n    std::slice",
+  "tokens": {
+    "prompt": 29,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036483-vnuwBQG4XEocPfIoZQkC"
+}

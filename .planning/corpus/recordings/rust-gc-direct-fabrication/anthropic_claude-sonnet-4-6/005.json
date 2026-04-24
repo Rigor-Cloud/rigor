@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:9b85865e694d960764446892ac45ea8f225259474011fda43739928918f308f6",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T13:01:02.992078Z",
+  "temperature": 0.7,
+  "response_text": "# Rust Doesn't Have a Garbage Collector\n\nThis is a common misconception worth clarifying directly. **Rust has no garbage collector** — this is actually one of its defining features and primary selling points.\n\n---\n\n## How Rust Manages Memory\n\nRust uses a compile-time ownership system instead of runtime garbage collection.\n\n### Core Concepts\n\n**Ownership Rules:**\n```rust\nfn main() {\n    let s1 = String::from(\"hello\"); // s1 owns this string\n    let s2 = s1;                    // ownership MOVES to s2\n    // println!(\"{}\", s1);          // COMPILE ERROR: s1 is invalid\n    println!(\"{}\", s2);             // fine\n} // s2 dropped here, memory freed automatically\n```\n\n**Borrowing (references without ownership transfer):**\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");\n    let len = calculate_length(&s1); // lend s1, don't move it\n    println!(\"{} has length {}\", s1, len); // s1 still valid\n}\n\nfn calculate_length(s: &String) -> usize { // s is a reference\n    s.len()\n} // s goes out of scope, but it doesn't own the data, so nothing is dropped\n```\n\n**Lifetimes (compiler tracks how long references are valid):**\n```rust\n// The compiler ensures the returned reference can't outlive its source\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n```\n\n### Memory Deallocation: `Drop`\n\nMemory is freed **deterministically** when a value goes out of scope:\n\n```rust\n{\n    let v = vec![1, 2, 3]; // heap allocation happens here\n    // use v...\n} // v goes out of scope: destructor runs, memory freed IMMEDIATELY here\n```\n\nNo pauses, no runtime overhead — the compiler inserts the `free()` call.\n\n---\n\n## How Java's GC Works\n\nJava allocates objects on the heap and a background GC process reclaims",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035653-7gEzFd1CXEQhgjIZlyHW"
+}

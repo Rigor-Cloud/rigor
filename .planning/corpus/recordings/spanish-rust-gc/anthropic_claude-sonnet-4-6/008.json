@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T13:24:35.831012Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura: Rust vs Java\n\n## La respuesta corta: Rust NO tiene recolector de basura\n\nEsta es precisamente una de las características más distintivas de Rust. Vamos a desglosarlo:\n\n---\n\n## Cómo gestiona Rust la memoria\n\nRust usa un sistema de **propiedad (ownership)** con reglas verificadas en **tiempo de compilación**.\n\n### Los tres pilares\n\n```rust\n// 1. OWNERSHIP - Cada valor tiene un único dueño\nfn ownership_ejemplo() {\n    let s1 = String::from(\"hola\");  // s1 es dueño\n    let s2 = s1;                     // s2 toma la propiedad (move)\n    // println!(\"{}\", s1);           // ERROR: s1 ya no es válido\n    println!(\"{}\", s2);              // OK\n}   // s2 sale de scope → memoria liberada AUTOMÁTICAMENTE aquí\n\n// 2. BORROWING - Préstamo de referencias\nfn borrowing_ejemplo() {\n    let s1 = String::from(\"hola\");\n    let len = calcular_longitud(&s1);  // préstamo inmutable\n    println!(\"{} tiene {} caracteres\", s1, len);  // s1 sigue siendo válido\n}\n\nfn calcular_longitud(s: &String) -> usize {\n    s.len()\n}   // s sale de scope, pero NO libera memoria (no es dueño)\n\n// 3. LIFETIMES - Garantías de validez de referencias\nfn lifetime_ejemplo<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n    // El compilador garantiza que la referencia devuelta\n    // no sobrevive a los datos originales\n}\n```\n\n### El destructor automático: `Drop`\n\n```rust\nstruct ConexionDB {\n    url: String,\n}\n\nimpl Drop for ConexionDB {\n    fn drop(&mut self) {\n        println!(\"",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037065-HeNIcyYoaiRcTWjZLNIT"
+}

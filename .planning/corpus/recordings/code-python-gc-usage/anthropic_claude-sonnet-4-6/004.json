@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T10:17:50.692551Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n## Overview\nThis script demonstrates manual control of Python's garbage collector using the `gc` module, including tracking objects, detecting cycles, and optimizing collection.\n\n```python\nimport gc\nimport sys\nimport weakref\nimport time\nimport logging\nfrom typing import Any, Optional\nfrom dataclasses import dataclass, field\nfrom contextlib import contextmanager\n\n# Configure logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\",\n    datefmt=\"%H:%M:%S\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# 1. Helper: GC Statistics Snapshot\n# ─────────────────────────────────────────────\n\n@dataclass\nclass GCStats:\n    \"\"\"Snapshot of garbage collector statistics.\"\"\"\n    counts: tuple = field(default_factory=tuple)\n    thresholds: tuple = field(default_factory=tuple)\n    collected: list = field(default_factory=list)\n    uncollectable: list = field(default_factory=list)\n    enabled: bool = True\n\n    @classmethod\n    def capture(cls) -> \"GCStats\":\n        stats = cls()\n        stats.counts = gc.get_count()\n        stats.thresholds = gc.get_threshold()\n        stats.enabled = gc.isenabled()\n        return stats\n\n    def __str__(self) -> str:\n        return (\n            f\"GCStats(\"\n            f\"counts={self.counts}, \"\n            f\"thresholds={self.thresholds}, \"\n            f\"enabled={self.enabled})\"\n        )\n\n\n# ─────────────────────────────────────────────\n# 2. GC Manager: Central Controller\n# ─────────────────────────────────────────────\n\nclass GarbageCollectionManager:\n    \"\"\"\n    Manages Python's garbage collector with fine-grained control.\n\n    Generations:\n      - Gen 0: Short-lived objects (collected most frequently)\n      - Gen 1: Survived one Gen 0 collection\n      ",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025853-ZsbmAHx1ab0xXaR8Gvi7"
+}

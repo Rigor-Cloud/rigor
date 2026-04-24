@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:1e215f3e679455341b9954f1984dfea1bd5c8328149959599aac793e1616a09c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T11:16:16.299253Z",
+  "temperature": 0.7,
+  "response_text": "JavaScript's multi-threading model is unique because **JavaScript itself is single-threaded**, but it provides concurrency through **Web Workers** (in browsers) and **Worker Threads** (in Node.js). These allow parallel execution without blocking the main thread.\n\n### Key Concepts:\n1. **Single-Threaded Main Runtime**:  \n   The primary JavaScript thread handles the event loop, UI rendering (in browsers), and most code execution. Blocking it (e.g., with heavy computation) freezes the application.\n\n2. **Web Workers / Worker Threads**:  \n   These are separate background threads that run scripts independently.  \n   - **Browser**: `new Worker('script.js')`  \n   - **Node.js**: `require('worker_threads')`\n\n---\n\n### How Threads Share Memory\nBy default, **workers do NOT share memory**. They communicate via **message passing**, which copies data between threads. However, JavaScript provides mechanisms for shared memory:\n\n#### 1. **Structured Cloning (Default)**\n   - Data is serialized when sent via `postMessage()` and deserialized in the receiver.\n   - Objects are copied, not shared.  \n   ```javascript\n   // Main thread\n   const worker = new Worker('worker.js');\n   worker.postMessage({ data: largeArray }); // Copy sent\n   ```\n\n#### 2. **Shared Memory with `SharedArrayBuffer`**\n   - Allows sharing raw binary memory (`ArrayBuffer`) between threads.\n   - Threads can read/write the same memory location.\n   ```javascript\n   // Main thread\n   ",
+  "tokens": {
+    "prompt": 24,
+    "completion": 568
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029356-FC9VHz9mM58hNFNA4z0K"
+}

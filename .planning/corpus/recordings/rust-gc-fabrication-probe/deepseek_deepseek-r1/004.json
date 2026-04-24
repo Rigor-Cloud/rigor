@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:4c9d79ef29930657a2a30091bfeaf8501d7eb8dbdf5c8fc67f428bd6eb0f2513",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T12:40:56.282845Z",
+  "temperature": 0.7,
+  "response_text": "Memory management in Rust is unique because it **enforces memory safety at compile time without a garbage collector**. It achieves this through a system of **ownership, borrowing, and lifetimes**.\n\n## Core Concepts:\n\n### 1️⃣ **Ownership**\n- Every value in Rust has a single **owner** variable.\n- When the owner goes out of scope, the value is automatically dropped (memory freed).\n- Ownership can be **moved** (transferred) to another variable.\n\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1; // Ownership moves from s1 to s2\n// println!(\"{}\", s1); // ERROR: s1 no longer valid here\n```\n\n### 2️⃣ **Borrowing**\n- Instead of transferring ownership, you can **borrow** references.\n- Two types of references:\n  - **Immutable references** (`&T`): multiple allowed, no mutation\n  - **Mutable references** (`&mut T`): only one allowed, allows mutation\n\n```rust\nfn calculate_length(s: &String) -> usize {\n    s.len() // Borrows s without taking ownership\n}\n```\n\n### 3️⃣ **Lifetimes**\n- Ensure references are always valid.\n- The compiler tracks how long references live.\n- Prevents **dangling references**.\n\n```rust\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n```\n\n## Key Rules (Compiler-Enforced):\n1. **One mutable reference OR",
+  "tokens": {
+    "prompt": 20,
+    "completion": 515
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777034437-DRQYjgtgLjMi1DG5gbNv"
+}

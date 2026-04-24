@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-compile-fabrication",
+  "prompt_hash": "sha256:e41c1c46e716a2c3886d7d24be00325f4a736eb1fa09e9e2442f6877d4f58897",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T11:44:26.491442Z",
+  "temperature": 0.7,
+  "response_text": "## Python's Ahead-of-Time Compilation to Native Machine Code\n\nThis is a nuanced topic worth clarifying carefully, because **Python doesn't have a standard AOT compiler** — but several tools attempt this with important trade-offs.\n\n---\n\n## What Python Actually Does (Baseline)\n\n```\nPython Source (.py)\n       ↓\n   CPython Compiler\n       ↓\n  Bytecode (.pyc)        ← This is NOT machine code\n       ↓\n  CPython Interpreter   ← Interprets bytecode at runtime\n```\n\nThe `.pyc` files are **bytecode for the CPython VM**, not native machine code.\n\n---\n\n## Tools That Do AOT Compilation\n\n### 1. Cython\n\n```python\n# example.pyx - Cython source\ndef add_numbers(int x, int y):\n    cdef int result    # Static type declaration\n    result = x + y\n    return result\n```\n\n**Compilation pipeline:**\n\n```\n.pyx file\n    ↓\nCython Compiler\n    ↓\nC/C++ source code      ← Key intermediate step\n    ↓\nC Compiler (gcc/clang)\n    ↓\n.so / .pyd (native shared library)\n```\n\n```bash\n# How to compile\ncython --c++ example.pyx          # Generate C++\ngcc -shared -fPIC example.c \\\n    $(python3-config --includes) \\\n    -o example.so                  # Compile to native\n```\n\n**What Cython actually generates:**\n\n```c\n/* Generated C code (simplified) */\nstatic PyObject *__pyx_pw_add_numbers(\n    PyObject *__pyx_self, PyObject *__pyx_args) \n{\n    int __pyx_v_x;\n    int __pyx_v_y;\n    int __pyx_v_result;\n    \n    // Type checking and unboxing\n    __pyx_v_x = __Pyx_PyInt_As_int(values[0]);\n    __pyx_v_y = __Pyx_PyInt_As_int(values[1]);",
+  "tokens": {
+    "prompt": 25,
+    "completion": 511
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777031054-Gq3VjkcRpCPxgE28mRBZ"
+}

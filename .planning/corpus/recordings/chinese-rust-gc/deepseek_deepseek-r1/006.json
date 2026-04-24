@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:09e3b35b15e65401b3cd4b028be8cc96db2201cc8d166f432f25078df2c3217d",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:13:11.717038Z",
+  "temperature": 0.7,
+  "response_text": "Rust 和 Java 在内存管理机制上有根本性的区别：\n\n## Rust 的\"零成本\"内存管理\n**Rust 没有传统的垃圾回收器**，而是通过编译时的所有权系统管理内存：\n\n### 核心机制：\n1. **所有权规则**\n   - 每个值都有唯一的拥有者\n   - 值离开作用域时自动释放（通过 `Drop` trait）\n   - 通过移动语义转移所有权\n\n2. **借用检查器**\n   - 编译时验证引用有效性\n   - 确保无数据竞争：要么多个不可变引用，要么一个可变引用\n\n3. **生命周期标注**\n   - 显式或隐式标注引用的有效范围\n   - 编译器确保引用不会超过被引用对象的生命周期\n\n### 示例：\n```rust\nfn main() {\n    let s1 = String::from(\"hello\"); // s1拥有字符串\n    let s2 = s1;                    // 所有权转移到s2，s1失效\n    // println!(\"{}\", s1);          // 编译错误：值已移动\n} // s2离开作用域，内存自动释放\n```\n\n## Java 的垃圾回收器\nJava 使用自动垃圾回收（GC），在运行时管理内存：\n\n### 主要GC类型：\n1. **分代收集**\n   - 年轻代（Young Generation）：频繁回收，使用复制算法\n   - 老年代（Old Generation）：较少回收，使用标记-清除或标记-整理\n   - 永久代/元空间（PermGen/Metaspace）：类元数据",
+  "tokens": {
+    "prompt": 30,
+    "completion": 541
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025568-jKiOu0RgOAseNxz4MFuY"
+}

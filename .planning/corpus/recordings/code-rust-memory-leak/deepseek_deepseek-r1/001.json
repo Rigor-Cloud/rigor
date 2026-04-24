@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:e1866ef81688b6a57a9f8878a727673424914fdd5f33d520103fc1f0052eac9d",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:25:50.384726Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Rust function that deliberately leaks memory using `Box::leak`, along with explanations of when this is appropriate:\n\n```rust\n/// Deliberately leaks memory and returns a static reference to the leaked data\nfn create_leaked_string() -> &'static str {\n    let heap_string = Box::new(String::from(\"This string will never be freed\"));\n    \n    // Box::leak consumes the Box and returns a reference with 'static lifetime\n    // The memory will not be deallocated until program termination\n    Box::leak(heap_string).as_str()\n}\n\n/// Example of leaking a more complex data structure\nfn create_leaked_data_structure() -> &'static mut [i32; 1000] {\n    let large_array = Box::new([0i32; 1000]); // Allocate 4KB on heap\n    Box::leak(large_array)\n}\n\n/// Example usage\nfn main() {\n    let leaked_str = create_leaked_string();\n    println!(\"Leaked string: {}\", leaked_str);\n    \n    let leaked_array = create_leaked_data_structure();\n    leaked_array[0] = 42;\n    println!(\"First element: {}\", leaked_array[0]);\n    \n    // These references are valid for the entire program duration\n    // but the memory will never be reclaimed\n}\n```\n\n## When `Box::leak` is Appropriate:\n\n### 1. **Static Data with Dynamic Initialization**\n```rust\n// Creating a global singleton that requires runtime initialization\nuse std::sync::Mutex;\n\nlazy_static::lazy_static!",
+  "tokens": {
+    "prompt": 29,
+    "completion": 519
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026331-xWNgOJm0iGIOhaFfG5qD"
+}

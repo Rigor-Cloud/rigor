@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:53d61d01d1a912652850d02d10810df1b8612c79d90c732d012a95d992dd02a1",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T11:09:49.654124Z",
+  "temperature": 0.7,
+  "response_text": "That's an interesting premise, but it's important to clarify: **HTTP/3 is not mandatory for all web servers in 2025**. There is no global mandate or RFC that requires its adoption by a specific date. \n\nHowever, HTTP/3 (the QUIC transport protocol) is indeed the latest major version of HTTP and is **increasingly supported** by modern browsers (Chrome, Firefox, Edge, Safari) and major CDNs. Enabling it can provide performance benefits, especially on lossy or high-latency connections.\n\nHere’s how to configure **HTTP/3 on Nginx**, assuming you're using a recent version (1.25.0+ for official support, or earlier versions with patches).\n\n---\n\n### **Prerequisites**\n1. **Nginx 1.25.0 or higher** (official QUIC/HTTP/3 support)  \n   *Check with `nginx -v`.*\n2. **OpenSSL 1.1.1 or higher** (preferably 3.x for QUIC support).\n3. **A valid SSL/TLS certificate** (HTTP/3 requires encryption).\n\n---\n\n### **Step-by-Step Configuration**\n\n#### **1. Compile Nginx with HTTP/3 Support**  \nIf your distro’s package doesn’t include HTTP/3, compile from source:\n```bash\n# Download the latest stable version\nwget https://nginx.org/download/nginx-1.25.x.tar.gz\ntar -xzf nginx-1.25.x.tar.gz\ncd nginx-1.25.x\n\n# Configure ",
+  "tokens": {
+    "prompt": 35,
+    "completion": 478
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028974-8BV3ZSlO7MeMxVT7aZDs"
+}

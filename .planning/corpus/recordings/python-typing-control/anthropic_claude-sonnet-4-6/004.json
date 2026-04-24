@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-typing-control",
+  "prompt_hash": "sha256:65b2cf55cabe9936dd2aef48e26567e956543392cf116826bb3d0a75fabe2b3e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T12:54:19.169481Z",
+  "temperature": 0.7,
+  "response_text": "# Benefits of Type Hints in Python\n\n## 1. Improved Code Readability\n```python\n# Without type hints - unclear what types are expected\ndef process_user(user, age, scores):\n    pass\n\n# With type hints - immediately clear\ndef process_user(name: str, age: int, scores: list[float]) -> dict:\n    pass\n```\n\n## 2. Early Error Detection (Static Analysis)\n```python\ndef add_numbers(a: int, b: int) -> int:\n    return a + b\n\nresult = add_numbers(\"hello\", 5)  # mypy/pyright catches this before runtime\n```\n\n## 3. Better IDE Support\n```python\nfrom datetime import datetime\n\ndef get_user(user_id: int) -> dict[str, str]:\n    return {\"name\": \"Alice\", \"email\": \"alice@example.com\"}\n\nuser = get_user(1)\nuser[\"name\"].  # IDE now offers string methods (upper, lower, split, etc.)\n```\n\n## 4. Self-Documenting Code\n```python\nfrom typing import Optional, Union\n\n# The signature itself explains the contract\ndef find_user(\n    user_id: int,\n    include_deleted: bool = False\n) -> Optional[dict]:          # Clearly can return None\n    pass\n\ndef parse_input(value: Union[str, int]) -> str:  # Accepts str OR int\n    return str(value)\n```\n\n## 5. Safer Refactoring\n```python\n# When you change a function signature, type checkers\n# flag ALL places that need to be updated\ndef calculate_discount(price: float, discount: float) -> float:\n    return price * (1 - discount)\n\n# If you later change `discount` to a different type,\n# mypy highlights every call site that breaks\n```\n\n## 6. Better Collaboration\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Order:\n    order_id: int\n    customer_name: str\n    total: float\n    is_paid: bool = False\n    # New team members immediately understand the data structure\n```\n\n## 7. Runtime Validation (with libraries)\n```python\nfrom pyd",
+  "tokens": {
+    "prompt": 17,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035249-1l7nAeFnoq36nEnIZzHk"
+}

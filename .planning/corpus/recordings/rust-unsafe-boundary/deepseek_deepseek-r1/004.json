@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T13:17:03.637002Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question. This gets to the heart of Rust's philosophy: **safe by default, but able to opt into unsafety when necessary, with clear boundaries.**\n\n### When to Use `unsafe`\n\nYou should use `unsafe` **only when you need to perform an operation that the compiler cannot verify as safe at compile time, and you, the programmer, can guarantee its safety by upholding the invariants that Rust's safety rules rely on.** It's a tool for extending the language's capabilities, not for bypassing rules you find inconvenient.\n\nCommon, valid use cases include:\n\n1.  **Dereferencing Raw Pointers (`*const T`, `*mut T`):**\n    *   When interfacing with C code (FFI).\n    *   Building low-level data structures (like `Vec`, `HashMap`, or a custom allocator) where you need precise control over memory layout and ownership.\n\n2.  **Calling Unsafe Functions (including FFI):**\n    *   Any function call from a C library via `extern \"C\"`.\n    *   Calling Rust's intrinsic compiler functions (e.g., `std::intrinsics`).\n    *   Functions in the standard library marked as `unsafe` (e.g., `std::ptr::read`, `std::slice::from_raw_parts`).\n\n3.  **Implementing Unsafe Traits:**\n    *   The primary example is `Send` and `Sync`. Telling the compiler \"this type is safe to transfer or share across threads\" is a promise you make using `unsafe trait`.\n\n4. ",
+  "tokens": {
+    "prompt": 30,
+    "completion": 521
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036605-d4l6gN8lWkqm5Dap8gyr"
+}

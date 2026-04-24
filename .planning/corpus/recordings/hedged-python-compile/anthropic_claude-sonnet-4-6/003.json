@@ -1,0 +1,15 @@
+{
+  "prompt_id": "hedged-python-compile",
+  "prompt_hash": "sha256:9f150881c56d2dcf2814d4f31e4306ffd7662d807c20fad80a36dfc9785c6d72",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T10:53:16.099068Z",
+  "temperature": 0.7,
+  "response_text": "## Python Compilation: The Reality\n\nThe claim is **mostly misleading**. Here's what actually happens:\n\n---\n\n### What Standard Python (CPython) Does\n\n1. **Source code → Bytecode** (`.pyc` files)\n   - This is compilation, but to an **intermediate bytecode**, not native machine code\n   - Bytecode is platform-independent instructions for the Python Virtual Machine\n2. **Bytecode → Execution via interpreter**\n   - The CPython interpreter (written in C) reads and executes bytecode at runtime\n   - This is fundamentally different from native compilation\n\n---\n\n### Why This Matters\n\n| Property | Native Compilation | CPython |\n|---|---|---|\n| Output | Machine code | Bytecode |\n| Runtime needed | No (mostly) | Yes (Python VM) |\n| Performance | Fast | Slower |\n| Platform specific | Yes | No |\n\n---\n\n### Where Native Compilation IS Real\n\nSome tools genuinely compile Python to native code:\n\n- **Cython** - transpiles to C, then compiles to native\n- **Nuitka** - compiles Python to C/machine code\n- **PyPy** - uses JIT compilation to native code at runtime\n- **mypyc** - compiles type-annotated Python to C extensions\n- **Numba** - JIT compiles specific functions (numerical code)\n\n---\n\n### The `.pyc` Misconception\n\nPeople sometimes see `.pyc` files and assume this means native compilation. It doesn't — it's just **cached bytecode** to skip re-parsing source files.\n\n---\n\n### Summary\n\nStandard Python is an **interpreted language with a compilation step to bytecode**, not native code. The confusion likely comes from misunderstanding what \"compiles\" means, or conflating CPython with tools like Nuitka or PyPy.",
+  "tokens": {
+    "prompt": 24,
+    "completion": 419
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027985-hyM2Jn9dyBDqZdkCGg8C"
+}

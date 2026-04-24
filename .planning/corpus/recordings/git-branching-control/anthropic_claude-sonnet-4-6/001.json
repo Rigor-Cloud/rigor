@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:38:03.701790Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## Core Philosophy Difference\n\n```\nGitFlow: Multiple long-lived branches, structured releases\nTrunk-Based: Single main branch, continuous integration\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain          ──●──────────────────────●──────────────●──\n                │                      │              │\ndevelop       ──●──●──●──●──●──●──●──●──●──●──●──●──●──\n                   │        │     │\nfeature/login ─────●──●──●──┘     │\n                              │   │\nrelease/1.2   ────────────────●──●┘\n                              │\nhotfix/bug    ────────────────────●──●──┘\n```\n\n### Branch Types & Purposes\n\n| Branch | Lifetime | Purpose |\n|--------|----------|---------|\n| `main` | Permanent | Production-ready code only |\n| `develop` | Permanent | Integration branch |\n| `feature/*` | Temporary | New features |\n| `release/*` | Temporary | Release preparation |\n| `hotfix/*` | Temporary | Emergency production fixes |\n\n### Workflow Example\n```bash\n# Start a feature\ngit checkout develop\ngit checkout -b feature/user-authentication\n\n# Work on feature...\ngit add .\ngit commit -m \"Add login endpoint\"\ngit commit -m \"Add JWT validation\"\n\n# Merge back to develop\ngit checkout develop\ngit merge --no-ff feature/user-authentication\ngit branch -d feature/user-authentication\n\n# Create release branch\ngit checkout -b release/1.2.0\n# Bug fixes, version bumps only\ngit commit -m \"Bump version to 1.2.0\"\n\n# Merge release to main AND develop\ngit checkout main\ngit merge --no-ff release/1.2.0\ngit tag -a v1.2.0\n\ngit checkout develop\ngit merge --no-ff release/1.2.0\ngit branch -d release/1.2.0\n\n# Emergency hotfix\ngit checkout main\ngit checkout -b hotfix/critical-security-fix\ngit commit -m",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027075-4qKbthAk8w5LqcYqbmA2"
+}

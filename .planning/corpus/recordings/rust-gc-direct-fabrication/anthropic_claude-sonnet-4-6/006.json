@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:9b85865e694d960764446892ac45ea8f225259474011fda43739928918f308f6",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T13:01:12.778630Z",
+  "temperature": 0.7,
+  "response_text": "# Rust Doesn't Have a Garbage Collector\n\nThis is a common misconception worth clarifying directly. **Rust has no garbage collector** — this is actually one of its defining features and primary design goals.\n\n---\n\n## How Rust Actually Manages Memory\n\nRust uses a **compile-time ownership system** to manage memory with zero runtime overhead.\n\n### The Three Core Rules\n\n```rust\n// RULE 1: Every value has a single owner\nlet s = String::from(\"hello\");  // s owns this string\n\n// RULE 2: When the owner goes out of scope, the value is dropped\n{\n    let s = String::from(\"hello\");\n}  // s is dropped HERE - memory freed automatically, no GC needed\n\n// RULE 3: There can only be one owner at a time\nlet s1 = String::from(\"hello\");\nlet s2 = s1;  // ownership MOVES to s2\n// println!(\"{}\", s1);  // COMPILE ERROR - s1 no longer owns the value\n```\n\n### Borrowing (Using Without Taking Ownership)\n\n```rust\nfn calculate_length(s: &String) -> usize {  // & = borrow, don't own\n    s.len()\n}  // s is NOT dropped here - we don't own it\n\nfn main() {\n    let s1 = String::from(\"hello\");\n    let len = calculate_length(&s1);  // lend s1, keep ownership\n    println!(\"{} has length {}\", s1, len);  // s1 still valid\n}\n```\n\n### Borrow Rules Enforced at Compile Time\n\n```rust\nlet mut s = String::from(\"hello\");\n\nlet r1 = &s;      // immutable borrow - OK\nlet r2 = &s;      // second immutable borrow - OK\n// let r3 = &mut s;  // COMPILE ERROR: can't borrow mutably while\n                     // immutable borrows exist\n\nprintln!(\"{} {}\", r1, r2);\n// r1 and r2 no longer used after this point\n\nlet r3 = &mut s;  // NOW this is fine - previous borrows ended\nr3.push_str(",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035663-iEwK6GIA84fbxLsOCx4Q"
+}

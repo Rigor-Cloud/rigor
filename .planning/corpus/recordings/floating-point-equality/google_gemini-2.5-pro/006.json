@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:0d2919e6f8d04818f2a9a82d037a24cfbfae609be00863c2122485c51010bec2",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:37:26.368785Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question. The short, direct answer is:\n\n**Generally, no, it is not safe to",
+  "tokens": {
+    "prompt": 17,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027038-hRiayB2iZ1flotiGDuCC"
+}

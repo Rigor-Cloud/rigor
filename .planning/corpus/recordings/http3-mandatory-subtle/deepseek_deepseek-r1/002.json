@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:53d61d01d1a912652850d02d10810df1b8612c79d90c732d012a95d992dd02a1",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T11:08:24.422964Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question! However, I should start with an important clarification: **HTTP/3 is not mandatory for all web servers as of 2025.** It is a significant and growing standard, but the \"mandatory\" part is a misconception. Major browsers support it, and adoption is accelerating, but HTTP/1.1 and HTTP/2 are still fully functional and widely used.\n\nThat said, enabling HTTP/3 (which uses QUIC over UDP) is a fantastic way to improve performance, especially for users with high latency or packet loss. Configuring it in Nginx involves a few key steps.\n\nHere is a comprehensive guide to configuring HTTP/3 on your Nginx instance.\n\n### Prerequisites\n\n1.  **Nginx Version:** You need **Nginx 1.25.0 or later**. Earlier versions (1.19.x+) had experimental support, but the stable module is integrated from 1.25.0 onward.\n2.  **OpenSSL Library:** Nginx should be compiled with a **QUIC-compatible TLS library** (preferably BoringSSL, LibreSSL, or OpenSSL with QUIC patches). Most modern package managers now provide this.\n3.  **Firewall:** Ensure **UDP port 443** is open in your firewall (e.g., `ufw allow 443/udp`), as HTTP/3 uses UDP in addition to TCP.\n\n---\n\n### Step-by-Step Configuration\n\nThe configuration is an addition to your existing HTTPS/HTTP2 setup.\n\n#### 1. Update Your `server` Block (in `sites-available/",
+  "tokens": {
+    "prompt": 35,
+    "completion": 451
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028887-edRW13Titv0oXVZzgvm3"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:3ab63f50b1bd87ff4430b1f25f9e4b73f27ccceeb533fb89a8f5f89cf8ea9f5a",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:21:13.766382Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Python script demonstrating manual garbage collection control using Python's `gc` module, with detailed explanations:\n\n```python\nimport gc\nimport sys\n\nclass Node:\n    \"\"\"Example class that creates reference cycles\"\"\"\n    def __init__(self, name):\n        self.name = name\n        self.parent = None\n        self.children = []\n    \n    def add_child(self, child):\n        self.children.append(child)\n        child.parent = self\n    \n    def __del__(self):\n        print(f\"Node {self.name} is being destroyed\")\n\ndef create_cycle():\n    \"\"\"Create a reference cycle to generate garbage\"\"\"\n    print(\"\\n1. Creating reference cycle...\")\n    a = Node(\"Parent\")\n    b = Node(\"Child\")\n    a.add_child(b)\n    # Create cycle: parent <-> child\n    b.children.append(a)\n    return a, b\n\ndef demonstrate_gc_control():\n    \"\"\"Main function demonstrating gc control\"\"\"\n    print(\"=\" * 50)\n    print(\"GARBAGE COLLECTION DEMONSTRATION\")\n    print(\"=\" * 50)\n    \n    # 1. Check current GC settings\n    print(\"\\n1. INITIAL GC STATE:\")\n    print(f\"   GC Enabled: {gc.isenabled()}\")\n    print(f\"   GC Thresholds: {gc.get_threshold()}\")\n    print(f\"   GC Count: {gc.get_count()}\")\n    \n    # 2. Create some garbage\n    print(\"\\n2. CREATING GARBAGE OBJECTS...\")\n    objects = []\n    for i in range(5):\n        obj = Node(f\"Temp_{i",
+  "tokens": {
+    "prompt": 25,
+    "completion": 469
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026055-T5gz9lzJTGZHfLGczAN2"
+}

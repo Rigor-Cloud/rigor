@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:e1866ef81688b6a57a9f8878a727673424914fdd5f33d520103fc1f0052eac9d",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:27:43.258934Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Rust function that deliberately leaks memory using `Box::leak`:\n\n```rust\nfn deliberate_memory_leak() -> &'static mut String {\n    let data = Box::new(String::from(\"This string will be leaked\"));\n    Box::leak(data)\n}\n\n// Usage example\nfn main() {\n    let leaked_ref = deliberate_memory_leak();\n    println!(\"Leaked string: {}\", leaked_ref);\n    \n    // We can still use the leaked data\n    leaked_ref.push_str(\" - modified after leak\");\n    println!(\"Modified leaked string: {}\", leaked_ref);\n    \n    // The memory will never be freed automatically\n}\n```\n\n## When `Box::leak` is Appropriate:\n\n### 1. **Static/Lifetime Extension**\nWhen you need to convert data to `'static` lifetime for APIs that require it:\n```rust\nfn create_static_str() -> &'static str {\n    let string = Box::new(String::from(\"static data\"));\n    Box::leak(string).as_str()\n}\n```\n\n### 2. **Global Initialization at Runtime**\nInitializing global state that depends on runtime values:\n```rust\nuse std::sync::Mutex;\n\nstatic RUNTIME_CONFIG: &Mutex<Config> = {\n    let config = Config::load_from_file(); // Runtime initialization\n    Box::leak(Box::new(Mutex::new(config)))\n};\n```\n\n### 3. **FFI (Foreign Function Interface)**\nWhen passing data to C code that will manage its own memory:\n```rust\nextern \"C\" {\n    fn c_function_takes_",
+  "tokens": {
+    "prompt": 29,
+    "completion": 648
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026441-crJ3ATt5o49lkJ2e8DYQ"
+}

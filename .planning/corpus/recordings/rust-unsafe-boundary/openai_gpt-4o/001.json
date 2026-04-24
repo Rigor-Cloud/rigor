@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:321c3a00b8f76950fc666090e5578b646f8ddbea6706d6d08c1e88e8a170dea4",
+  "model": "openai/gpt-4o",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T13:20:33.583156Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, you should use `unsafe` when you need to perform operations that the Rust compiler cannot guarantee to be safe. This includes:\n\n1. **Dereferencing raw pointers:** Raw pointers (`*const T` and `*mut T`) are not guaranteed by the Rust compiler to be valid or aligned, and dereferencing them is unsafe.\n\n2. **Calling unsafe functions or methods:** Some functions are marked as `unsafe` because they perform operations that the compiler cannot verify as safe. Calling these functions requires an `unsafe` block.\n\n3. **Accessing or modifying mutable static variables:** Static variables can lead to data races, so accessing or modifying mutable statics is unsafe.\n\n4. **Implementing unsafe traits:** Some traits are marked as `unsafe` to indicate that incorrect implementations could lead to undefined behavior. Implementing these traits requires an `unsafe` block.\n\n5. **Performing operations that violate the borrow checker rules:** This includes things like creating multiple mutable references to the same data.\n\nDespite the use of `unsafe`, the Rust compiler still provides several guarantees:\n\n1. **Memory Safety Outside of Unsafe Operations:** The existence of an `unsafe` block doesn't mean the entire program is unsafe. Only the operations within the block are not checked by the borrow checker. Code outside of `unsafe` blocks is still subject to all of Rust's safety checks.\n\n2. **Type Safety:** Rust's type system is still enforced. You cannot perform operations that would result in type mismatches, even within an `unsafe` block.\n\n3. **Data Race Freedom:** While `unsafe` blocks can potentially lead to data races if used improperly, Rust's ownership and concurrency model still applies outside of `unsafe` blocks, helping to prevent data races in safe code.\n\n4. **No Implicit Undefined Behavior:** Unsafe code doesn't automatically lead to undefined behavior. Undefined behavior only occurs if the programmer violates Rust's safety guarantees, such as dereferencing a null pointer or creating aliased mutable references.\n\nIn summary, `unsafe` is a tool that allows you to perform operations that are not possible with safe Rust but should be used with caution. The responsibility is on you to ensure that the invariants typically checked by the compiler are maintained manually.",
+  "tokens": {
+    "prompt": 27,
+    "completion": 448
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036827-frEPhieAIm3y70v8TRiq"
+}

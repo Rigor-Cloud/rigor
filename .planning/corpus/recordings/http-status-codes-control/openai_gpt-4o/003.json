@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:e7d280eddf99433b6286fbe697c4928b39cea5c3428e06d1004fe24698cb9bec",
+  "model": "openai/gpt-4o",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T11:04:20.881394Z",
+  "temperature": 0.7,
+  "response_text": "HTTP status codes are issued by a server in response to a client's request made to the server. They are grouped into five classes, each representing a different category of response. Here are some of the most common HTTP status codes and their meanings:\n\n1. **1xx: Informational**\n   - **100 Continue**: The server has received the request headers, and the client should proceed to send the request body.\n   - **101 Switching Protocols**: The requester has asked the server to switch protocols, and the server is acknowledging that it will do so.\n\n2. **2xx: Success**\n   - **200 OK**: The request was successful, and the server has returned the requested resource.\n   - **201 Created**: The request was successful, and a new resource has been created as a result.\n   - **204 No Content**: The server successfully processed the request, but no content is returned.\n\n3. **3xx: Redirection**\n   - **301 Moved Permanently**: The requested resource has been permanently moved to a new URL.\n   - **302 Found**: The requested resource resides temporarily under a different URL.\n   - **304 Not Modified**: The resource has not been modified since the last request, so the client can use the cached version.\n\n4. **4xx: Client Error**\n   - **400 Bad Request**: The server cannot process the request due to a client error (e.g., malformed request syntax).\n   - **401 Unauthorized**: Authentication is required and has failed or has not yet been provided.\n   - **403 Forbidden**: The server understands the request but refuses to authorize it.\n   - **404 Not Found**: The requested resource could not be found on the server.\n   - **405 Method Not Allowed**: The request method is known by the server but is not supported by the target resource.\n\n5. **5xx: Server Error**\n   - **500 Internal Server Error**: An unexpected condition was encountered, and the server cannot fulfill the request.\n   - **502 Bad Gateway**: The server, while acting as a gateway or proxy, received an invalid response from the upstream server.\n   - **503 Service Unavailable**: The server is currently unable to handle the request due to temporary overloading or maintenance.\n   - **504 Gateway Timeout**: The server, while acting as a gateway or proxy, did not receive a timely response from the upstream server.\n\nThese status codes help clients understand the outcome of their requests and take appropriate actions",
+  "tokens": {
+    "prompt": 19,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028647-9wUnTrt6aXCQJIJ8gfjW"
+}

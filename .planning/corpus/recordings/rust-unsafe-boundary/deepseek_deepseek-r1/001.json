@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T13:16:09.963309Z",
+  "temperature": 0.7,
+  "response_text": "## When to Use `unsafe` in Rust\n\nYou should use `unsafe` in Rust **only when absolutely necessary**, typically in these scenarios:\n\n1. **FFI (Foreign Function Interface)** - Calling C code or other foreign functions\n2. **Raw pointer manipulation** - Dereferencing raw pointers (`*const T`, `*mut T`)\n3. **Inline assembly** - Using architecture-specific instructions\n4. **Memory layout operations** - `std::mem::transmute`, `std::ptr::read_unaligned`\n5. **Implementing unsafe traits** - Like `Send` and `Sync` manually\n6. **Accessing mutable static variables** - Global mutable state\n7. **Implementing low-level abstractions** - Building safe APIs around unsafe operations (like `Vec`, `Rc`, `Mutex`)\n\n**Key principle**: Encapsulate unsafe code in safe abstractions with clear invariants. Most Rust code should be safe.\n\n## Guarantees the Compiler Still Provides in `unsafe` Blocks\n\nEven inside `unsafe` blocks, Rust maintains **all of these guarantees**:\n\n### 1. **Type System Enforcement**\n   - Type checking still occurs\n   - Trait bounds are still enforced\n   - Lifetime annotations are still respected\n\n### 2. **Ownership System**\n   - The borrow checker still operates normally\n   - Move semantics are enforced\n   - Destructors (`Drop`) are still called automatically\n\n### 3. **Memory Safety Features**\n   - Bounds checking on safe collections (unless explicitly bypassed)\n   ",
+  "tokens": {
+    "prompt": 30,
+    "completion": 1048
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036537-RwXaMoGpTa2YjydKxwBt"
+}

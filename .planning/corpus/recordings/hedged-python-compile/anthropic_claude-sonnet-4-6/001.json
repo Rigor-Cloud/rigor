@@ -1,0 +1,15 @@
+{
+  "prompt_id": "hedged-python-compile",
+  "prompt_hash": "sha256:9f150881c56d2dcf2814d4f31e4306ffd7662d807c20fad80a36dfc9785c6d72",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:52:53.443262Z",
+  "temperature": 0.7,
+  "response_text": "## Python Compilation: The Reality\n\nThis is a common misconception worth clarifying. Here's what actually happens:\n\n### What Python Actually Does\n\nPython compiles to **bytecode**, not native machine code:\n\n```\nSource code (.py)  →  Bytecode (.pyc)  →  Interpreted by CPython VM\n```\n\n- The bytecode is stored in `__pycache__/` directories\n- It's **platform-independent** (unlike native code)\n- The CPython interpreter executes bytecode instructions at runtime\n\n### You Can Inspect This\n\n```python\nimport dis\n\ndef add(a, b):\n    return a + b\n\ndis.dis(add)\n# Output shows bytecode instructions:\n#   LOAD_FAST 'a'\n#   LOAD_FAST 'b'\n#   BINARY_OP +\n#   RETURN_VALUE\n```\n\n### Why This Matters (Performance)\n\n| Approach | Speed | Notes |\n|----------|-------|-------|\n| CPython (standard) | Baseline | Bytecode interpreted |\n| PyPy | ~5-10x faster | JIT compilation to native code |\n| Cython | Near C speed | Compiles Python-like code to C |\n| Nuitka | Native | Genuinely compiles Python to C/machine code |\n\n### The Nuance\n\n- **CPython** (the standard implementation) does **not** produce native code\n- **PyPy** uses JIT compilation, generating native code at runtime\n- Tools like **Nuitka** or **Cython** can genuinely compile to native code, but they're separate tools, not standard Python\n\n### The Short Answer\n\nStandard Python is **compiled to bytecode, then interpreted** — it's a hybrid approach, not native compilation. The suggestion that Python compiles to native code is either referring to third-party tools or is simply inaccurate.",
+  "tokens": {
+    "prompt": 24,
+    "completion": 435
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027963-1gKDo6M4nAcGFz52nY4f"
+}

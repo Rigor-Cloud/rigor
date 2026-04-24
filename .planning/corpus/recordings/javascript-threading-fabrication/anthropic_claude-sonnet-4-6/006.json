@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:13901fe88a8ee56078ea80b44bbda998f3853a1dc3f3d3728948938995ca3919",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T11:13:48.082050Z",
+  "temperature": 0.7,
+  "response_text": "# JavaScript's Threading Model\n\n## The Honest Answer First\n\n**JavaScript has no built-in multi-threading in the traditional sense.** It is fundamentally single-threaded — there is exactly one call stack, and only one piece of code runs at a time on the main thread.\n\n---\n\n## The Single-Threaded Reality\n\n```javascript\n// This is ALL sequential - no parallelism here\nfunction blockingOperation() {\n    const start = Date.now();\n    while (Date.now() - start < 3000) {} // blocks EVERYTHING for 3 seconds\n    console.log(\"done\");\n}\n\nblockingOperation();\n// Nothing else can run during those 3 seconds\n// UI freezes, events queue up, network callbacks wait\n```\n\n### The Event Loop (Concurrency, Not Parallelism)\n\n```\nCall Stack          Callback Queue        Microtask Queue\n┌─────────┐        ┌──────────────┐      ┌──────────────┐\n│  main() │        │ setTimeout() │      │ Promise.then │\n│  fetch()│   →    │ click handler│      │ queueMicro.. │\n│         │        │ I/O callback │      │              │\n└─────────┘        └──────────────┘      └──────────────┘\n                          ↑\n                   Event Loop picks next\n                   task when stack is empty\n```\n\n```javascript\nconsole.log(\"1\");\n\nsetTimeout(() => console.log(\"2\"), 0);     // Callback queue\n\nPromise.resolve().then(() => console.log(\"3\")); // Microtask queue\n\nconsole.log(\"4\");\n\n// Output: 1, 4, 3, 2\n// Microtasks drain completely before next callback queue task\n```\n\n---\n\n## Actual Multi-Threading: Web Workers\n\nWeb Workers provide **true parallel execution** in separate threads.\n\n```javascript\n// main.js - Main thread\nconst worker = new Worker(\"worker.js\");\n\nworker.postMessage({ data: [1, 2, 3, 4, 5] });\n\nworker.onmessage = (event) => {\n    console.log(\"Result from worker",
+  "tokens": {
+    "prompt": 23,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029217-cLwNvCi7F1aFe8UB6BO0"
+}

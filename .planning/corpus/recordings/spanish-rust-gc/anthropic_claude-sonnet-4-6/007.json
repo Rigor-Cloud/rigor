@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T13:24:25.644227Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura: Rust vs Java\n\n## La respuesta corta: Rust NO tiene recolector de basura\n\nEsta es la diferencia fundamental. Rust usa un modelo completamente distinto.\n\n---\n\n## Cómo gestiona la memoria Rust\n\nRust usa un sistema de **Ownership + Borrowing + Lifetimes** que el compilador verifica en tiempo de compilación.\n\n### Las 3 reglas de Ownership\n\n```rust\n// REGLA 1: Cada valor tiene un único dueño\nlet s1 = String::from(\"hola\");  // s1 es el dueño\n\n// REGLA 2: Solo puede haber un dueño a la vez\nlet s2 = s1;  // s1 se MUEVE a s2, s1 ya no es válido\n// println!(\"{}\", s1);  // ❌ ERROR en compilación: s1 fue movido\n\n// REGLA 3: Cuando el dueño sale del scope, la memoria se libera\n{\n    let s3 = String::from(\"mundo\");\n    // ... uso de s3\n} // ← s3 se destruye AQUÍ, memoria liberada automáticamente (Drop)\n```\n\n### El sistema de Borrowing (préstamos)\n\n```rust\nfn main() {\n    let s1 = String::from(\"hola\");\n\n    // Préstamo inmutable: puedes tener MUCHOS a la vez\n    let len = calcular_longitud(&s1);\n    println!(\"{} tiene {} caracteres\", s1, len); // s1 sigue siendo válido\n\n    // Préstamo mutable: solo UNO a la vez\n    let mut s2 = String::from(\"hola\");\n    modificar(&mut s2);\n}\n\nfn calcular_longitud(s: &String) -> usize {  // recibe referencia, no ownership\n    s.len()\n} // s NO se destruye aquí, no era el dueño\n\nfn modificar(s: &mut String) {\n    s.push_str(\", mundo\");\n}\n```\n\n###",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037055-dFSoTJzGwFT5DL0WqMuP"
+}

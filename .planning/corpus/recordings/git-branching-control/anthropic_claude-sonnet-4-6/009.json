@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T10:39:22.401100Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## The Core Philosophy Difference\n\n```\nGitFlow:  Multiple long-lived branches → merge complexity → structured releases\nTrunk:    One main branch → continuous integration → continuous delivery\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain          ──●──────────────────────────●──────────────────●──\n                │                          │                  │\n                └─ v1.0                    └─ v2.0            └─ v3.0\n                \nhotfix        ────────────────────────●───\n                                      │\n                                    patch\n\nrelease       ──────────────────●────┘\n                                │\ndevelop       ──●──●──●──●──●──┘──●──●──●──●──●──\n                │              │\nfeature/A  ─────●──●──●────────┘\n                      │\nfeature/B  ───────────●──●──●──●──────────────────\n```\n\n### The Five Branch Types\n\n```bash\n# 1. MAIN (production-ready code only)\ngit checkout main\n# Never commit directly here\n\n# 2. DEVELOP (integration branch)\ngit checkout -b develop main\n\n# 3. FEATURE branches (new work)\ngit checkout -b feature/user-authentication develop\n# ... do work ...\ngit checkout develop\ngit merge --no-ff feature/user-authentication\ngit branch -d feature/user-authentication\n\n# 4. RELEASE branches (prep for production)\ngit checkout -b release/1.2.0 develop\n# Only bug fixes, version bumps, docs\ngit checkout main\ngit merge --no-ff release/1.2.0\ngit tag -a v1.2.0\ngit checkout develop\ngit merge --no-ff release/1.2.0  # Back-merge!\n\n# 5. HOTFIX branches (emergency production fixes)\ngit checkout -b hotfix/critical-security-bug main\n# Fix the bug...\ngit checkout main\ngit merge --no-ff hotfix/critical-security-bug\ngit tag -a v1.1.1\ngit checkout develop\ngit merge",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027152-tbirYMSIwjK2mXt6eHRv"
+}

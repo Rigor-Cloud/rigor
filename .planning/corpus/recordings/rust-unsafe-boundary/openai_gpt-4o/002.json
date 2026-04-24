@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:321c3a00b8f76950fc666090e5578b646f8ddbea6706d6d08c1e88e8a170dea4",
+  "model": "openai/gpt-4o",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T13:20:39.788668Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, the `unsafe` keyword is used to bypass some of the safety checks that the compiler normally enforces. You should use `unsafe` when:\n\n1. **Interfacing with C or other low-level systems**: When you need to call foreign functions or interact with hardware directly, you often need to use `unsafe` because these operations are outside Rust's safety guarantees.\n\n2. **Implementing low-level data structures**: For example, when writing your own memory management routines or implementing data structures that require precise control over memory layout and lifetimes.\n\n3. **Optimizing performance**: Sometimes, the abstractions provided by safe Rust can introduce overhead. By using `unsafe`, you can perform operations that are potentially more efficient, but you must ensure their correctness manually.\n\n4. **Bypassing Rust's borrowing rules**: In some rare cases, you might need to perform operations that the borrow checker cannot understand, such as creating self-referential structs.\n\n5. **Accessing or modifying mutable static variables**: Since mutable static variables can be accessed from multiple threads, you need `unsafe` to ensure proper synchronization.\n\nWhen you use `unsafe`, you're telling the compiler that you will uphold certain guarantees manually. However, even within `unsafe` blocks, Rust still provides several important guarantees:\n\n1. **Type Safety**: Rust ensures that operations respect type constraints. You cannot, for example, treat an integer as a pointer without an explicit cast.\n\n2. **Memory Safety (to some extent)**: While `unsafe` allows you to perform operations that can potentially violate memory safety (like dereferencing raw pointers), it's still your responsibility to ensure that such operations are safe. Rust does not automatically enforce these checks, but it relies on you to uphold them.\n\n3. **Data Race Freedom**: Unsafe blocks do not compromise Rust's guarantees around data races. You still need to manually ensure that data accessed from multiple threads is properly synchronized.\n\n4. **Syntax and Concurrency Checking**: Rust continues to enforce syntax correctness and checks for some concurrency issues outside of what `unsafe` bypasses.\n\nIn summary, using `unsafe` in Rust is a powerful tool that should be used judiciously and only when necessary. While it allows you to perform operations that are not checked by the compiler for safety, you are responsible for ensuring that these operations do not violate Rust's safety principles.",
+  "tokens": {
+    "prompt": 27,
+    "completion": 482
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036833-NsuIbXezJ5mdpXnHMbCA"
+}

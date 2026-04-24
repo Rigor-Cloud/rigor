@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:6d56c84c410a5ac9fbe6f5ddc4937b4d9c3cc3e8cf5a85402e05005435f8bcb0",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T13:26:10.585849Z",
+  "temperature": 0.7,
+  "response_text": "Rust no tiene un **recolector de basura (GC) tradicional** como Java, sino que gestiona la memoria mediante un sistema de **propiedad (ownership)** y **préstamos (borrowing)** en tiempo de compilación. Aquí está la explicación y comparación:\n\n---\n\n## 🔹 **Gestión de memoria en Rust**\nRust utiliza **\"Ownership\"** para garantizar seguridad sin GC:\n1. **Cada valor tiene un único dueño** (variable).\n2. Cuando el dueño sale del ámbito (`scope`), el valor se libera automáticamente (`drop`).\n3. Se evitan errores como *use-after-free* o *doble liberación* en tiempo de compilación.\n\n### Ejemplo:\n```rust\nfn main() {\n    let s1 = String::from(\"hola\"); // s1 es dueña del String.\n    let s2 = s1; // La propiedad se mueve a s2. ¡s1 ya no es válida!\n    // println!(\"{}\", s1); // ERROR: valor prestado después de moverlo.\n    println!(\"{}\", s2); // Correcto.\n} // s2 sale del ámbito → la memoria se libera aquí.\n```\n\n### Mecanismos clave:\n- **Borrowing**: Prestar referencias (`&`) sin transferir propiedad.\n- **Lifetimes**: Anotaciones que verifican que las referencias sean válidas.\n- **RAII**: Los recursos se limpian al salir del ámbito.\n\n---\n\n## ",
+  "tokens": {
+    "prompt": 32,
+    "completion": 1386
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037125-EpXK3czlht7g4mpd55zA"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T13:15:03.263356Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or type system — it unlocks **five specific capabilities** that the compiler can't verify automatically.\n\n```rust\nunsafe {\n    // The compiler still enforces:\n    // ✓ Type checking\n    // ✓ Borrow checker rules (for safe references)\n    // ✓ Lifetime validity (for safe references)\n    // ✓ Move semantics\n    // ✓ Pattern exhaustiveness\n    \n    // You're manually asserting correctness of:\n    // ✗ Raw pointer dereferences\n    // ✗ Calling unsafe functions\n    // ✗ Accessing mutable statics\n    // ✗ Implementing unsafe traits\n    // ✗ Accessing union fields\n}\n```\n\n---\n\n## The Five Unsafe Superpowers\n\n### 1. Dereference Raw Pointers\n```rust\nlet x = 42i32;\nlet raw = &x as *const i32;\n\nunsafe {\n    println!(\"{}\", *raw); // You assert: pointer is valid, aligned, initialized\n}\n\n// Dangers you're responsible for:\n// - Null pointers\n// - Dangling pointers (pointing to freed memory)\n// - Unaligned access\n// - Data races\n```\n\n### 2. Call Unsafe Functions\n```rust\nunsafe fn dangerous(ptr: *mut i32) {\n    *ptr = 100; // Caller must guarantee ptr is valid\n}\n\n// FFI is always unsafe\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n\nunsafe {\n    dangerous(&mut 42 as *mut i32);\n    println!(\"{}\", abs(-5));\n}\n```\n\n### 3. Access Mutable Static Variables\n```rust\nstatic mut COUNTER: u32 = 0;\n\nfn increment() {\n    unsafe {\n        COUNTER += 1; // You assert: no concurrent access\n    }\n}\n// Better alternative: use AtomicU32 instead\n```\n\n### 4. Implement Unsafe Traits\n```rust\n// Unsafe trait",
+  "tokens": {
+    "prompt": 29,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036493-0rTCzytIDpJdJkyW7fIR"
+}

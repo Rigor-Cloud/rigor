@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:e7c77fff5e17f6e6e96df375b5cff86eb93b05970af2ec1e489f66d3aebacd3c",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:30:57.824358Z",
+  "temperature": 0.7,
+  "response_text": "## Comparing Floating Point Numbers with `==` in IEEE 754\n\nThe short answer is: **it depends on the situation**.\n\n---\n\n## When `==` is Safe\n\n### 1. Comparing with Zero (Sometimes)\n```c\nfloat x = 0.0f;\nif (x == 0.0f) { ... }  // Safe IF x was explicitly assigned 0\n```\n\n### 2. Exact Integer Values (Within Precision)\n```c\nfloat x = 2.0f;\nif (x == 2.0f) { ... }  // Safe - powers of 2 are exact\n```\n\n### 3. Checking if Two Variables Share the Same Value\n```c\nif (a == b) { ... }  // Safe if both came from the same source\n```\n\n### 4. Special Values\n```c\n// NaN - NEVER equal to anything, including itself\ndouble nan = NaN;\nnan == nan;  // Always FALSE - use isnan() instead\n\n// Infinity - well defined\nINFINITY == INFINITY;  // TRUE\n```\n\n---\n\n## When `==` is Unsafe\n\n### The Core Problem: Rounding Errors\n```c\ndouble x = 0.1 + 0.2;\nx == 0.3;  // FALSE! x is 0.30000000000000004\n```\n\n### Accumulated Errors\n```c\ndouble sum = 0.0;\nfor (int i = 0; i < 10; i++) sum += 0.1;\nsum == 1.0;  // FALSE\n```\n\n---\n\n## Safe Alternatives\n\n### Absolute Epsilon (for values near zero)\n```c\nbool nearly_equal(double a, double b) {\n    return fabs(a - b) < 1e-9;\n}\n```\n\n### Relative Epsilon (for large values)\n```c\nbool nearly_equal(double a, double b, double epsilon) {\n    return fabs(a - b) <= epsilon * fmax(fabs(a), fabs(b));\n}\n```\n\n### Combined (Knuth / Boost approach)\n```c\nbool nearly_equal(double a, double b, double epsilon) {",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026648-fZPy3DeQ1tqmEC9ic9ae"
+}

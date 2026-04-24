@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:6c57896a264891627e02aff6cc1e1bd516778db1a1d9d8d887b5b02f528a8e5e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:09:58.960296Z",
+  "temperature": 0.7,
+  "response_text": "# Rust 没有垃圾回收器\n\n这是一个很常见的误解，让我来澄清并深入解释。\n\n## Rust 的内存管理：所有权系统\n\nRust 在**编译时**通过所有权系统管理内存，完全不需要运行时垃圾回收器。\n\n### 核心三原则\n\n```rust\n// 原则1：每个值有且只有一个所有者\nlet s1 = String::from(\"hello\");  // s1 拥有这块内存\n\n// 原则2：所有权可以转移（Move）\nlet s2 = s1;  // 所有权转移给 s2\n// println!(\"{}\", s1);  // ❌ 编译错误！s1 已失效\n\n// 原则3：所有者离开作用域时，内存自动释放\n{\n    let s3 = String::from(\"world\");\n    // 使用 s3...\n} // ← s3 在此处自动调用 drop()，内存立即释放\n```\n\n### 借用与生命周期\n\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");\n    \n    // 不可变借用：可以有多个\n    let len = calculate_length(&s1);\n    println!(\"{} 的长度是 {}\", s1, len);  // s1 仍然有效\n    \n    // 可变借用：同一时间只能有一个\n    let mut s2 = String::from(\"hello\");\n    let r1 = &mut s2;\n    // let r2 = &mut s2;  // ❌ 编译错误！不能同时有两个可变借用\n    r1.push_str(\", world\");\n}\n\nfn calculate_length(s: &String) -> usize {  // 借用，不获取所有权\n    s.len()\n}  // s 离开作",
+  "tokens": {
+    "prompt": 45,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025389-Xbgw6Omkl5ASO4Bsue6I"
+}

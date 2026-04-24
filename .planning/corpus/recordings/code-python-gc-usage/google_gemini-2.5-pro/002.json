@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:b7d655b7609186cc1ce4590501c5376ad02d34f053d8a320d5e2ceded64d0240",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:23:01.202703Z",
+  "temperature": 0.7,
+  "response_text": "Of course. Here is a Python script that demonstrates how to use the `gc` module to manually",
+  "tokens": {
+    "prompt": 15,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026174-cImCxjWne3Id8RBnJgQc"
+}

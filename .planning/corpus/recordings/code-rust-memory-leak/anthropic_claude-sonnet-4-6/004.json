@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:b9d9540081ed37d2b6f376621147dac8a3b6afd368b79aa0eaee32585879b592",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T10:24:38.851729Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Leaking in Rust with `Box::leak`\n\n## What `Box::leak` Does\n\n`Box::leak` converts a `Box<T>` into a `&'static mut T`, intentionally preventing the destructor from running and giving the value a `'static` lifetime.\n\n```rust\nuse std::collections::HashMap;\nuse std::sync::OnceLock;\n\n// ============================================================\n// Example 1: Static configuration loaded at startup\n// ============================================================\n\n#[derive(Debug)]\nstruct AppConfig {\n    database_url: String,\n    max_connections: u32,\n    feature_flags: HashMap<String, bool>,\n}\n\nimpl AppConfig {\n    fn new(database_url: &str, max_connections: u32) -> Self {\n        let mut feature_flags = HashMap::new();\n        feature_flags.insert(\"dark_mode\".to_string(), true);\n        feature_flags.insert(\"beta_features\".to_string(), false);\n\n        AppConfig {\n            database_url: database_url.to_string(),\n            max_connections,\n            feature_flags,\n        }\n    }\n}\n\nimpl Drop for AppConfig {\n    fn drop(&mut self) {\n        // This will NEVER be called when we use Box::leak\n        println!(\"AppConfig dropped (you won't see this with Box::leak)\");\n    }\n}\n\n/// Leaks config intentionally so it can be referenced with 'static lifetime\n/// from anywhere in the program without synchronization overhead.\nfn init_config(database_url: &str, max_connections: u32) -> &'static AppConfig {\n    let config = Box::new(AppConfig::new(database_url, max_connections));\n    Box::leak(config)\n    // Memory is now \"owned\" by the program for its entire lifetime\n}\n\n// ============================================================\n// Example 2: Thread-safe global initialization\n// ============================================================\n\nstatic GLOBAL_CONFIG: OnceLock<&'static AppConfig> = OnceLock::new();\n\nfn get_or_init_config() -> &'static AppConfig {\n    GLOBAL_CONFIG.get_or_init(|| {\n        init_config(\"postgres",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026270-fjFXHiGHI0GOUa5UpkHL"
+}

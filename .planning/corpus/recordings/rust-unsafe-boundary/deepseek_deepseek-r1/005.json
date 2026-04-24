@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T13:17:31.723039Z",
+  "temperature": 0.7,
+  "response_text": "## When to Use `unsafe` in Rust\n\nYou should use `unsafe` **sparingly** and only when you need to:\n\n### 1. **Interfacing with C/FFI**\n   ```rust\n   extern \"C\" {\n       fn c_function(ptr: *const i32) -> i32;\n   }\n   ```\n\n### 2. **Raw Pointer Operations**\n   ```rust\n   let raw_ptr: *const i32 = &some_value;\n   unsafe { *raw_ptr }  // Dereferencing raw pointers\n   ```\n\n### 3. **Memory Management**\n   - Manual allocation/deallocation\n   - Implementing custom smart pointers\n   - Building low-level data structures\n\n### 4. **Inline Assembly**\n   ```rust\n   unsafe { asm!(\"nop\") }\n   ```\n\n### 5. **Mutable Static Variables**\n   ```rust\n   static mut COUNTER: i32 = 0;\n   unsafe { COUNTER += 1; }\n   ```\n\n### 6. **Unsafe Traits**\n   - `Sync` and `Send` implementations for custom types\n   - `GlobalAlloc` for custom allocators\n\n### 7. **Performance-Critical Code**\n   - When you can prove safety but compiler's conservative checks prevent optimizations\n\n## What the Compiler **Still Guarantees** in `unsafe` Blocks\n\n**Important**: `unsafe` doesn't disable safety—it just allows specific operations. Most Rust safety features remain active:\n\n### 1. **Type System Still Works**\n   - Type ",
+  "tokens": {
+    "prompt": 30,
+    "completion": 842
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036623-FNYjWZ1De7bIGp5O9a9d"
+}

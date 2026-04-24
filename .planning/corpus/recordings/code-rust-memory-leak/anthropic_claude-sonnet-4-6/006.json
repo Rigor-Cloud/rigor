@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:b9d9540081ed37d2b6f376621147dac8a3b6afd368b79aa0eaee32585879b592",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:24:56.624754Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Leaking in Rust with `Box::leak`\n\n## Basic Example\n\n```rust\nfn leak_string() -> &'static str {\n    let s = String::from(\"Hello, leaked world!\");\n    Box::leak(s.into_boxed_str())\n}\n\nfn main() {\n    let leaked: &'static str = leak_string();\n    println!(\"{}\", leaked);\n    // Memory is never freed, but the reference is valid forever\n}\n```\n\n## Comprehensive Examples\n\n```rust\nuse std::collections::HashMap;\nuse std::sync::atomic::{AtomicUsize, Ordering};\n\n// ============================================================\n// 1. Global Configuration (most common legitimate use case)\n// ============================================================\n\n#[derive(Debug)]\nstruct Config {\n    database_url: String,\n    max_connections: u32,\n    timeout_ms: u64,\n    feature_flags: HashMap<String, bool>,\n}\n\nimpl Config {\n    fn new(database_url: &str) -> Self {\n        let mut feature_flags = HashMap::new();\n        feature_flags.insert(\"dark_mode\".to_string(), true);\n        feature_flags.insert(\"beta_features\".to_string(), false);\n\n        Config {\n            database_url: database_url.to_string(),\n            max_connections: 10,\n            timeout_ms: 5000,\n            feature_flags,\n        }\n    }\n}\n\n/// Leak config so it can be referenced globally with 'static lifetime.\n/// This is appropriate because:\n/// - Config is initialized once at startup\n/// - It needs to be accessed from anywhere in the program\n/// - The program's lifetime == config's lifetime, so no actual leak occurs\nfn init_config(database_url: &str) -> &'static Config {\n    let config = Box::new(Config::new(database_url));\n    Box::leak(config)\n}\n\n// Usage with a static reference (safe alternative to lazy_static for simple cases)\nstatic mut GLOBAL_CONFIG: Option<&'static Config> = None;\n\nfn get_config() -> &'static Config {\n    // SAFETY: Written once before any reads, single-threaded initialization\n    ",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026287-Z114gerWEsUgPmSicjEJ"
+}

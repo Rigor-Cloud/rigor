@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:6c57896a264891627e02aff6cc1e1bd516778db1a1d9d8d887b5b02f528a8e5e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T10:10:25.193582Z",
+  "temperature": 0.7,
+  "response_text": "# Rust 没有垃圾回收器\n\n这是一个非常重要的澄清：**Rust 根本没有垃圾回收器（GC）**。这正是 Rust 的核心设计哲学之一。\n\n---\n\n## Rust 的内存管理机制\n\nRust 使用**所有权系统（Ownership System）**在编译期管理内存。\n\n### 核心概念\n\n```\n所有权（Ownership）\n    ├── 借用（Borrowing）\n    │     ├── 不可变借用 &T\n    │     └── 可变借用 &mut T\n    ├── 生命周期（Lifetime）\n    └── 移动语义（Move Semantics）\n```\n\n### 所有权三原则\n\n```rust\n// 原则1：每个值有且只有一个所有者\nlet s1 = String::from(\"hello\");\n\n// 原则2：所有权可以转移（Move）\nlet s2 = s1;  // s1 的所有权移动到 s2\n// println!(\"{}\", s1);  // ❌ 编译错误！s1 已失效\n\n// 原则3：所有者离开作用域时，值被自动释放\n{\n    let s3 = String::from(\"world\");\n    // 使用 s3\n} // ← s3 在这里自动调用 drop()，内存被释放\n```\n\n### 借用机制\n\n```rust\nfn main() {\n    let s = String::from(\"hello\");\n    \n    // 不可变借用：可以有多个\n    let r1 = &s;\n    let r2 = &s;\n    println!(\"{} {}\", r1, r2); // ✅ 合法\n    \n    // 可变借用：同一时刻只能有一个\n    let mut s2 = String::from(\"world\");\n    let r3 = &mut",
+  "tokens": {
+    "prompt": 45,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025416-EPhTTPGDv3QFPrKgV89C"
+}

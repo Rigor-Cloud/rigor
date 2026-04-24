@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:6d56c84c410a5ac9fbe6f5ddc4937b4d9c3cc3e8cf5a85402e05005435f8bcb0",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T13:25:25.183770Z",
+  "temperature": 0.7,
+  "response_text": "## Recolector de Basura en Rust 🦀\n\n**Rust NO tiene un recolector de basura tradicional.** En su lugar, utiliza un sistema de **propiedad (ownership) y préstamos (borrowing)** que garantiza la seguridad de memoria en tiempo de compilación:\n\n### Mecanismo de Rust:\n1. **Sistema de Propiedad**: Cada valor tiene un único dueño\n2. **Préstamos**: Referencias inmutables (`&T`) o mutables (`&mut T`)\n3. **Lifetimes**: Anotaciones que especifican cuánto tiempo viven las referencias\n4. **Drop trait**: Liberación automática cuando las variables salen del ámbito\n\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");  // s1 es dueño\n    let s2 = s1;                     // propiedad transferida a s2\n    // println!(\"{}\", s1);           // ERROR: s1 ya no es válido\n    \n    let x = 5;\n    let y = &x;                      // préstamo inmutable\n    println!(\"{}\", y);               // OK\n}  // x y y se liberan automáticamente aquí\n```\n\n**Conteo de referencias (opcional)**:\n- `Rc<T>` para single-thread\n- `Arc<T>` para multi-thread\n- `Weak<T>` para evitar ciclos\n\n---\n\n## Recolector de Basura en Java ☕\n\nJava tiene un **GC automático y ",
+  "tokens": {
+    "prompt": 32,
+    "completion": 895
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037094-SW3yOJtt6RGVZRZNOu5H"
+}

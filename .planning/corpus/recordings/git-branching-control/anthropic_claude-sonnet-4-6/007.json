@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:39:01.925572Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## The Core Philosophy Difference\n\n```\nGitFlow: Multiple long-lived branches, structured releases\nTrunk-Based: Everyone integrates to one branch frequently\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain/master          ─────●─────────────────────●──────────\n                          ↑                     ↑\n                        v1.0                  v2.0\nhotfix               ────●──/\n                        /\ndevelop          ──●──●──────────────●──────────●──────────\n                       \\            /  \\       /\nfeature/login    ────────●──●──●──/    \\     /\n                                        \\   /\nrelease/2.0      ────────────────────────●─/\n```\n\n### The Branches Explained\n\n| Branch | Purpose | Lifespan |\n|--------|---------|----------|\n| `main` | Production-ready code only | Permanent |\n| `develop` | Integration branch | Permanent |\n| `feature/*` | New features | Until merged |\n| `release/*` | Release preparation | Until released |\n| `hotfix/*` | Production bug fixes | Until fixed |\n\n### GitFlow in Practice\n```bash\n# Starting a feature\ngit checkout develop\ngit checkout -b feature/user-authentication\n\n# Work, commit, work, commit...\ngit add .\ngit commit -m \"Add JWT token validation\"\n\n# Finish feature - merge back to develop\ngit checkout develop\ngit merge --no-ff feature/user-authentication\ngit branch -d feature/user-authentication\n\n# Starting a release\ngit checkout develop\ngit checkout -b release/2.1.0\n\n# Only bug fixes on release branch\ngit commit -m \"Fix login redirect bug\"\n\n# Finish release - merge to BOTH main AND develop\ngit checkout main\ngit merge --no-ff release/2.1.0\ngit tag -a v2.1.0\n\ngit checkout develop\ngit merge --no-ff release/2.1.0\ngit branch -d release/2.1.0\n\n# Hotfix on production\ngit checkout main\ngit checkout -b hotfix/critical-security",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027132-v2gJacf6HWiAjFeYDYOI"
+}

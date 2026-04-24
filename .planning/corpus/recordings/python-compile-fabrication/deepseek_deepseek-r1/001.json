@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-compile-fabrication",
+  "prompt_hash": "sha256:be8835c9c940cc3c967464a8e74f564aa2a98530e93f17c1f1e65d1e96ad1cbc",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T11:45:48.058632Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question. This gets to the heart of Python's execution model and the tools that extend it.\n\nThe key point to understand first is: **Standard Python (CPython) does not have a built-in Ahead-of-Time (AOT) compiler that converts Python code directly to native machine code.** Its primary execution model is interpretation of bytecode.\n\nHowever, there are several powerful third-party tools that *do* perform AOT compilation of Python or Python-like code to native machine code. Here’s how they work, breaking down the process and the major tools involved.\n\n### Why Isn't Standard CPython AOT Compiled?\nPython's dynamic nature makes true, general-purpose AOT compilation extremely difficult:\n*   **Dynamic Typing:** The type of a variable can change at runtime.\n*   **Dynamic Binding/Monkey Patching:** You can modify classes and functions at runtime.\n*   **`eval()` and `exec()`:** Can execute arbitrary code strings.\n*   **Highly Introspective:** Features like `__dict__` and `inspect` module.\n\nA classic AOT compiler (like for C) needs to know types and memory layouts at compile time to generate efficient machine code. Python's features prevent this in the general case.\n\n---\n\n### How Third-Party AOT Compilers Work\n\nThese tools work by imposing restrictions or using clever strategies to bypass Python's dynamic limitations.\n\n#### 1. **Cython** (The most common approach)\nCython is a superset of the Python language that allows you to add **static type declarations**. It acts as a source-to-source compiler.\n\n**Process:**\n1.  ",
+  "tokens": {
+    "prompt": 26,
+    "completion": 570
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777031128-hRIOpExQsksWBHcXucfI"
+}

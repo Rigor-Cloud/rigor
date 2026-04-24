@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:13901fe88a8ee56078ea80b44bbda998f3853a1dc3f3d3728948938995ca3919",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T11:13:18.782992Z",
+  "temperature": 0.7,
+  "response_text": "# JavaScript's Threading Model\n\n## The Core Reality\n\n**JavaScript is single-threaded.** It does not have a built-in multi-threading model in the traditional sense. There is one main thread, one call stack, and one piece of code executing at any given moment.\n\n```javascript\n// This all runs on ONE thread, sequentially\nconsole.log(\"first\");\nconsole.log(\"second\");  // \"second\" cannot run until \"first\" finishes\nconsole.log(\"third\");\n```\n\n---\n\n## How JavaScript Handles Concurrency\n\nJavaScript achieves *concurrency* (not parallelism) through the **Event Loop**.\n\n```\n┌─────────────────────────────────────────────────────┐\n│                    Call Stack                        │\n│  [ main() → setTimeout cb → fetch cb → ... ]        │\n└──────────────────────┬──────────────────────────────┘\n                       │\n┌──────────────────────▼──────────────────────────────┐\n│                   Event Loop                         │\n│   Continuously checks: \"Is the call stack empty?\"   │\n│   If yes → pull next task from queue                 │\n└──────────┬────────────────────────┬─────────────────┘\n           │                        │\n┌──────────▼──────────┐  ┌──────────▼──────────────── ┐\n│   Macrotask Queue   │  │     Microtask Queue         │\n│  setTimeout         │  │  Promise.then()             │\n│  setInterval        │  │  queueMicrotask()           │\n│  I/O callbacks      │  │  MutationObserver           │\n│  UI events          │  │                             │\n└─────────────────────┘  └─────────────────────────────┘\n```\n\n### Execution Priority\n\n```javascript\nconsole.log(\"1 - synchronous\");\n\nsetTimeout(() => console.log(\"2 - macrotask\"), 0);\n\nPromise.resolve()\n  .then(() => console.log(\"3 - microtask\"))\n  .then(() => console.log(\"4 - microtask",
+  "tokens": {
+    "prompt": 23,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029188-nWDHzP8cO4fNMAwWuV5N"
+}

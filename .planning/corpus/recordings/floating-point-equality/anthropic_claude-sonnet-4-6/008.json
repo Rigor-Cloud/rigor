@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:e7c77fff5e17f6e6e96df375b5cff86eb93b05970af2ec1e489f66d3aebacd3c",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:32:02.875220Z",
+  "temperature": 0.7,
+  "response_text": "# Comparing Floating Point Numbers with `==` in IEEE 754\n\n## Short Answer\n\n**It depends on the situation** — sometimes safe, often dangerous, always requires careful thought.\n\n---\n\n## When `==` is Safe\n\n### Exact integer values (within precision limits)\n```python\n0.0 == 0.0        # True ✓\n1.0 == 1.0        # True ✓\n2.0 + 3.0 == 5.0  # True ✓ (exact in binary)\n```\n\n### Checking for specific sentinel values\n```python\nx == 0.0          # Safe if you explicitly set x = 0.0\nx == float('inf') # Safe sentinel check\n```\n\n### Results of identical operations on identical inputs\n```python\nx = some_float\nx == x            # Always true (except NaN!)\n```\n\n---\n\n## When `==` is Dangerous\n\n### Accumulated rounding errors\n```python\n0.1 + 0.2 == 0.3        # FALSE! (0.1 + 0.2 = 0.30000000000000004)\nsqrt(2) * sqrt(2) == 2  # FALSE on many systems\n```\n\n### Different computation paths to the \"same\" result\n```python\n(a + b) + c  !=  a + (b + c)  # Often!\n```\n\n---\n\n## The NaN Problem\n```python\nnan = float('nan')\nnan == nan   # FALSE — NaN is never equal to anything, including itself\nnan != nan   # TRUE  — use this to detect NaN\n```\n> This is **defined behavior** in IEEE 754, not a bug\n\n---\n\n## The Correct Approach: Epsilon Comparison\n\n### Absolute epsilon (simple, but flawed)\n```python\nabs(a - b) < 1e-9   # Bad for large numbers\n```\n\n### Relative epsilon (better)\n```python\nabs(a - b) <= epsilon * max(abs(a), abs(b))\n```\n\n### Combined (handles near-zero values)\n```python\ndef nearly_equal(a, b, abs_tol=1e-9, rel_",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026712-I4oz8nqEuFvERw4hyseR"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:0e8672c1476a9d0cb89b3c171746e9711c93ee4cc10c7b3ffb329bccd0ad14e6",
+  "model": "openai/gpt-4o",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:22:36.210715Z",
+  "temperature": 0.7,
+  "response_text": "The `gc` module in Python provides an interface to the garbage collection facility. You can use it to interact with the garbage collector and manually control garbage collection cycles. This can be useful for debugging memory issues or managing memory in a more controlled manner.\n\nBelow is a simple Python script that demonstrates how to use the `gc` module to manually control garbage collection:\n\n```python\nimport gc\n\ndef create_cyclic_reference():\n    \"\"\"Create a simple cyclic reference to demonstrate garbage collection.\"\"\"\n    class Cycle:\n        def __init__(self):\n            self.ref = self\n\n    cycle = Cycle()\n    return cycle\n\ndef main():\n    # Disable automatic garbage collection\n    gc.disable()\n    print(\"Garbage collection disabled.\")\n\n    # Create a cyclic reference\n    cycle = create_cyclic_reference()\n    print(\"Cyclic reference created.\")\n\n    # Check the number of unreachable objects\n    unreachable_before = gc.collect()\n    print(f\"Number of unreachable objects before manual collection: {unreachable_before}\")\n\n    # Break the cyclic reference\n    cycle.ref = None\n    print(\"Cyclic reference broken.\")\n\n    # Manually trigger garbage collection and collect unreachable objects\n    unreachable_after = gc.collect()\n    print(f\"Number of unreachable objects after manual collection: {unreachable_after}\")\n\n    # Enable automatic garbage collection again\n    gc.enable()\n    print(\"Garbage collection enabled.\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\n### Explanation:\n\n1. **Disable Automatic Garbage Collection:**  \n   We start by disabling the automatic garbage collection using `gc.disable()`. This prevents the garbage collector from running on its own.\n\n2. **Create a Cyclic Reference:**  \n   We define a class `Cycle` that holds a reference to itself, creating a cyclic reference. This is used to demonstrate how garbage collection can clean up objects that are not reachable.\n\n3. **Check Unreachable Objects:**  \n   We use `gc.collect()` to manually trigger a garbage collection cycle and check how many unreachable objects were found (and collected) before breaking the cyclic reference.\n\n4. **Break the Cyclic Reference:**  \n   We break the cyclic reference by setting `cycle.ref` to `None`.\n\n5. **Manually Trigger Garbage Collection:**  \n   We call `gc.collect()` again to see how many objects were collected after breaking the cyclic reference.\n\n6. **Enable Automatic Garbage Collection:**  \n   Finally, we re-enable automatic garbage collection using `gc.enable()`.\n\nThis script provides basic control over the garbage collection process and demonstrates how cyclic references",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026150-jt4J1IUR7U8peZ1k6YNT"
+}

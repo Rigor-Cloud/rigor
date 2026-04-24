@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T13:24:04.668252Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura: Rust vs Java\n\n## El punto clave antes de empezar\n\n```\nRust NO tiene recolector de basura (GC).\n```\n\nEsta es precisamente una de sus características más distintivas. Vamos a entender qué hace cada uno.\n\n---\n\n## Cómo gestiona la memoria Java (con GC)\n\n### El ciclo de vida de un objeto en Java\n\n```java\n// Java crea objetos en el heap\nString nombre = new String(\"Hola\");  // Objeto en el heap\nnombre = null;                        // Ya no hay referencia\n// En algún momento... el GC lo limpiará\n```\n\n### Cómo funciona el GC de Java\n\nJava usa un **GC generacional** basado en una observación empírica:\n> *\"La mayoría de objetos mueren jóvenes\"*\n\n```\nHEAP de Java\n┌─────────────────────────────────────────────┐\n│  Young Generation          Old Generation   │\n│  ┌──────┬──────┬──────┐   ┌───────────────┐ │\n│  │ Eden │ Sur- │ Sur- │──▶│   Tenured     │ │\n│  │      │ vivor│ vivor│   │               │ │\n│  │      │  S0  │  S1  │   │               │ │\n│  └──────┴──────┴──────┘   └───────────────┘ │\n│     Minor GC (frecuente)    Major GC (lento) │\n└─────────────────────────────────────────────┘\n```\n\n### Fases del GC de Java\n\n```\n1. MARK   → Encuentra todos los objetos alcanzables\n           (recorre el grafo desde las \"raíces\")\n\n2. SWEEP  → Identifica y libera los no alcanzables\n\n3. COMPACT → Compacta la memoria para evitar fragmentación\n```\n\n```java\n// Ejemplo: ¿Qué objetos sobreviven?\npublic void ejemplo()",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037034-7fNFMLSrfLS1vONsCDHd"
+}

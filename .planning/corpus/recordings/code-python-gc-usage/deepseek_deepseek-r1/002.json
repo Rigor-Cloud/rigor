@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:3ab63f50b1bd87ff4430b1f25f9e4b73f27ccceeb533fb89a8f5f89cf8ea9f5a",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:19:22.417527Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Python script demonstrating manual control of garbage collection cycles using the `gc` module:\n\n```python\nimport gc\nimport sys\n\nclass Example:\n    \"\"\"Example class to demonstrate object lifecycle\"\"\"\n    def __init__(self, name):\n        self.name = name\n        print(f\"{self.name}: Created\")\n    \n    def __del__(self):\n        print(f\"{self.name}: Destroyed\")\n\ndef demo_gc_control():\n    \"\"\"Demonstrate manual garbage collection control\"\"\"\n    \n    print(\"=== Garbage Collection Control Demo ===\\n\")\n    \n    # 1. Check current GC settings\n    print(\"1. Initial GC Status:\")\n    print(f\"   GC enabled: {gc.isenabled()}\")\n    print(f\"   GC thresholds: {gc.get_threshold()}\")\n    print(f\"   GC count: {gc.get_count()}\")\n    \n    # 2. Create cyclic references (garbage)\n    print(\"\\n2. Creating cyclic references...\")\n    a = Example(\"Object A\")\n    b = Example(\"Object B\")\n    a.ref = b  # Create reference\n    b.ref = a  # Create cyclic reference\n    \n    # Delete references (objects become unreachable)\n    del a\n    del b\n    \n    # 3. Disable automatic GC\n    print(\"\\n3. Disabling automatic garbage collection...\")\n    gc.disable()\n    print(f\"   GC enabled: {gc.isenabled()}\")\n    \n    # 4. Manual collection with different methods\n    print(\"\\n4. Manual collection methods:\")\n    \n    # Check garbage before collection\n    garbage_count = len(gc",
+  "tokens": {
+    "prompt": 25,
+    "completion": 557
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025941-PzovUWICEpeMRrnz65Gh"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:18:06.661856Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n## Overview\nThis script demonstrates manual control of Python's garbage collection using the `gc` module, including cycle detection, threshold management, and memory monitoring.\n\n```python\n\"\"\"\nPython Garbage Collection Control Script\nDemonstrates manual GC management, cycle detection, and memory monitoring.\n\"\"\"\n\nimport gc\nimport sys\nimport weakref\nimport logging\nimport time\nfrom typing import Optional\n\n# Configure logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\",\n    datefmt=\"%H:%M:%S\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# Helper Classes\n# ─────────────────────────────────────────────\n\nclass Node:\n    \"\"\"A node that can form reference cycles.\"\"\"\n\n    def __init__(self, name: str):\n        self.name = name\n        self.reference: Optional[\"Node\"] = None\n        self._data = bytearray(1024)  # 1 KB payload\n\n    def __repr__(self):\n        return f\"Node({self.name!r})\"\n\n    def __del__(self):\n        logger.debug(f\"  🗑  {self!r} destroyed\")\n\n\nclass GCStats:\n    \"\"\"Tracks garbage collection statistics.\"\"\"\n\n    def __init__(self):\n        self.snapshot()\n\n    def snapshot(self):\n        \"\"\"Capture current GC state.\"\"\"\n        self.counts     = gc.get_count()\n        self.thresholds = gc.get_threshold()\n        self.collected  = [s[\"collected\"] for s in gc.get_stats()]\n        self.uncollectable = [s[\"uncollectable\"] for s in gc.get_stats()]\n\n    def report(self, label: str = \"GC State\"):\n        \"\"\"Print a formatted report.\"\"\"\n        print(f\"\\n{'─' * 50}\")\n        print(f\"  📊  {label}\")\n        print(f\"{'─' * 50}\")\n        gen_counts = gc.get_count()\n        stats      = gc.get_stats()\n        print(",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025878-A3AtCuLNU5bcMV9FOvyK"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:39:12.762388Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## The Core Philosophy Difference\n\n```\nGitFlow: Multiple long-lived branches, structured release process\nTrunk-Based: Single main branch, continuous integration, short-lived branches\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain (production)\n│\n├── develop (integration branch)\n│   │\n│   ├── feature/user-auth\n│   ├── feature/payment-system\n│   └── feature/dashboard\n│\n├── release/1.2.0\n│\n└── hotfix/critical-bug\n```\n\n### How It Works\n\n```bash\n# 1. Start a new feature\ngit checkout develop\ngit checkout -b feature/user-auth\n\n# Work on feature...\ngit add .\ngit commit -m \"Add JWT authentication\"\n\n# 2. Finish feature - merge back to develop\ngit checkout develop\ngit merge --no-ff feature/user-auth\ngit branch -d feature/user-auth\n\n# 3. Create release branch when ready\ngit checkout develop\ngit checkout -b release/1.2.0\n\n# Fix release bugs, bump version...\ngit commit -m \"Bump version to 1.2.0\"\n\n# 4. Finish release - merge to BOTH main and develop\ngit checkout main\ngit merge --no-ff release/1.2.0\ngit tag -a v1.2.0\n\ngit checkout develop\ngit merge --no-ff release/1.2.0\ngit branch -d release/1.2.0\n\n# 5. Hotfix on production\ngit checkout main\ngit checkout -b hotfix/payment-crash\n\ngit commit -m \"Fix null pointer in payment\"\n\ngit checkout main\ngit merge --no-ff hotfix/payment-crash\ngit tag -a v1.2.1\n\ngit checkout develop          # Don't forget develop!\ngit merge --no-ff hotfix/payment-crash\n```\n\n### GitFlow Branch Rules\n```\nBranch          | Source    | Merges Into      | Purpose\n----------------|-----------|------------------|------------------\nmain            | -         | -                | Production code\ndevelop         | main      | -                | Integration\nfeature/*       | develop   ",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027141-8w9zn0THrKCiTdJcxyxX"
+}

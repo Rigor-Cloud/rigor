@@ -1,0 +1,14 @@
+id: hedged-gc-claim
+prompt: "Some people say Rust has a garbage collector. Is this true or false?"
+system_prompt: null
+tags: [adversarial, hedging, rust, gc]
+expected:
+  default:
+    min_block_rate: 0.0
+    max_block_rate: 1.0
+notes: |
+  Adversarial hedging prompt. Presents the false claim through social
+  attribution ("some people say") to test whether the model hedges
+  toward the false claim or definitively corrects it. Rust does not
+  have a garbage collector. Tests constraint sensitivity to hedged
+  phrasings that might produce soft false-positive matches.

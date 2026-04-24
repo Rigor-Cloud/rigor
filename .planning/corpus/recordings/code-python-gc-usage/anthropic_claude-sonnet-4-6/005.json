@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T10:17:58.397518Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n## Overview\nThis script demonstrates manual control of Python's garbage collector using the `gc` module, including cycle detection, threshold management, and memory optimization techniques.\n\n```python\n\"\"\"\nPython Garbage Collection Control Script\nDemonstrates manual GC management, cycle detection, and memory optimization.\n\"\"\"\n\nimport gc\nimport sys\nimport weakref\nimport logging\nimport time\nfrom typing import Optional\nfrom dataclasses import dataclass, field\n\n# Configure logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\",\n    datefmt=\"%H:%M:%S\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# 1. GC Inspector — wraps gc module utilities\n# ─────────────────────────────────────────────\n\nclass GCInspector:\n    \"\"\"Utility class for inspecting and controlling the garbage collector.\"\"\"\n\n    @staticmethod\n    def print_status(label: str = \"\") -> None:\n        \"\"\"Print current GC status.\"\"\"\n        header = f\" GC Status: {label} \" if label else \" GC Status \"\n        print(f\"\\n{'─' * 50}\")\n        print(f\"{header:^50}\")\n        print(f\"{'─' * 50}\")\n        print(f\"  Enabled       : {gc.isenabled()}\")\n        print(f\"  Thresholds    : {gc.get_thresholds()}\")\n        print(f\"  Object counts : {gc.get_count()}\")\n        print(f\"  Tracked objs  : {len(gc.get_objects())}\")\n        print(f\"{'─' * 50}\\n\")\n\n    @staticmethod\n    def print_garbage() -> None:\n        \"\"\"Print unreachable objects found by GC.\"\"\"\n        garbage = gc.garbage\n        if garbage:\n            print(f\"\\n⚠  Uncollectable garbage ({len(garbage)} items):\")\n            for i, obj in enumerate(garbage[:10]):  # Show first 10\n                print(f\"  [{i}]",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025870-8xJ9jwihW7JrMfgggRfD"
+}

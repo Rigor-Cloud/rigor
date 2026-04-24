@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T13:16:45.661522Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, `unsafe` is used for operations that the compiler cannot guarantee are memory-safe at compile time. However, even within `unsafe` blocks, Rust still provides important guarantees.\n\n## When to Use `unsafe`\n\nYou should use `unsafe` only when necessary, typically for:\n\n1. **Dereferencing raw pointers** (`*const T` and `*mut T`)\n2. **Calling unsafe functions** (including C FFI)\n3. **Implementing unsafe traits** (like `Send` and `Sync`)\n4. **Accessing or modifying mutable static variables**\n5. **Inline assembly** (using `asm!` macro)\n\nCommon legitimate use cases:\n- Interfacing with C libraries or system calls\n- Implementing low-level data structures (like Vec, HashMap)\n- Performance-critical code where bounds checks can be manually verified\n- Certain types of memory-mapped I/O or hardware interaction\n\n## Guarantees Still Provided in `unsafe` Blocks\n\nCrucially, **`unsafe` doesn't disable Rust's safety systems** - it merely allows you to perform specific operations that could violate safety if misused. The compiler still enforces:\n\n### 1. **Type System**\nAll type checking still applies. You can't arbitrarily reinterpret memory as different types without explicit conversions.\n\n### 2. **Lifetime Checking**\nThe borrow checker still operates normally. You must respect Rust's ownership rules unless explicitly working with raw pointers.\n\n### 3. **Bounds Checking** (unless explicitly bypassed)\nArray bounds checks still occur unless you use `.get_unc",
+  "tokens": {
+    "prompt": 30,
+    "completion": 480
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036588-fVDJurg1gPStIlNT7LCX"
+}

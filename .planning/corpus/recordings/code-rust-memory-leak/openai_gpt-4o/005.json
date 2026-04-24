@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:9dd25bb1994545ba1ad4905c448bf649e33fa14eb49c5548dc1340783159ae55",
+  "model": "openai/gpt-4o",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T10:29:07.618765Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, memory leaks are generally avoided because the language's ownership model ensures that resources are automatically cleaned up when they go out of scope. However, there are rare cases where deliberately leaking memory might be appropriate, such as when you need to create a static reference to a value that should live for the entire duration of the program.\n\nOne way to deliberately leak memory in Rust is by using the `Box::leak` method. This method takes ownership of a `Box<T>` and converts it into a `'static` reference `&'static mut T`, effectively leaking the memory. Here's an example of how you might use `Box::leak`:\n\n```rust\nfn create_static_str() -> &'static str {\n    // Create a Box containing a String\n    let boxed_string = Box::new(String::from(\"Hello, world!\"));\n    \n    // Leak the Box, converting it into a static reference\n    let static_str: &'static mut String = Box::leak(boxed_string);\n\n    // Return a string slice from the leaked String\n    static_str.as_str()\n}\n\nfn main() {\n    let static_str = create_static_str();\n    println!(\"{}\", static_str);\n}\n```\n\n### Explanation:\n\n1. **Creating a Box**: We start by creating a `Box<String>`, which allocates memory on the heap for a `String`.\n\n2. **Leaking the Box**: We then call `Box::leak`, which prevents the `Box` from being deallocated when it goes out of scope. Instead, it converts the `Box<T>` into a `&'static mut T`, effectively making the memory live for the entire duration of the program.\n\n3. **Returning a Static Reference**: We return a string slice `&'static str` from the leaked `String`. This allows us to use the data as if it were a static reference.\n\n### When is this appropriate?\n\n1. **Global or Static Data**: When you have data that needs to live for the entire duration of the program, such as a global configuration or a cache, leaking memory can be appropriate. This is because there's no need to ever deallocate this data, as it should be available until the program exits.\n\n2. **Interfacing with FFI**: In some cases, when interfacing with foreign function interfaces (FFI) or legacy code that assumes static lifetimes, leaking memory might be necessary to provide the required `'static` lifetime.\n\n3. **Avoiding Overhead**: In performance",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026541-3uwq3auO3dAqdya2a8JU"
+}

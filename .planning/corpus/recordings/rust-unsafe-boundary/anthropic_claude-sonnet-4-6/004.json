@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T13:14:31.474107Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or type system — it unlocks **five specific capabilities** that the compiler can't verify automatically.\n\n```rust\nunsafe {\n    // You can now:\n    // 1. Dereference raw pointers\n    // 2. Call unsafe functions/methods\n    // 3. Access/modify mutable static variables\n    // 4. Implement unsafe traits\n    // 5. Access fields of unions\n}\n```\n\n## What the Compiler Still Guarantees Inside `unsafe`\n\nThis is the critical misunderstanding — `unsafe` removes *less* than most people think:\n\n```rust\nunsafe {\n    // ✅ STILL enforced:\n    let x = 5i32;\n    let y: &str = x; // type error — types still checked\n    \n    let s = String::from(\"hello\");\n    let r = &s;\n    drop(s);\n    println!(\"{}\", r); // borrow checker STILL catches this\n    \n    // ✅ Bounds checks still happen at runtime (unless you opt out)\n    let v = vec![1, 2, 3];\n    let _ = v[10]; // still panics\n    \n    // ✅ Destructors still run, no memory leaks by default\n    // ✅ Integer overflow still checked in debug mode\n    // ✅ Stack overflows still detected\n}\n```\n\n**What you're actually taking responsibility for:**\n\n| Capability | What YOU must guarantee |\n|------------|------------------------|\n| Raw pointer deref | Pointer is valid, aligned, points to initialized data |\n| Unsafe fn calls | Preconditions documented by that function |\n| Mutable statics | No data races |\n| Unsafe traits | Invariants the trait requires (e.g., `Send`, `Sync`) |\n| Union field access | You're reading the correct variant |\n\n## When to Use `unsafe`\n\n### ✅ Legitimate Use Cases\n\n**1. FFI (Foreign Function Interface)**\n```rust\nextern \"C\" {\n    fn abs(input: i32) -> i32;\n}",
+  "tokens": {
+    "prompt": 29,
+    "completion": 511
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036459-WbP3PF5HnLw44xewt6r6"
+}

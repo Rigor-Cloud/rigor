@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:e1866ef81688b6a57a9f8878a727673424914fdd5f33d520103fc1f0052eac9d",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:27:21.372740Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Rust function that deliberately leaks memory using `Box::leak`, along with an explanation of appropriate use cases:\n\n```rust\nfn create_leaked_data() -> &'static mut String {\n    let data = Box::new(String::from(\"This data will be leaked\"));\n    \n    // Deliberately leak the boxed memory\n    Box::leak(data)\n}\n\nfn main() {\n    let leaked_ref = create_leaked_data();\n    leaked_ref.push_str(\" - modified after leak\");\n    println!(\"{}\", leaked_ref);\n    \n    // The memory is never freed - this is a deliberate memory leak\n}\n```\n\n## When is `Box::leak` appropriate?\n\n### Appropriate Use Cases:\n\n1. **Global/Static Data Initialization**\n   When you need to create static data that's initialized at runtime:\n   ```rust\n   static RUNTIME_CONFIG: &Config = {\n       let config = Box::new(Config::load_from_file());\n       Box::leak(config)\n   };\n   ```\n\n2. **FFI (Foreign Function Interface)**\n   When passing data to C libraries that require static lifetimes:\n   ```rust\n   let c_string = Box::new(CString::new(\"data\").unwrap());\n   let ptr = Box::leak(c_string).as_ptr();\n   unsafe { ffi_function(ptr) };\n   ```\n\n3. **Singleton Patterns**\n   For creating global singletons that need runtime initialization:\n   ```rust\n   struct AppState { /* ... */ }\n   \n   static APP_STATE: &AppState = {\n       let state = Box::new(AppS",
+  "tokens": {
+    "prompt": 29,
+    "completion": 577
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026420-7yTOiGeH5EpwC9CzTcAy"
+}

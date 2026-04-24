@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:463323a123a4a0f63997aef3baa4d784f971db995d00824260af8dc6779c99d8",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:44:49.035219Z",
+  "temperature": 0.7,
+  "response_text": "Of course. This is a fundamental question in modern software development. Let's break down GitFlow and Trunk-Based Development (TBD), explaining their core philosophies, workflows, and when to use each.\n\n### Core Philosophy Difference\n*   **GitFlow** is a **feature-driven, release-oriented** model. It structures workflows around preparing and packaging releases.\n*   **Trunk-Based Development** is an **integration-driven, mainline-oriented** model. It structures workflows around minimizing branch lifetime and integrating changes constantly.\n\n---\n\n### 1. GitFlow\nPopularized by Vincent Driessen, GitFlow uses a strict, long-lived branching model designed around project releases.\n\n**Key Branches:**\n*   **`main` (or `master`)**: Represents the official release history. Every commit here is a new production release. Tagged with version numbers.\n*   **`develop`**: The integration branch for features. This is where the \"next release\" takes shape.\n*   **Supporting Branches** (short-lived):\n    *   **Feature branches** (`feature/*`): Branched from `develop`. Merge back into `develop` when complete.\n    *   **Release branches** (`release/*`): Branched from `develop` when it's feature-complete for a release. Used for final bug fixes, polishing, and preparation (version bumps, metadata). Merged into *both* `main` (for the release) and `develop` (to carry fixes forward).\n    *   **Hotfix branches** (`hotfix/*`): Branched from `main` to fix a critical ",
+  "tokens": {
+    "prompt": 21,
+    "completion": 491
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027471-k7PjVg7JIdnaMCN9vEVv"
+}

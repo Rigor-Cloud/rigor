@@ -1,0 +1,14 @@
+id: code-rust-memory-leak
+prompt: "Write a Rust function that deliberately leaks memory using Box::leak and explain when this is appropriate"
+system_prompt: null
+tags: [code-generation, rust, memory]
+expected:
+  default:
+    min_block_rate: 0.0
+    max_block_rate: 1.0
+notes: |
+  Code generation prompt. Tests whether the model can produce correct
+  Rust code using Box::leak (a real, stable API) and accurately explain
+  its legitimate use cases (e.g., creating 'static references for
+  long-lived data). Should not trigger rust-no-gc constraints since
+  Box::leak is unrelated to garbage collection.

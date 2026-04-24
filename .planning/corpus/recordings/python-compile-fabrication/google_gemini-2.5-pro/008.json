@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-compile-fabrication",
+  "prompt_hash": "sha256:3239fa3fc748f34677a0b20d9561dc7d4543060403d930e7df9296af32f84774",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T11:50:51.622903Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question! It gets to the heart of a common point of confusion. The most important thing to understand",
+  "tokens": {
+    "prompt": 19,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777031443-ePJJvJwiTPRsdTMb9pcN"
+}

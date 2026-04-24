@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:ac11a189c661e9d7858b4d385dd1fdccee240074c93e6dcb055b739cc3372fd3",
+  "model": "openai/gpt-4o",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T11:11:16.265845Z",
+  "temperature": 0.7,
+  "response_text": "As of my last update, HTTP/3 was not yet mandatory for all web servers, and I cannot provide future policy changes. However, I can guide you on how to configure HTTP/3 for your Nginx instance based on the information available up to 2023. Note that implementing HTTP/3 requires using a version of Nginx that supports it, as well as the necessary dependencies like a compatible version of the QUIC and TLS libraries.\n\nHere’s a general guide to configuring HTTP/3 on Nginx:\n\n### Prerequisites\n\n1. **Nginx Version**: Make sure you are using a version of Nginx that supports HTTP/3. This typically requires a mainline version or a custom build with HTTP/3 support.\n   \n2. **OpenSSL**: You need a version of OpenSSL that supports QUIC. BoringSSL or a custom build of OpenSSL might be required.\n\n3. **Quiche or Other Libraries**: Nginx uses the Quiche library (by Cloudflare) or other implementations for HTTP/3 support. Ensure it is installed and configured.\n\n### Steps to Configure HTTP/3\n\n1. **Build Nginx with HTTP/3 Support**:\n   - Download the source code for Nginx and the Quiche library.\n   - Compile Nginx with the `--with-http_v3_module` flag and link it to the Quiche library.\n\n2. **Configure Nginx for HTTP/3**:\n   Edit your Nginx configuration files to enable HTTP/3 alongside HTTP/2 and HTTP/1.1.\n\n   ```nginx\n   server {\n       listen 443 ssl http2; # HTTP/2\n       listen [::]:443 ssl http2;\n       listen 443 quic; # HTTP/3\n       listen [::]:443 quic;\n\n       ssl_certificate /path/to/your/certificate.crt;\n       ssl_certificate_key /path/to/your/private.key;\n\n       # Add the preferred protocols\n       ssl_protocols TLSv1.3; # HTTP/3 requires TLS 1.3\n\n       # Configure HTTP/3 specific settings\n       http3_max_concurrent_streams 1000;\n       http3_idle_timeout 3m;\n\n       # Other server configuration...\n   }\n   ```\n\n3. **Add Alt-Svc Header**:\n   To inform clients about HTTP/3 support, add an Alt-Svc header to the responses:\n\n   ```nginx\n   add",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029067-9rUSC48w0St9VmlriHlm"
+}
