@@ -133,7 +133,7 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-021
 **Workstream:** coverage
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 - [x] 11-01-PLAN.md — TestProxy CONNECT upgrade support + blind-tunnel/MITM handshake E2E tests (wave 1)
 - [x] 11-02-PLAN.md — Stop-hook harness E2E + PID crash recovery lifecycle tests (wave 1)
 
