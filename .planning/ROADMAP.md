@@ -50,6 +50,9 @@ status: active
 **Requirements:** REQ-006, REQ-007
 **Workstream:** phase-0-close
 **Canonical spec:** `.planning/roadmap/epistemic-expansion-plan.md` section 0J
+**Plans:** 1 plan
+Plans:
+- [ ] 02-01-PLAN.md — CorpusRow struct + streaming export + CLI subcommand wiring + 9 unit tests
 
 #### Phase 3: PR-5 — ONNX host (feature-flagged)
 **Goal:** Add optional ONNX runtime behind a feature flag. Shared infra for Phase 1D Kompress (context compression) and Phase 4F ModernBERT safety discriminator.
