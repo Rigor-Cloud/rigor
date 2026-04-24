@@ -143,8 +143,8 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-022, REQ-023, REQ-024
 **Workstream:** coverage
-**Plans:** 2 plans
-- [ ] 12-01-PLAN.md — Enhance MockLlmServer with request tracking + response sequences (wave 1)
+**Plans:** 1/2 plans complete
+- [x] 12-01-PLAN.md — Enhance MockLlmServer with request tracking + response sequences (wave 1)
 - [ ] 12-02-PLAN.md — B1 kill-switch, B2 auto-retry, B3 PII redact integration tests (wave 2)
 
 #### Phase 13: F6 full-proxy corpus replay via mock-LLM

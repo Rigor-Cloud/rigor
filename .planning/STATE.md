@@ -19,11 +19,11 @@ progress:
 ## Current Position
 
 Phase: 12
-Plan: Not started
-**Status:** Ready to plan
+Plan: 01 complete, 02 pending
+**Status:** In progress
 **Last Completed Phase:** 11 — e2e-coverage-gaps
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 11-02: 7 E2E tests covering stop-hook constraint evaluation via rigor-harness subprocess helpers and PID file crash recovery lifecycle
+**Last Activity Description:** Completed 12-01: MockLlmServer enhanced with request tracking (received_requests()) and per-call-index response selection (response_sequence())
 
 ## Milestone Overview
 
@@ -78,10 +78,13 @@ Plan: Not started
 - MITM test uses raw TCP + TLS handshake for full pipeline validation
 - Local PID_TEST_LOCK mutex in integration tests since RIGOR_HOME_TEST_LOCK is pub(crate)
 - RIGOR_HOME set to tempdir root (not .rigor subdir) since rigor_home() returns env var as-is
+- Body-only request tracking in ReceivedRequest (no headers) -- sufficient for B3 PII inspection
+- response_sequence wraps single-chunks fallback into vec![chunks] for unified handler code path
+- JSON parse failure in MockLlmServer stores Value::Null rather than panicking
 
 ## Session Continuity
 
-**Stopped At:** Completed 11-02-PLAN.md
+**Stopped At:** Completed 12-01-PLAN.md
 **Resume File:** None
 
-**Planned Phase:** 11 (e2e-coverage-gaps) -- plan 2/2 complete -- 2026-04-24
+**Planned Phase:** 12 (mock-llm-server-harness-b1-b2-b3-integration-tests) -- plan 1/2 complete -- 2026-04-24
