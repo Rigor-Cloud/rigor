@@ -2,28 +2,28 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-04-24T06:32:32Z"
+status: executing
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-04-24T06:59:11Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
   completed_phases: 9
-  total_plans: 18
-  completed_plans: 18
-  percent: 43
+  total_plans: 20
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 13
-Plan: Not started
-**Status:** Ready to plan
-**Last Completed Phase:** 12 — mock-llm-server-harness-b1-b2-b3-integration-tests
+Phase: 14
+Plan: 01 complete (1/1)
+**Status:** Phase 14 complete
+**Last Completed Phase:** 14 — rigor-test-e2e-harness-flesh-out
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 12-02: B1/B2/B3 integration tests (7 tests: streaming kill-switch, auto-retry with epistemic correction, PII redact-before-forward)
+**Last Activity Description:** Completed 14-01: Replaced e2e/bench/report stubs with real implementations backed by rigor-harness, 3 smoke tests passing
 
 ## Milestone Overview
 
@@ -84,10 +84,13 @@ Plan: Not started
 - B2 retry_at_most_once uses pre-injected [RIGOR EPISTEMIC CORRECTION] marker to test already_retried guard directly
 - B3 tests use stream:true (realistic SSE path) since PII-IN runs on request path regardless of streaming mode
 - Per-file ENV_LOCK mutex for RIGOR_NO_RETRY rather than cross-file shared mutex
+- Bench smoke test uses --help instead of full criterion run to keep tests fast
+- YAML suite loading deferred; --suite prints message and runs built-in scenarios
+- Report skipped count derived from total minus pass minus fail (forward-compatible)
 
 ## Session Continuity
 
-**Stopped At:** Completed 12-02-PLAN.md
+**Stopped At:** Completed 14-01-PLAN.md
 **Resume File:** None
 
-**Planned Phase:** 12 complete (mock-llm-server-harness-b1-b2-b3-integration-tests) -- 2/2 plans -- 2026-04-24
+**Planned Phase:** 14 complete (rigor-test-e2e-harness-flesh-out) -- 1/1 plans -- 2026-04-24
