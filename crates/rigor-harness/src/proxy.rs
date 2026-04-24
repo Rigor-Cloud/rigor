@@ -3,6 +3,10 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 
+// Serializes env var mutations in spawn_blocking across parallel tests.
+// Without this, concurrent start/start_with_mock calls race on RIGOR_HOME/RIGOR_TARGET_API.
+static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// A test proxy wrapping the production `build_router` + `DaemonState` on an ephemeral port.
 ///
 /// Uses `IsolatedHome` so `DaemonState::load` never touches real `~/.rigor/`.
@@ -37,16 +41,15 @@ impl TestProxy {
             let event_tx = event_tx.clone();
             let rigor_home_str = rigor_home_str.clone();
             tokio::task::spawn_blocking(move || {
+                let _guard = ENV_MUTEX.lock().unwrap();
                 let original_rigor_home = std::env::var("RIGOR_HOME").ok();
-                // Safety: spawn_blocking runs on a dedicated thread. The RIGOR_HOME mutation
-                // is scoped to this closure and restored immediately after DaemonState::load.
                 unsafe { std::env::set_var("RIGOR_HOME", &rigor_home_str) };
                 let result = rigor::daemon::DaemonState::load(yaml_path, event_tx);
-                // Restore original RIGOR_HOME
                 match original_rigor_home {
                     Some(h) => unsafe { std::env::set_var("RIGOR_HOME", h) },
                     None => unsafe { std::env::remove_var("RIGOR_HOME") },
                 }
+                drop(_guard);
                 result.expect("DaemonState::load failed in TestProxy")
             })
             .await
@@ -98,6 +101,7 @@ impl TestProxy {
             let rigor_home_str = rigor_home_str.clone();
             let mock_url = mock_url.clone();
             tokio::task::spawn_blocking(move || {
+                let _guard = ENV_MUTEX.lock().unwrap();
                 let original_rigor_home = std::env::var("RIGOR_HOME").ok();
                 let original_target = std::env::var("RIGOR_TARGET_API").ok();
                 unsafe {
@@ -105,7 +109,6 @@ impl TestProxy {
                     std::env::set_var("RIGOR_TARGET_API", &mock_url);
                 };
                 let result = rigor::daemon::DaemonState::load(yaml_path, event_tx);
-                // Restore original env
                 match original_rigor_home {
                     Some(h) => unsafe { std::env::set_var("RIGOR_HOME", h) },
                     None => unsafe { std::env::remove_var("RIGOR_HOME") },
@@ -114,6 +117,7 @@ impl TestProxy {
                     Some(t) => unsafe { std::env::set_var("RIGOR_TARGET_API", t) },
                     None => unsafe { std::env::remove_var("RIGOR_TARGET_API") },
                 }
+                drop(_guard);
                 result.expect("DaemonState::load failed in TestProxy::start_with_mock")
             })
             .await
