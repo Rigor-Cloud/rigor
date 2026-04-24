@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-04-23T23:55:19.362Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-04-24T00:13:37.828Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -19,8 +19,8 @@ progress:
 ## Current Position
 
 Phase: 8
-Plan: 1 of 2 complete
-**Status:** Executing
+Plan: 2 of 2 complete
+**Status:** Ready to execute
 **Last Completed Phase:** 07 — Integration test infrastructure (rigor-harness crate)
 **Last Activity:** 2026-04-24
 **Last Activity Description:** Completed 08-01: rigor_home() indirection + 17 call site replacements + 4 Category B annotations
@@ -62,10 +62,12 @@ Plan: 1 of 2 complete
 - Option<PathBuf> return types preserved with Some(rigor_home()...) wrapping to minimize caller changes
 - Category B HOME usages annotated with // rigor-home-ok for CI grep guard allowlisting
 - rigor_home() panics on failure rather than returning Result to avoid cascading signature changes
+- RIGOR_HOME set to rigor_dir_str() (the .rigor/ subdir) matching rigor_home() semantics
+- CI grep guard placed as step in clippy job (not separate job) -- zero-cost grep
 
 ## Session Continuity
 
-**Stopped At:** Completed 08-01-PLAN.md
-**Resume File:** .planning/phases/08-home-rigor-test-isolation/08-02-PLAN.md
+**Stopped At:** Completed 08-02-PLAN.md
+**Resume File:** None
 
 **Planned Phase:** 8 ($HOME/.rigor test isolation) — 2 plans — 2026-04-24
