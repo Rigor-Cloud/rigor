@@ -102,7 +102,7 @@ status: active
 **Workstream:** test-infra
 **Plans:** 2 plans
 - [x] 08-01-PLAN.md — Create paths.rs with rigor_home() + replace all 17 call sites (wave 1)
-- [ ] 08-02-PLAN.md — Update TestProxy to RIGOR_HOME + CI grep guard (wave 2)
+- [x] 08-02-PLAN.md — Update TestProxy to RIGOR_HOME + CI grep guard (wave 2)
 
 ### Workstream: coverage
 
