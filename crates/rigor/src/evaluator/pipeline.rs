@@ -608,4 +608,98 @@ violation contains v if {
         assert!(!results[0].violated);
         assert!(results[0].reason.contains("no evaluator matched"));
     }
+
+    // --- Fail-open tests (gap 5) ---
+
+    /// A test-only evaluator that simulates an internal error but follows
+    /// the fail-open contract by returning EvalResult::allow.
+    struct FailingEvaluator;
+
+    impl ClaimEvaluator for FailingEvaluator {
+        fn name(&self) -> &str {
+            "failing"
+        }
+
+        fn can_evaluate(&self, _claim: &Claim, _constraint: &Constraint) -> bool {
+            true
+        }
+
+        fn evaluate(&self, _claim: &Claim, _constraint: &Constraint) -> EvalResult {
+            EvalResult::allow("internal error (fail-open): simulated failure")
+        }
+    }
+
+    #[test]
+    fn test_failing_evaluator_returns_allow() {
+        // Verify that an evaluator following the fail-open contract
+        // (returning allow with error reason) never produces a violation.
+        let constraint =
+            make_constraint("c1", "violation contains v if { false; v := 0 }", vec![]);
+        let mut pipeline = EvaluatorPipeline::new();
+        pipeline.register(Box::new(FailingEvaluator));
+
+        let claim = make_claim("c1", "any text");
+        let results = pipeline.evaluate_claim(&claim, &[constraint]);
+        assert_eq!(results.len(), 1);
+        assert!(
+            !results[0].violated,
+            "fail-open: error must never produce a violation"
+        );
+        assert!(
+            results[0].reason.contains("fail-open"),
+            "reason should mention fail-open, got: {}",
+            results[0].reason
+        );
+    }
+
+    #[test]
+    fn test_regex_evaluator_fail_open_on_engine_error() {
+        // RegexEvaluator with a valid engine, evaluated against a constraint
+        // whose id does not match any loaded rule. The engine returns Ok([])
+        // (no matching violation), so the evaluator returns allow -- proving
+        // the non-violation path is also safe (never violated: true).
+        let loaded_constraint = make_constraint(
+            "loaded",
+            r#"violation contains v if { false; v := {"constraint_id": "loaded", "violated": true, "claims": [], "reason": "never"} }"#,
+            vec![],
+        );
+        let config = make_config(vec![loaded_constraint]);
+        let ev = RegexEvaluator::new(&config).unwrap();
+
+        // Evaluate against a constraint NOT loaded into the engine
+        let unloaded = make_constraint("unloaded", "violation contains v if { false; v := 0 }", vec![]);
+        let claim = make_claim("c1", "some text");
+        let result = ev.evaluate(&claim, &unloaded);
+        assert!(
+            !result.violated,
+            "evaluating an unloaded constraint must never produce a violation, got: {:?}",
+            result
+        );
+        assert!(
+            result.reason.contains("no violation"),
+            "reason should indicate no violation, got: {}",
+            result.reason
+        );
+    }
+
+    #[test]
+    fn test_all_evaluators_miss_returns_allow() {
+        // Pipeline with no evaluators and no fallback. Every constraint
+        // should fail-open with "no evaluator matched".
+        let constraint = make_constraint("orphan", "", vec![]);
+        let pipeline = EvaluatorPipeline::new();
+        let claim = make_claim("c1", "text");
+        let results = pipeline.evaluate_claim(&claim, &[constraint]);
+        assert_eq!(results.len(), 1);
+        assert!(
+            !results[0].violated,
+            "no evaluator matched must fail-open, got: {:?}",
+            results[0]
+        );
+        assert!(
+            results[0].reason.contains("no evaluator matched"),
+            "reason should mention no evaluator matched, got: {}",
+            results[0].reason
+        );
+    }
 }

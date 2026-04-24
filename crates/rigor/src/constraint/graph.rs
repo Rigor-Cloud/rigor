@@ -559,4 +559,105 @@ mod tests {
             "expected b ≈ {expected}, got {b}"
         );
     }
+
+    // --- DF-QuAD boundary tests (gap 6) ---
+
+    #[test]
+    fn test_btreemap_determinism() {
+        // Two graphs with the same nodes and relations added in different
+        // orders must produce identical strengths. BTreeMap guarantees
+        // sorted iteration order, so insertion order is irrelevant.
+        let mut graph_a = ArgumentationGraph::new();
+        graph_a.add_constraint("alpha", EpistemicType::Belief);
+        graph_a.add_constraint("beta", EpistemicType::Belief);
+        graph_a.add_constraint("gamma", EpistemicType::Justification);
+        graph_a.add_relation(Relation {
+            from: "alpha".to_string(),
+            to: "beta".to_string(),
+            relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
+        });
+
+        let mut graph_b = ArgumentationGraph::new();
+        // Deliberately different insertion order
+        graph_b.add_constraint("gamma", EpistemicType::Justification);
+        graph_b.add_constraint("alpha", EpistemicType::Belief);
+        graph_b.add_constraint("beta", EpistemicType::Belief);
+        graph_b.add_relation(Relation {
+            from: "alpha".to_string(),
+            to: "beta".to_string(),
+            relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
+        });
+
+        graph_a.compute_strengths().unwrap();
+        graph_b.compute_strengths().unwrap();
+
+        let strengths_a = graph_a.get_all_strengths();
+        let strengths_b = graph_b.get_all_strengths();
+
+        assert_eq!(
+            strengths_a, strengths_b,
+            "BTreeMap determinism: insertion order must not affect strengths.\n  A: {strengths_a:?}\n  B: {strengths_b:?}"
+        );
+    }
+
+    #[test]
+    fn test_single_strong_attacker_dominance() {
+        // Justification (base 0.9) attacks Defeater (base 0.7).
+        // Defeater strength = 0.7 * (1 - 0.9) = 0.07 (driven very low).
+        let mut graph = ArgumentationGraph::new();
+        graph.add_constraint("justification", EpistemicType::Justification);
+        graph.add_constraint("defeater", EpistemicType::Defeater);
+        graph.add_relation(Relation {
+            from: "justification".to_string(),
+            to: "defeater".to_string(),
+            relation_type: RelationType::Attacks,
+            confidence: 1.0,
+            extraction_method: None,
+        });
+        graph.compute_strengths().unwrap();
+
+        let defeater = graph.get_strength("defeater").unwrap();
+        assert!(
+            defeater < 0.1,
+            "single strong attacker (base 0.9) should drive defeater (base 0.7) below 0.1, got {defeater}"
+        );
+        // Exact value: 0.7 * (1 - 0.9) = 0.07
+        assert!(
+            (defeater - 0.07).abs() < 0.01,
+            "expected defeater ~ 0.07, got {defeater}"
+        );
+    }
+
+    #[test]
+    fn test_constants_are_documented_values() {
+        // Regression guard: if MAX_ITERATIONS or EPSILON are changed,
+        // this test forces acknowledgment.
+        assert_eq!(
+            MAX_ITERATIONS, 100,
+            "MAX_ITERATIONS changed from documented value of 100"
+        );
+        assert!(
+            (EPSILON - 0.001).abs() < f64::EPSILON,
+            "EPSILON changed from documented value of 0.001"
+        );
+    }
+
+    #[test]
+    fn test_zero_attacker_zero_supporter_retains_base() {
+        // A single isolated node with no relations retains its base
+        // strength. Explicit zero-attacker test from issue #16.
+        let mut graph = ArgumentationGraph::new();
+        graph.add_constraint("solo", EpistemicType::Belief);
+        graph.compute_strengths().unwrap();
+
+        let strength = graph.get_strength("solo").unwrap();
+        assert!(
+            (strength - 0.8).abs() < EPSILON,
+            "single node with no relations should retain base strength 0.8, got {strength}"
+        );
+    }
 }
