@@ -506,14 +506,31 @@ pub struct CorpusRow {
 
 impl CorpusRow {
     /// Convert a ViolationLogEntry into zero or more CorpusRows (one per claim).
-    fn from_violation(_entry: &ViolationLogEntry) -> Vec<CorpusRow> {
-        // TDD RED: stub — returns empty to make tests fail
-        vec![]
+    fn from_violation(entry: &ViolationLogEntry) -> Vec<CorpusRow> {
+        if entry.claim_text.is_empty() {
+            return vec![];
+        }
+        entry
+            .claim_text
+            .iter()
+            .map(|claim| CorpusRow {
+                claim_text: claim.clone(),
+                constraint_id: entry.constraint_id.clone(),
+                constraint_name: entry.constraint_name.clone(),
+                label: entry.decision.clone(),
+                human_corrected: entry.false_positive,
+                reasoning: entry.message.clone(),
+                model: entry.model.clone(),
+                knowledge_type: entry.claim_type.clone(),
+                claim_confidence: entry.claim_confidence,
+                created_at: entry.session.timestamp.clone(),
+                session_id: entry.session.session_id.clone(),
+            })
+            .collect()
     }
 }
 
 fn parse_since_date(s: &str) -> Result<chrono::DateTime<chrono::Utc>> {
-    // TDD RED: stub
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
         return Ok(dt.with_timezone(&chrono::Utc));
     }
@@ -531,13 +548,63 @@ fn parse_since_date(s: &str) -> Result<chrono::DateTime<chrono::Utc>> {
 /// Reads line-by-line via BufReader (no Vec collection). Applies optional
 /// `--constraint` and `--since` filters. Returns the number of records written.
 pub fn export_corpus(
-    _log_path: &Path,
-    _constraint: Option<&str>,
-    _since: Option<&str>,
-    _writer: &mut dyn Write,
+    log_path: &Path,
+    constraint: Option<&str>,
+    since: Option<&str>,
+    writer: &mut dyn Write,
 ) -> Result<usize> {
-    // TDD RED: stub — returns 0 to make tests fail
-    Ok(0)
+    use std::io::BufRead;
+
+    if !log_path.exists() {
+        return Ok(0);
+    }
+
+    let file = std::fs::File::open(log_path)
+        .with_context(|| format!("Failed to open {}", log_path.display()))?;
+    let reader = std::io::BufReader::new(file);
+
+    let since_ts = since.map(parse_since_date).transpose()?;
+
+    let mut count = 0usize;
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let entry: ViolationLogEntry = match serde_json::from_str(&line) {
+            Ok(e) => e,
+            Err(_) => continue, // skip malformed lines (T-02-01)
+        };
+
+        // Apply --constraint filter
+        if let Some(cid) = constraint {
+            if entry.constraint_id != cid {
+                continue;
+            }
+        }
+
+        // Apply --since filter
+        if let Some(ts) = since_ts {
+            if let Ok(entry_ts) =
+                chrono::DateTime::parse_from_rfc3339(&entry.session.timestamp)
+            {
+                if entry_ts.with_timezone(&chrono::Utc) < ts {
+                    continue;
+                }
+            } else {
+                continue; // unparseable timestamp — skip
+            }
+        }
+
+        // Transform to CorpusRow(s) — one per claim
+        for row in CorpusRow::from_violation(&entry) {
+            writeln!(writer, "{}", serde_json::to_string(&row)?)?;
+            count += 1;
+        }
+    }
+
+    Ok(count)
 }
 
 #[cfg(test)]
