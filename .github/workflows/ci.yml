@@ -135,6 +135,12 @@ jobs:
       - name: Run Rigor on itself
         run: ./target/release/rigor validate --path rigor.yaml
 
+      - name: Corpus replay consistency check
+        run: cargo test -p rigor --test corpus_replay --release -- --nocapture
+
+      - name: Corpus proxy replay smoke
+        run: cargo test -p rigor --test corpus_proxy_replay --release -- --nocapture
+
   cargo-audit:
     name: Security Audit
     runs-on: ubuntu-latest
