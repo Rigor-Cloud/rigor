@@ -113,7 +113,7 @@ status: active
 **Requirements:** REQ-019
 **Workstream:** coverage
 **Plans:** 2 plans
-- [ ] 09-01-PLAN.md — JudgeClient trait seam + unit tests for judge functions (wave 1)
+- [x] 09-01-PLAN.md — JudgeClient trait seam + unit tests for judge functions (wave 1)
 - [ ] 09-02-PLAN.md — Integration tests for extract_and_evaluate, evaluate_text_inline, proxy_request (wave 2)
 
 #### Phase 10: Unit coverage gaps (MITM allowlist, daemon lifecycle, TLS CA, SNI, DF-QuAD, content_store TTL, action gates)

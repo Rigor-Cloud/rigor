@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-04-24T00:13:37.828Z"
+status: executing
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-04-24T00:56:00Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
-  percent: 19
+  completed_phases: 3
+  total_plans: 11
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 ## Current Position
 
 Phase: 9
-Plan: Not started
-**Status:** Ready to plan
-**Last Completed Phase:** 07 — Integration test infrastructure (rigor-harness crate)
+Plan: 1 of 2 complete
+**Status:** Executing
+**Last Completed Phase:** 08 — HOME/.rigor test isolation
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 08-01: rigor_home() indirection + 17 call site replacements + 4 Category B annotations
+**Last Activity Description:** Completed 09-01: JudgeClient trait seam + 13 unit tests for judge-calling functions
 
 ## Milestone Overview
 
@@ -64,10 +64,13 @@ Plan: Not started
 - rigor_home() panics on failure rather than returning Result to avoid cascading signature changes
 - RIGOR_HOME set to rigor_dir_str() (the .rigor/ subdir) matching rigor_home() semantics
 - CI grep guard placed as step in clippy job (not separate job) -- zero-cost grep
+- JudgeClient trait tests placed in proxy.rs mod tests (not separate file) due to #[cfg(test)] visibility
+- JudgeClient/JudgeError/ReqwestJudgeClient made pub (not pub(crate)) because DaemonState.judge_client field requires pub trait
+- Concurrency test uses tokio::sync::Barrier + try_acquire (not proptest async wrapper)
 
 ## Session Continuity
 
-**Stopped At:** Completed 08-02-PLAN.md
+**Stopped At:** Completed 09-01-PLAN.md
 **Resume File:** None
 
-**Planned Phase:** 8 ($HOME/.rigor test isolation) — 2 plans — 2026-04-24
+**Planned Phase:** 9 (daemon/proxy.rs hot-path tests) -- plan 01 complete, plan 02 pending -- 2026-04-24
