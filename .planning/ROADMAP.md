@@ -128,11 +128,14 @@ status: active
 - [x] 10-03-PLAN.md — Content store TTL/concurrency, action gate timeout/lifecycle (wave 1)
 
 #### Phase 11: E2E coverage gaps (BLOCK kill-switch, auto-retry, PII-before-upstream, blind-tunnel, TLS MITM handshake, stop-hook, corpus drift)
-**Goal:** Close listed end-to-end gaps.
+**Goal:** Close listed end-to-end gaps (Phase 11 scope: blind-tunnel, TLS MITM, stop-hook, PID lifecycle; Phase 12 covers B1/B2/B3).
 **Issue:** #17
 **Depends on:** Phase 7
 **Requirements:** REQ-021
 **Workstream:** coverage
+**Plans:** 2 plans
+- [ ] 11-01-PLAN.md — TestProxy CONNECT upgrade support + blind-tunnel/MITM handshake E2E tests (wave 1)
+- [ ] 11-02-PLAN.md — Stop-hook harness E2E + PID crash recovery lifecycle tests (wave 1)
 
 #### Phase 12: Mock-LLM server harness + B1/B2/B3 integration tests
 **Goal:** Build mock-LLM server + streaming kill-switch / auto-retry / PII redact-before-forward integration tests. Largest chunk; unblocks Phase 13.
