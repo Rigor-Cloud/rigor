@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: milestone_complete
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-04-24T07:24:11.080Z"
+status: completed
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-04-24T07:57:09.957Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 11
-  total_plans: 21
-  completed_plans: 21
-  percent: 52
+  completed_phases: 10
+  total_plans: 23
+  completed_plans: 22
+  percent: 96
 ---
 
 # Project State
@@ -90,10 +90,12 @@ Plan: Not started
 - cargo-deny 0.19.x format used; 11 known advisories temporarily ignored with tracking reasons
 - License allow-list extended to 13 entries based on actual dep tree (MIT-0, Unicode-3.0, MPL-2.0, CDLA-Permissive-2.0 added)
 - Keyless OIDC signing (no private keys) via GitHub Actions id-token: write permission
+- Extended cli/refine.rs in-place for corpus exporter rather than creating module directory
+- CLI grammar: rigor refine --apply becomes rigor refine suggest --apply (pre-1.0 acceptable)
 
 ## Session Continuity
 
-**Stopped At:** Completed 17-02-PLAN.md
+**Stopped At:** Completed 02-01-PLAN.md
 **Resume File:** None
 
 **Planned Phase:** 14 complete (rigor-test-e2e-harness-flesh-out) -- 1/1 plans -- 2026-04-24
