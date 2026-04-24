@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-04-24T06:59:11Z"
+status: planning
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-04-24T07:19:47.037Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 12
-  total_plans: 20
+  completed_phases: 8
+  total_plans: 21
   completed_plans: 20
-  percent: 57
+  percent: 95
 ---
 
 # Project State
@@ -87,10 +87,12 @@ Plan: Not started
 - Bench smoke test uses --help instead of full criterion run to keep tests fast
 - YAML suite loading deferred; --suite prints message and runs built-in scenarios
 - Report skipped count derived from total minus pass minus fail (forward-compatible)
+- cargo-deny 0.19.x format used; 11 known advisories temporarily ignored with tracking reasons
+- License allow-list extended to 13 entries based on actual dep tree (MIT-0, Unicode-3.0, MPL-2.0, CDLA-Permissive-2.0 added)
 
 ## Session Continuity
 
-**Stopped At:** Completed 14-01-PLAN.md
+**Stopped At:** Completed 17-01-PLAN.md
 **Resume File:** None
 
 **Planned Phase:** 14 complete (rigor-test-e2e-harness-flesh-out) -- 1/1 plans -- 2026-04-24
