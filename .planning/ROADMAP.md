@@ -160,7 +160,7 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-026
 **Workstream:** coverage
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 - [x] 14-01-PLAN.md — Replace e2e/bench/report stubs with real implementations + smoke tests
 
 ### Workstream: ci-hardening
