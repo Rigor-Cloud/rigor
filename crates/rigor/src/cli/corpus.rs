@@ -4,9 +4,21 @@
 //! No library logic lives here -- just argument parsing and dispatch.
 
 use anyhow::Result;
-use clap::Subcommand;
+use clap::{Subcommand, ValueEnum};
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+/// Output format for `rigor corpus stats`.
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum StatsFormat {
+    /// Aligned columns for terminal display (default)
+    #[default]
+    Table,
+    /// Machine-readable JSON
+    Json,
+    /// Comma-separated values
+    Csv,
+}
 
 #[derive(Subcommand)]
 pub enum CorpusCommands {
@@ -37,7 +49,7 @@ pub enum CorpusCommands {
         #[arg(long)]
         prompt: Option<String>,
     },
-    /// Show per-model/per-prompt corpus statistics as JSON
+    /// Show per-model/per-prompt corpus statistics
     Stats {
         /// Directory containing recordings
         #[arg(long, default_value = ".planning/corpus/recordings")]
@@ -45,6 +57,9 @@ pub enum CorpusCommands {
         /// Path to rigor.yaml for replay evaluation (auto-detected if omitted)
         #[arg(long)]
         rigor_yaml: Option<PathBuf>,
+        /// Output format: table (default), json, csv
+        #[arg(long, value_enum, default_value_t = StatsFormat::Table)]
+        format: StatsFormat,
     },
     /// Verify integrity (SHA-256, non-empty response) of recorded corpus entries
     Validate {
@@ -73,7 +88,8 @@ pub fn run_corpus_command(cmd: CorpusCommands) -> Result<()> {
         CorpusCommands::Stats {
             recordings,
             rigor_yaml,
-        } => run_stats(recordings, rigor_yaml),
+            format,
+        } => run_stats(recordings, rigor_yaml, format),
         CorpusCommands::Validate {
             prompts,
             recordings,
@@ -134,12 +150,16 @@ fn run_record(
     Ok(())
 }
 
-fn run_stats(recordings_dir: PathBuf, rigor_yaml: Option<PathBuf>) -> Result<()> {
+fn run_stats(recordings_dir: PathBuf, rigor_yaml: Option<PathBuf>, format: StatsFormat) -> Result<()> {
     let recordings = crate::corpus::load_recordings(&recordings_dir)?;
 
     if recordings.is_empty() {
         eprintln!("No recordings found in {}", recordings_dir.display());
-        println!("{{\"per_prompt\":[],\"per_model\":[]}}");
+        match format {
+            StatsFormat::Json => println!("{{\"per_prompt\":[],\"per_model\":[]}}"),
+            StatsFormat::Csv => println!("prompt_id,model,samples,blocks,block_rate"),
+            StatsFormat::Table => println!("(no data)"),
+        }
         return Ok(());
     }
 
@@ -180,8 +200,92 @@ fn run_stats(recordings_dir: PathBuf, rigor_yaml: Option<PathBuf>) -> Result<()>
     let rows = crate::corpus::compute_stats(&recordings, replay_fn);
     let aggregates = crate::corpus::aggregate_by_model(&rows);
 
-    // Build JSON output. ModelStats/PerModelAggregate don't derive Serialize,
-    // so we use serde_json::json! to construct the output manually.
+    match format {
+        StatsFormat::Table => format_table(&rows, &aggregates),
+        StatsFormat::Json => format_json(&rows, &aggregates)?,
+        StatsFormat::Csv => format_csv(&rows, &aggregates),
+    }
+
+    Ok(())
+}
+
+/// Aligned-column table output for TTY display.
+fn format_table(
+    rows: &[crate::corpus::ModelStats],
+    aggregates: &[crate::corpus::PerModelAggregate],
+) {
+    // Compute dynamic column widths from data.
+    let prompt_w = rows
+        .iter()
+        .map(|r| r.prompt_id.len())
+        .max()
+        .unwrap_or(9)
+        .max(9); // "PROMPT_ID"
+    let model_w = rows
+        .iter()
+        .map(|r| r.model.len())
+        .chain(aggregates.iter().map(|a| a.model.len()))
+        .max()
+        .unwrap_or(5)
+        .max(5); // "MODEL"
+
+    // Per-prompt table
+    println!("Per-Prompt Statistics");
+    println!(
+        "{:<prompt_w$}  {:<model_w$}  {:>7}  {:>6}  {:>10}",
+        "PROMPT_ID", "MODEL", "SAMPLES", "BLOCKS", "BLOCK_RATE",
+        prompt_w = prompt_w,
+        model_w = model_w,
+    );
+    println!(
+        "{:-<prompt_w$}  {:-<model_w$}  {:->7}  {:->6}  {:->10}",
+        "", "", "", "", "",
+        prompt_w = prompt_w,
+        model_w = model_w,
+    );
+    for r in rows {
+        println!(
+            "{:<prompt_w$}  {:<model_w$}  {:>7}  {:>6}  {:>9.1}%",
+            r.prompt_id,
+            r.model,
+            r.samples,
+            r.blocks,
+            r.block_rate() * 100.0,
+            prompt_w = prompt_w,
+            model_w = model_w,
+        );
+    }
+
+    // Per-model aggregate table
+    println!();
+    println!("Per-Model Aggregates");
+    println!(
+        "{:<model_w$}  {:>7}  {:>6}  {:>10}",
+        "MODEL", "SAMPLES", "BLOCKS", "BLOCK_RATE",
+        model_w = model_w,
+    );
+    println!(
+        "{:-<model_w$}  {:->7}  {:->6}  {:->10}",
+        "", "", "", "",
+        model_w = model_w,
+    );
+    for a in aggregates {
+        println!(
+            "{:<model_w$}  {:>7}  {:>6}  {:>9.1}%",
+            a.model,
+            a.total_samples,
+            a.total_blocks,
+            a.block_rate() * 100.0,
+            model_w = model_w,
+        );
+    }
+}
+
+/// JSON output (preserves original behavior from Phase 4).
+fn format_json(
+    rows: &[crate::corpus::ModelStats],
+    aggregates: &[crate::corpus::PerModelAggregate],
+) -> Result<()> {
     let per_prompt: Vec<serde_json::Value> = rows
         .iter()
         .map(|r| {
@@ -214,6 +318,38 @@ fn run_stats(recordings_dir: PathBuf, rigor_yaml: Option<PathBuf>) -> Result<()>
 
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
+}
+
+/// CSV output for spreadsheet consumption.
+fn format_csv(
+    rows: &[crate::corpus::ModelStats],
+    aggregates: &[crate::corpus::PerModelAggregate],
+) {
+    // Per-prompt rows
+    println!("prompt_id,model,samples,blocks,block_rate");
+    for r in rows {
+        println!(
+            "{},{},{},{},{:.4}",
+            r.prompt_id,
+            r.model,
+            r.samples,
+            r.blocks,
+            r.block_rate(),
+        );
+    }
+
+    // Per-model aggregate rows (blank prompt_id column)
+    println!();
+    println!("model,total_samples,total_blocks,block_rate");
+    for a in aggregates {
+        println!(
+            "{},{},{},{:.4}",
+            a.model,
+            a.total_samples,
+            a.total_blocks,
+            a.block_rate(),
+        );
+    }
 }
 
 fn run_validate(prompts_dir: PathBuf, recordings_dir: PathBuf) -> Result<()> {
