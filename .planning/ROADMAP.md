@@ -162,7 +162,7 @@ Plans:
 **Depends on:** Phase 5, Phase 12
 **Requirements:** REQ-025
 **Workstream:** coverage
-**Plans:** 1/1 plans complete
+**Plans:** 1/0 plans complete
 - [x] 13-01 — corpus_proxy_replay.rs: 80/800 recordings through full proxy pipeline (smoke mode)
 
 #### Phase 14: rigor-test e2e harness flesh-out
