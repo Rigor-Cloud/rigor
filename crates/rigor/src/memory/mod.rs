@@ -12,6 +12,8 @@
 
 pub mod content_store;
 pub mod episodic;
+#[cfg(feature = "onnx")]
+pub mod onnx_host;
 
 pub use content_store::{
     hash_bytes, hash_hex, Category, ContentStoreBackend, Hash, InMemoryBackend, SearchResult,
