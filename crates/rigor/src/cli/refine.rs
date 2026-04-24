@@ -476,6 +476,70 @@ fn inject_rego_exclusion(content: &str, constraint_id: &str, pattern: &str) -> S
     }
 }
 
+/// One training record in the exported corpus JSONL.
+/// Schema designed for Phase 3E (GEPA) and Phase 4E (Modal training).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorpusRow {
+    /// Claim text that triggered the violation
+    pub claim_text: String,
+    /// Constraint that was violated
+    pub constraint_id: String,
+    /// Constraint human-readable name
+    pub constraint_name: String,
+    /// Ground-truth label from the evaluator decision
+    pub label: String,
+    /// Whether a human corrected the evaluator's decision
+    pub human_corrected: Option<bool>,
+    /// Evaluator reasoning / violation message
+    pub reasoning: String,
+    /// Model that produced the original output (if known)
+    pub model: Option<String>,
+    /// Epistemic knowledge type of the claim (if tagged)
+    pub knowledge_type: Option<String>,
+    /// Claim confidence score (if available)
+    pub claim_confidence: Option<f64>,
+    /// ISO 8601 timestamp from the session
+    pub created_at: String,
+    /// Session ID for provenance
+    pub session_id: String,
+}
+
+impl CorpusRow {
+    /// Convert a ViolationLogEntry into zero or more CorpusRows (one per claim).
+    fn from_violation(_entry: &ViolationLogEntry) -> Vec<CorpusRow> {
+        // TDD RED: stub — returns empty to make tests fail
+        vec![]
+    }
+}
+
+fn parse_since_date(s: &str) -> Result<chrono::DateTime<chrono::Utc>> {
+    // TDD RED: stub
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+        return Ok(dt.with_timezone(&chrono::Utc));
+    }
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        let ndt = d.and_hms_opt(0, 0, 0).context("Invalid date")?;
+        return Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+            ndt,
+            chrono::Utc,
+        ));
+    }
+    anyhow::bail!("Expected YYYY-MM-DD or RFC3339 timestamp")
+}
+
+/// Streaming JSONL corpus export from the violation log.
+/// Reads line-by-line via BufReader (no Vec collection). Applies optional
+/// `--constraint` and `--since` filters. Returns the number of records written.
+pub fn export_corpus(
+    _log_path: &Path,
+    _constraint: Option<&str>,
+    _since: Option<&str>,
+    _writer: &mut dyn Write,
+) -> Result<usize> {
+    // TDD RED: stub — returns 0 to make tests fail
+    Ok(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -538,5 +602,166 @@ mod tests {
         ];
         let refs = compute_refinements(&entries);
         assert!(refs.is_empty());
+    }
+
+    // --- CorpusRow + export_corpus tests ---
+
+    #[test]
+    fn test_corpus_row_from_violation() {
+        let entry = mk("c1", Some(false), "the earth is flat");
+        let rows = CorpusRow::from_violation(&entry);
+        assert_eq!(rows.len(), 1);
+        let r = &rows[0];
+        assert_eq!(r.claim_text, "the earth is flat");
+        assert_eq!(r.constraint_id, "c1");
+        assert_eq!(r.constraint_name, "name_c1");
+        assert_eq!(r.label, "block");
+        assert_eq!(r.human_corrected, Some(false));
+        assert_eq!(r.reasoning, "m");
+        assert_eq!(r.model, None);
+        assert_eq!(r.knowledge_type, None);
+        assert_eq!(r.claim_confidence, None);
+        assert_eq!(r.created_at, "2026-04-19T00:00:00Z");
+        assert_eq!(r.session_id, "s");
+    }
+
+    #[test]
+    fn test_corpus_row_multi_claim() {
+        let mut entry = mk("c2", None, "claim A");
+        entry.claim_text = vec!["claim A".into(), "claim B".into(), "claim C".into()];
+        let rows = CorpusRow::from_violation(&entry);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].claim_text, "claim A");
+        assert_eq!(rows[1].claim_text, "claim B");
+        assert_eq!(rows[2].claim_text, "claim C");
+        // All share the same constraint_id and session_id
+        for r in &rows {
+            assert_eq!(r.constraint_id, "c2");
+            assert_eq!(r.session_id, "s");
+        }
+    }
+
+    #[test]
+    fn test_corpus_row_empty_claims() {
+        let mut entry = mk("c3", None, "unused");
+        entry.claim_text = vec![];
+        let rows = CorpusRow::from_violation(&entry);
+        assert_eq!(rows.len(), 0);
+    }
+
+    #[test]
+    fn test_export_produces_valid_jsonl() {
+        let entries = vec![
+            mk("c1", Some(false), "claim 1"),
+            mk("c2", Some(true), "claim 2"),
+            mk("c3", None, "claim 3"),
+        ];
+        let dir = std::env::temp_dir().join("rigor_test_export_valid_jsonl");
+        let _ = std::fs::create_dir_all(&dir);
+        let log_path = dir.join("violations.jsonl");
+        {
+            let mut f = std::fs::File::create(&log_path).unwrap();
+            for e in &entries {
+                writeln!(f, "{}", serde_json::to_string(e).unwrap()).unwrap();
+            }
+        }
+        let mut buf: Vec<u8> = Vec::new();
+        let count = export_corpus(&log_path, None, None, &mut buf).unwrap();
+        assert_eq!(count, 3);
+        let output = String::from_utf8(buf).unwrap();
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(lines.len(), 3);
+        for line in &lines {
+            let row: CorpusRow = serde_json::from_str(line).unwrap();
+            assert!(!row.claim_text.is_empty());
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_export_constraint_filter() {
+        let entries = vec![
+            mk("A", None, "claim A1"),
+            mk("A", None, "claim A2"),
+            mk("B", None, "claim B1"),
+        ];
+        let dir = std::env::temp_dir().join("rigor_test_export_constraint");
+        let _ = std::fs::create_dir_all(&dir);
+        let log_path = dir.join("violations.jsonl");
+        {
+            let mut f = std::fs::File::create(&log_path).unwrap();
+            for e in &entries {
+                writeln!(f, "{}", serde_json::to_string(e).unwrap()).unwrap();
+            }
+        }
+        let mut buf: Vec<u8> = Vec::new();
+        let count = export_corpus(&log_path, Some("A"), None, &mut buf).unwrap();
+        assert_eq!(count, 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_export_since_filter() {
+        let mut e1 = mk("c1", None, "old claim");
+        e1.session.timestamp = "2026-01-01T00:00:00Z".into();
+        let mut e2 = mk("c1", None, "mid claim");
+        e2.session.timestamp = "2026-06-01T00:00:00Z".into();
+        let mut e3 = mk("c1", None, "new claim");
+        e3.session.timestamp = "2026-12-01T00:00:00Z".into();
+
+        let dir = std::env::temp_dir().join("rigor_test_export_since");
+        let _ = std::fs::create_dir_all(&dir);
+        let log_path = dir.join("violations.jsonl");
+        {
+            let mut f = std::fs::File::create(&log_path).unwrap();
+            for e in [&e1, &e2, &e3] {
+                writeln!(f, "{}", serde_json::to_string(e).unwrap()).unwrap();
+            }
+        }
+        let mut buf: Vec<u8> = Vec::new();
+        let count = export_corpus(&log_path, None, Some("2026-06-01"), &mut buf).unwrap();
+        assert_eq!(count, 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_export_skips_malformed_lines() {
+        let valid = mk("c1", None, "valid claim");
+        let dir = std::env::temp_dir().join("rigor_test_export_malformed");
+        let _ = std::fs::create_dir_all(&dir);
+        let log_path = dir.join("violations.jsonl");
+        {
+            let mut f = std::fs::File::create(&log_path).unwrap();
+            writeln!(f, "{}", serde_json::to_string(&valid).unwrap()).unwrap();
+            writeln!(f, "this is not valid json at all").unwrap();
+            writeln!(f, "{}", serde_json::to_string(&valid).unwrap()).unwrap();
+        }
+        let mut buf: Vec<u8> = Vec::new();
+        let count = export_corpus(&log_path, None, None, &mut buf).unwrap();
+        assert_eq!(count, 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_export_empty_log() {
+        let dir = std::env::temp_dir().join("rigor_test_export_empty");
+        let _ = std::fs::create_dir_all(&dir);
+        let log_path = dir.join("violations.jsonl");
+        std::fs::File::create(&log_path).unwrap(); // empty file
+        let mut buf: Vec<u8> = Vec::new();
+        let count = export_corpus(&log_path, None, None, &mut buf).unwrap();
+        assert_eq!(count, 0);
+        assert!(buf.is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_export_missing_log() {
+        let log_path = std::env::temp_dir().join("rigor_test_export_missing_nonexistent.jsonl");
+        let _ = std::fs::remove_file(&log_path); // ensure it does not exist
+        let mut buf: Vec<u8> = Vec::new();
+        let count = export_corpus(&log_path, None, None, &mut buf).unwrap();
+        assert_eq!(count, 0);
+        assert!(buf.is_empty());
     }
 }
