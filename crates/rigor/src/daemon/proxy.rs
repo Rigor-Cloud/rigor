@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
+use async_trait::async_trait;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -42,6 +43,78 @@ fn apply_provider_auth(req: reqwest::RequestBuilder, api_key: &str) -> reqwest::
         req.header("x-api-key", api_key)
     } else {
         req.header("authorization", format!("Bearer {}", api_key))
+    }
+}
+
+/// Error type for judge client calls.
+#[derive(Debug)]
+pub enum JudgeError {
+    Timeout,
+    HttpError(u16),
+    NetworkError(String),
+    ParseError(String),
+}
+
+/// Abstraction for LLM judge calls (scope check, violation persist check, relevance scoring).
+/// Production: ReqwestJudgeClient wraps reqwest + apply_provider_auth.
+/// Tests: MockJudgeClient returns canned responses.
+#[async_trait]
+pub trait JudgeClient: Send + Sync {
+    async fn call_judge(
+        &self,
+        api_url: &str,
+        api_key: &str,
+        body: &serde_json::Value,
+        timeout_secs: u64,
+    ) -> Result<serde_json::Value, JudgeError>;
+}
+
+/// Production implementation wrapping reqwest::Client.
+pub struct ReqwestJudgeClient {
+    client: reqwest::Client,
+}
+
+impl ReqwestJudgeClient {
+    pub fn new(client: reqwest::Client) -> Self {
+        Self { client }
+    }
+}
+
+#[async_trait]
+impl JudgeClient for ReqwestJudgeClient {
+    async fn call_judge(
+        &self,
+        api_url: &str,
+        api_key: &str,
+        body: &serde_json::Value,
+        timeout_secs: u64,
+    ) -> Result<serde_json::Value, JudgeError> {
+        let mut req = self
+            .client
+            .post(format!("{}/v1/messages", api_url))
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json");
+        req = apply_provider_auth(req, api_key);
+
+        let resp = match tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            req.json(body).send(),
+        )
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => return Err(JudgeError::NetworkError(e.to_string())),
+            Err(_) => return Err(JudgeError::Timeout),
+        };
+
+        let status = resp.status().as_u16();
+        if !resp.status().is_success() {
+            return Err(JudgeError::HttpError(status));
+        }
+
+        resp.json()
+            .await
+            .map_err(|e| JudgeError::ParseError(e.to_string()))
     }
 }
 
@@ -1244,6 +1317,7 @@ async fn proxy_request(
         event_tx,
         constraints_count,
         http_client,
+        judge_client,
         fallback,
     ) = {
         let mut st = state.lock().unwrap();
@@ -1262,6 +1336,7 @@ async fn proxy_request(
             st.event_tx.clone(),
             count,
             st.http_client.clone(),
+            st.judge_client.clone(),
             st.fallback.clone(),
         )
     };
@@ -1549,6 +1624,7 @@ async fn proxy_request(
         let headers_bg = headers.clone();
         let model_bg = model.clone();
         let http_client_bg = http_client.clone();
+        let judge_client_bg = judge_client.clone();
         let user_message_bg = user_message.clone();
         let session_id_bg = session_id.clone();
         let response_chain_bg = request_chain.clone();
@@ -1809,12 +1885,12 @@ async fn proxy_request(
                                 let user_msg = user_message_bg.clone();
                                 let sess = session_id_bg.clone();
                                 let req_id = request_id_bg.clone();
-                                let http = http_client_bg.clone();
+                                let jc = judge_client_bg.clone();
                                 let etx = event_tx_bg.clone();
                                 let st_clone = state_bg.clone();
                                 tokio::spawn(async move {
                                     let (within_scope, reason) = scope_judge_check(
-                                        &http,
+                                        &*jc,
                                         &judge_url,
                                         &api_key,
                                         &judge_model,
@@ -2188,7 +2264,7 @@ async fn proxy_request(
                                         };
                                         let still_violated = if !retry_text.is_empty() {
                                             check_violations_persist(
-                                                &http_client_bg,
+                                                &*judge_client_bg,
                                                 &judge_url_1,
                                                 judge_key_1.as_deref(),
                                                 &judge_model_1,
@@ -2374,7 +2450,7 @@ async fn proxy_request(
 
                         let judge_start = std::time::Instant::now();
                         let violated = check_violations_persist(
-                            &http_client_bg,
+                            &*judge_client_bg,
                             &judge_url_2,
                             judge_key_2.as_deref(),
                             &judge_model_2,
@@ -2539,7 +2615,7 @@ async fn proxy_request(
                                 };
                                 let still_violated = if !retry_text.is_empty() {
                                     check_violations_persist(
-                                        &http_client_bg,
+                                        &*judge_client_bg,
                                         &judge_url_3,
                                         judge_key_3.as_deref(),
                                         &judge_model_3,
@@ -2875,8 +2951,8 @@ fn extract_and_evaluate(
 /// Fast LLM check: do the original violations still persist in the retry text?
 /// Uses a minimal prompt (~50 tokens per violation) for speed.
 /// Returns true if ANY violation is still present (rephrased or not).
-async fn check_violations_persist(
-    client: &reqwest::Client,
+pub async fn check_violations_persist(
+    client: &dyn JudgeClient,
     api_url: &str,
     api_key: Option<&str>,
     model: &str,
@@ -2931,29 +3007,10 @@ async fn check_violations_persist(
 
     let judge_start = std::time::Instant::now();
 
-    // Call API directly — not through the proxy (avoids self-evaluation loop)
-    let mut req = client
-        .post(format!("{}/v1/messages", api_url))
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json");
-
-    req = apply_provider_auth(req, api_key);
-
-    let resp =
-        tokio::time::timeout(std::time::Duration::from_secs(10), req.json(&body).send()).await;
-
-    let resp = match resp {
-        Ok(Ok(r)) => r,
-        Ok(Err(e)) => {
-            crate::daemon::ws::emit_log(
-                event_tx,
-                "error",
-                "relevance",
-                format!("Retry verification LLM call failed: {}", e),
-            );
-            return false; // fail open
-        }
-        Err(_) => {
+    // Call API via JudgeClient trait — not through the proxy (avoids self-evaluation loop)
+    let resp_json = match client.call_judge(api_url, api_key, &body, 10).await {
+        Ok(j) => j,
+        Err(JudgeError::Timeout) => {
             crate::daemon::ws::emit_log(
                 event_tx,
                 "error",
@@ -2962,11 +3019,18 @@ async fn check_violations_persist(
             );
             return false; // fail open
         }
-    };
-
-    let resp_json: serde_json::Value = match resp.json().await {
-        Ok(j) => j,
-        Err(_) => return false,
+        Err(JudgeError::NetworkError(e)) => {
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "relevance",
+                format!("Retry verification LLM call failed: {}", e),
+            );
+            return false; // fail open
+        }
+        Err(JudgeError::HttpError(_)) | Err(JudgeError::ParseError(_)) => {
+            return false; // fail open
+        }
     };
 
     let answer = resp_json
@@ -3032,8 +3096,8 @@ async fn check_violations_persist(
 
 /// Ask the LLM judge whether an action intent is within scope of user's request.
 /// Returns (within_scope, reason).
-async fn scope_judge_check(
-    client: &reqwest::Client,
+pub async fn scope_judge_check(
+    client: &dyn JudgeClient,
     api_url: &str,
     api_key: &str,
     model: &str,
@@ -3058,29 +3122,9 @@ async fn scope_judge_check(
         "messages": [{"role": "user", "content": prompt}]
     });
 
-    let mut req = client
-        .post(format!("{}/v1/messages", api_url))
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json");
-    req = apply_provider_auth(req, api_key);
-
-    let resp = match tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        req.json(&body).send(),
-    )
-    .await
-    {
-        Ok(Ok(r)) => r,
-        Ok(Err(e)) => {
-            crate::daemon::ws::emit_log(
-                event_tx,
-                "error",
-                "gate",
-                format!("Scope judge request failed: {}", e),
-            );
-            return (true, "Judge error — defaulting to allow".to_string());
-        }
-        Err(_) => {
+    let resp_json = match client.call_judge(api_url, api_key, &body, 10).await {
+        Ok(j) => j,
+        Err(JudgeError::Timeout) => {
             crate::daemon::ws::emit_log(
                 event_tx,
                 "warn",
@@ -3089,26 +3133,27 @@ async fn scope_judge_check(
             );
             return (true, "Judge timeout — defaulting to allow".to_string());
         }
-    };
-
-    // Fail-open on HTTP errors (401/403/500/etc.). Without this, a 401 from
-    // Anthropic parses as {"error": ...}, `get("content")` returns None,
-    // text is empty, and `within_scope` ends up false — rejecting every
-    // action instead of failing open. This caused the contrapunk gate stall.
-    let status = resp.status();
-    if !status.is_success() {
-        crate::daemon::ws::emit_log(
-            event_tx,
-            "warn",
-            "gate",
-            format!("Scope judge HTTP {} — defaulting to allow", status),
-        );
-        return (true, format!("Judge HTTP {} — defaulting to allow", status));
-    }
-
-    let resp_json: serde_json::Value = match resp.json().await {
-        Ok(j) => j,
-        Err(_) => return (true, "Parse error — defaulting to allow".to_string()),
+        Err(JudgeError::NetworkError(e)) => {
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "gate",
+                format!("Scope judge request failed: {}", e),
+            );
+            return (true, "Judge error — defaulting to allow".to_string());
+        }
+        Err(JudgeError::HttpError(status)) => {
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "warn",
+                "gate",
+                format!("Scope judge HTTP {} — defaulting to allow", status),
+            );
+            return (true, format!("Judge HTTP {} — defaulting to allow", status));
+        }
+        Err(JudgeError::ParseError(_)) => {
+            return (true, "Parse error — defaulting to allow".to_string());
+        }
     };
 
     let text = resp_json
@@ -3444,7 +3489,7 @@ fn extract_and_evaluate_text(
             .collect();
 
         // Use judge config (OpenRouter) if available, else fall back to captured API key
-        let (judge_url, judge_key, judge_model, http_client) = {
+        let (judge_url, judge_key, judge_model, jc) = {
             let st = state.lock().unwrap();
             let key = st.judge_api_key.clone().or_else(|| st.api_key.clone());
             let url = if st.judge_api_key.is_some() {
@@ -3453,13 +3498,13 @@ fn extract_and_evaluate_text(
                 st.target_api.clone()
             };
             let model = st.judge_model.clone();
-            (url, key, model, st.http_client.clone())
+            (url, key, model, st.judge_client.clone())
         };
 
         let event_tx_rel = event_tx.clone();
         tokio::spawn(async move {
             score_claim_relevance(
-                &http_client,
+                &*jc,
                 &judge_url,
                 judge_key.as_deref(),
                 &judge_model,
@@ -3518,10 +3563,24 @@ pub fn lookup_relevance(claim_text: &str) -> Vec<(String, String, String)> {
     cache.get(claim_text).cloned().unwrap_or_default()
 }
 
+/// Clear the relevance cache. Test-only helper to prevent cross-test contamination.
+#[cfg(test)]
+pub fn clear_relevance_cache() {
+    RELEVANCE_CACHE.lock().unwrap().clear();
+}
+
+/// Reset the relevance semaphore to unacquired state. Test-only helper.
+#[cfg(test)]
+pub fn reset_relevance_semaphore() {
+    RELEVANCE_SEMAPHORE
+        .0
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
 /// Call Sonnet to compute semantic relevance between claims and constraints.
 /// Features: 30s timeout, rate limiting (1 in flight), caching, logging.
-async fn score_claim_relevance(
-    client: &reqwest::Client,
+pub async fn score_claim_relevance(
+    client: &dyn JudgeClient,
     api_url: &str,
     api_key: Option<&str>,
     model: &str,
@@ -3632,31 +3691,42 @@ async fn score_claim_relevance(
             tokio::time::sleep(std::time::Duration::from_secs(*delay)).await;
         }
 
-        // Rebuild request each attempt (reqwest consumes the builder)
-        let mut retry_req = client
-            .post(format!("{}/v1/messages", api_url))
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json");
-        retry_req = apply_provider_auth(retry_req, api_key);
-
-        let resp = tokio::time::timeout(
-            std::time::Duration::from_secs(30),
-            retry_req.json(&body).send(),
-        )
-        .await;
-
-        let r = match resp {
-            Ok(Ok(r)) => r,
-            Ok(Err(e)) => {
+        // Call via JudgeClient trait
+        match client.call_judge(api_url, api_key, &body, 30).await {
+            Ok(j) => {
+                eprintln!(
+                    "rigor relevance: API status: 200 (attempt {})",
+                    attempt + 1
+                );
+                resp_json = j;
+                break;
+            }
+            Err(JudgeError::HttpError(429)) => {
+                eprintln!(
+                    "rigor relevance: API status: 429 (attempt {})",
+                    attempt + 1
+                );
+                // Rate limited — will retry if more attempts remain
+                if attempt < delays.len() - 1 {
+                    continue;
+                }
                 crate::daemon::ws::emit_log(
                     event_tx,
                     "error",
                     "relevance",
-                    format!("LLM call failed: {}", e),
+                    "Rate limited after all retry attempts".to_string(),
                 );
                 return;
             }
-            Err(_) => {
+            Err(JudgeError::HttpError(status)) => {
+                eprintln!(
+                    "rigor relevance: API status: {} (attempt {})",
+                    status,
+                    attempt + 1
+                );
+                return;
+            }
+            Err(JudgeError::Timeout) => {
                 crate::daemon::ws::emit_log(
                     event_tx,
                     "error",
@@ -3665,35 +3735,16 @@ async fn score_claim_relevance(
                 );
                 return;
             }
-        };
-
-        let status = r.status();
-        eprintln!(
-            "rigor relevance: API status: {} (attempt {})",
-            status,
-            attempt + 1
-        );
-
-        if status.as_u16() == 429 {
-            // Rate limited — will retry if more attempts remain
-            if attempt < delays.len() - 1 {
-                continue;
+            Err(JudgeError::NetworkError(e)) => {
+                crate::daemon::ws::emit_log(
+                    event_tx,
+                    "error",
+                    "relevance",
+                    format!("LLM call failed: {}", e),
+                );
+                return;
             }
-            crate::daemon::ws::emit_log(
-                event_tx,
-                "error",
-                "relevance",
-                "Rate limited after all retry attempts".to_string(),
-            );
-            return;
-        }
-
-        match r.json().await {
-            Ok(j) => {
-                resp_json = j;
-                break;
-            }
-            Err(e) => {
+            Err(JudgeError::ParseError(e)) => {
                 crate::daemon::ws::emit_log(
                     event_tx,
                     "error",

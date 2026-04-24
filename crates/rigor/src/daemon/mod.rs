@@ -176,6 +176,8 @@ pub struct DaemonState {
     pub rigor_ca: Option<Arc<tls::RigorCA>>,
     /// Shared HTTP client for upstream requests — reuses connection pools across requests.
     pub http_client: reqwest::Client,
+    /// Abstracted judge client for LLM-as-judge calls (scope check, violation persist, relevance).
+    pub judge_client: Arc<dyn proxy::JudgeClient>,
     /// Judge config: (api_url, api_key, model) — from ~/.rigor/config or env vars
     pub judge_api_url: String,
     pub judge_api_key: Option<String>,
@@ -284,6 +286,7 @@ impl DaemonState {
             policy_engine,
             tls_config,
             rigor_ca,
+            judge_client: Arc::new(proxy::ReqwestJudgeClient::new(http_client.clone())),
             http_client,
             disabled_constraints: std::collections::HashSet::new(),
             proxy_paused: false,
@@ -349,6 +352,7 @@ impl DaemonState {
             policy_engine: None,
             tls_config,
             rigor_ca,
+            judge_client: Arc::new(proxy::ReqwestJudgeClient::new(http_client.clone())),
             http_client,
             disabled_constraints: std::collections::HashSet::new(),
             proxy_paused: false,
