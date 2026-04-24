@@ -3,27 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-04-24T02:59:20Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-04-24T06:32:32Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 7
-  total_plans: 16
-  completed_plans: 16
-  percent: 33
+  completed_phases: 8
+  total_plans: 18
+  completed_plans: 18
+  percent: 38
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 12
-Plan: 01 complete, 02 pending
-**Status:** In progress
-**Last Completed Phase:** 11 — e2e-coverage-gaps
+Phase: 12 complete
+Plan: 02 complete (2/2)
+**Status:** Phase 12 complete
+**Last Completed Phase:** 12 — mock-llm-server-harness-b1-b2-b3-integration-tests
 **Last Activity:** 2026-04-24
-**Last Activity Description:** Completed 12-01: MockLlmServer enhanced with request tracking (received_requests()) and per-call-index response selection (response_sequence())
+**Last Activity Description:** Completed 12-02: B1/B2/B3 integration tests (7 tests: streaming kill-switch, auto-retry with epistemic correction, PII redact-before-forward)
 
 ## Milestone Overview
 
@@ -81,10 +81,13 @@ Plan: 01 complete, 02 pending
 - Body-only request tracking in ReceivedRequest (no headers) -- sufficient for B3 PII inspection
 - response_sequence wraps single-chunks fallback into vec![chunks] for unified handler code path
 - JSON parse failure in MockLlmServer stores Value::Null rather than panicking
+- B2 retry_at_most_once uses pre-injected [RIGOR EPISTEMIC CORRECTION] marker to test already_retried guard directly
+- B3 tests use stream:true (realistic SSE path) since PII-IN runs on request path regardless of streaming mode
+- Per-file ENV_LOCK mutex for RIGOR_NO_RETRY rather than cross-file shared mutex
 
 ## Session Continuity
 
-**Stopped At:** Completed 12-01-PLAN.md
+**Stopped At:** Completed 12-02-PLAN.md
 **Resume File:** None
 
-**Planned Phase:** 12 (mock-llm-server-harness-b1-b2-b3-integration-tests) -- plan 1/2 complete -- 2026-04-24
+**Planned Phase:** 12 complete (mock-llm-server-harness-b1-b2-b3-integration-tests) -- 2/2 plans -- 2026-04-24
