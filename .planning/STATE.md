@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-04-24T07:19:47.037Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-04-24T07:24:11.080Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 21
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 21
-  completed_plans: 20
-  percent: 95
+  completed_plans: 21
+  percent: 100
 ---
 
 # Project State
@@ -89,10 +89,11 @@ Plan: Not started
 - Report skipped count derived from total minus pass minus fail (forward-compatible)
 - cargo-deny 0.19.x format used; 11 known advisories temporarily ignored with tracking reasons
 - License allow-list extended to 13 entries based on actual dep tree (MIT-0, Unicode-3.0, MPL-2.0, CDLA-Permissive-2.0 added)
+- Keyless OIDC signing (no private keys) via GitHub Actions id-token: write permission
 
 ## Session Continuity
 
-**Stopped At:** Completed 17-01-PLAN.md
+**Stopped At:** Completed 17-02-PLAN.md
 **Resume File:** None
 
 **Planned Phase:** 14 complete (rigor-test-e2e-harness-flesh-out) -- 1/1 plans -- 2026-04-24
