@@ -213,3 +213,118 @@ async fn evaluate_text_inline_blocks_pii_in_response() {
         "Response body should not be empty even with PII"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Task 2: Integration tests for proxy_request decision branches.
+// These exercise the proxy_request function through the full TCP stack via
+// TestProxy + MockLlmServer.
+// ---------------------------------------------------------------------------
+
+/// proxy_request returns 200 for a clean streaming response.
+/// MockLlmServer serves a benign Anthropic SSE response. The proxy forwards
+/// the request, evaluates the stream, finds no violations, and returns the
+/// complete SSE stream to the client with 200.
+#[tokio::test]
+async fn proxy_request_allow_clean_stream() {
+    let mock = MockLlmServerBuilder::new()
+        .anthropic_chunks("The sky is blue.")
+        .build()
+        .await;
+
+    let proxy = TestProxy::start_with_mock(MINIMAL_YAML, &mock.url()).await;
+    let body = anthropic_request_body(true, "What color is the sky?");
+    let resp = proxy_post(&proxy.url(), &body).await;
+
+    assert_eq!(
+        resp.status(),
+        200,
+        "Clean streaming request should return 200"
+    );
+
+    let resp_body = resp.text().await.unwrap();
+
+    // Verify the SSE stream is complete and well-formed
+    let events = parse_sse_events(&resp_body);
+    assert!(
+        !events.is_empty(),
+        "Response should contain SSE events"
+    );
+
+    // Verify the text content was passed through
+    let text = extract_text_from_sse(&events, SseFormat::Anthropic);
+    assert!(
+        text.contains("sky") || text.contains("blue"),
+        "SSE text should contain 'sky' or 'blue'. Got: {}",
+        text
+    );
+
+    // Verify the SSE stream contains expected Anthropic event types
+    assert!(
+        resp_body.contains("message_start"),
+        "SSE should contain message_start event"
+    );
+    assert!(
+        resp_body.contains("content_block_delta"),
+        "SSE should contain content_block_delta events"
+    );
+}
+
+/// proxy_request returns 400 on malformed JSON body.
+/// Sending a non-JSON body triggers proxy_request's JSON parse failure
+/// early return with StatusCode::BAD_REQUEST.
+#[tokio::test]
+async fn proxy_request_bad_json_returns_400() {
+    let proxy = TestProxy::start(MINIMAL_YAML).await;
+
+    let resp = reqwest::Client::new()
+        .post(format!("{}/v1/messages", proxy.url()))
+        .header("content-type", "application/json")
+        .header("x-api-key", "sk-ant-api03-test")
+        .body("not json at all")
+        .send()
+        .await
+        .expect("transport should succeed");
+
+    assert_eq!(
+        resp.status(),
+        400,
+        "Malformed JSON should return 400 Bad Request"
+    );
+
+    let resp_body = resp.text().await.unwrap();
+    assert!(
+        resp_body.contains("Invalid JSON"),
+        "Error message should mention 'Invalid JSON'. Got: {}",
+        resp_body
+    );
+}
+
+/// proxy_request handles non-streaming requests.
+/// MockLlmServer only serves SSE, but the proxy handles non-streaming
+/// requests by buffering the upstream response. The proxy returns 200
+/// with the buffered body, and extract_and_evaluate runs in the background.
+#[tokio::test]
+async fn proxy_request_non_streaming_returns_200() {
+    let mock = MockLlmServerBuilder::new()
+        .anthropic_chunks("Non-streaming response text.")
+        .build()
+        .await;
+
+    let proxy = TestProxy::start_with_mock(MINIMAL_YAML, &mock.url()).await;
+    let body = anthropic_request_body(false, "Tell me something.");
+    let resp = proxy_post(&proxy.url(), &body).await;
+
+    // Even though MockLlmServer serves SSE for a non-streaming request,
+    // the proxy buffers the response and returns it with 200.
+    assert_eq!(
+        resp.status(),
+        200,
+        "Non-streaming request should return 200"
+    );
+
+    let resp_body = resp.text().await.unwrap();
+    assert!(
+        !resp_body.is_empty(),
+        "Non-streaming response body should not be empty"
+    );
+}
