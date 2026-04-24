@@ -384,4 +384,83 @@ mod tests {
         assert!(!is_action_intent("Should we refactor this?"));
         assert!(!is_action_intent("What do you want me to change?"));
     }
+
+    // --- Pipeline ordering tests (gap 8) ---
+
+    #[test]
+    fn test_pipeline_ordering_code_block_with_hedged_claim() {
+        // A hedged sentence inside a code block is removed by
+        // strip_code_blocks (step 1) BEFORE is_hedged (step 4) ever sees it.
+        // This proves the pipeline ordering: strip first, filter later.
+        let text = "This is a real claim.\n```\nMaybe this is hedged inside code.\n```\nAnother real claim.";
+        let claims = extract_claims_from_text(text, 0);
+
+        let texts: Vec<&str> = claims.iter().map(|c| c.text.as_str()).collect();
+        assert_eq!(
+            claims.len(),
+            2,
+            "expected 2 claims (hedged sentence inside code block stripped), got {}: {:?}",
+            claims.len(),
+            texts
+        );
+        assert!(
+            claims[0].text.contains("This is a real claim"),
+            "first claim mismatch: {}",
+            claims[0].text
+        );
+        assert!(
+            claims[1].text.contains("Another real claim"),
+            "second claim mismatch: {}",
+            claims[1].text
+        );
+    }
+
+    #[test]
+    fn test_pipeline_ordering_assertion_then_hedge_filter() {
+        // "Perhaps Rust is also safe." passes is_assertion (not a question,
+        // not hypothetical, not code) but is caught by is_hedged (contains
+        // "Perhaps"). Only the two non-hedged sentences survive.
+        let text = "Rust is fast. Perhaps Rust is also safe. Go is compiled.";
+        let claims = extract_claims_from_text(text, 0);
+
+        let texts: Vec<&str> = claims.iter().map(|c| c.text.as_str()).collect();
+        assert_eq!(
+            claims.len(),
+            2,
+            "expected 2 claims (hedged sentence filtered), got {}: {:?}",
+            claims.len(),
+            texts
+        );
+        // Verify the hedged sentence is absent
+        for c in &claims {
+            assert!(
+                !c.text.contains("Perhaps"),
+                "hedged sentence should be filtered: {}",
+                c.text
+            );
+        }
+    }
+
+    #[test]
+    fn test_pipeline_action_intent_filtered_by_assertion() {
+        // "Let me edit the file to add the test." is filtered by
+        // is_assertion (the "let me" conversational prefix). Only the
+        // factual claim survives.
+        let text = "Let me edit the file to add the test. The file contains important logic.";
+        let claims = extract_claims_from_text(text, 0);
+
+        let texts: Vec<&str> = claims.iter().map(|c| c.text.as_str()).collect();
+        assert_eq!(
+            claims.len(),
+            1,
+            "expected 1 claim (action intent filtered by is_assertion), got {}: {:?}",
+            claims.len(),
+            texts
+        );
+        assert!(
+            claims[0].text.contains("important logic"),
+            "surviving claim should be the factual one, got: {}",
+            claims[0].text
+        );
+    }
 }
