@@ -122,7 +122,7 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-020
 **Workstream:** coverage
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 - [x] 10-01-PLAN.md — Daemon module tests: MITM allowlist, PID lifecycle, TLS CA, SNI edge cases (wave 1)
 - [x] 10-02-PLAN.md — Evaluator fail-open, DF-QuAD boundaries, SeverityThresholds, claim pipeline ordering (wave 1)
 - [x] 10-03-PLAN.md — Content store TTL/concurrency, action gate timeout/lifecycle (wave 1)
