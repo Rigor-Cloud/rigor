@@ -526,4 +526,125 @@ mod tests {
         let hits = store.search("   ", None).await.unwrap();
         assert!(hits.is_empty());
     }
+
+    // ── Gap 9: Verdict TTL eviction ─────────────────────────────────────
+
+    #[tokio::test]
+    async fn verdict_ttl_evicts_after_deadline() {
+        // Short verdict TTL, long compression TTL — mirrors compression_ttl_evicts_after_deadline.
+        let store = InMemoryBackend::with_ttls(
+            std::time::Duration::from_secs(60),
+            std::time::Duration::from_millis(50),
+        );
+        let hash = store
+            .store(b"verdict-short-lived".to_vec(), Category::Verdict, None, None)
+            .await
+            .unwrap();
+        assert!(
+            store.retrieve(&hash).await.unwrap().is_some(),
+            "verdict should be retrievable immediately after store"
+        );
+
+        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+        // moka evicts lazily on access; retrieve returns None once TTL has elapsed.
+        assert!(
+            store.retrieve(&hash).await.unwrap().is_none(),
+            "verdict should be evicted after TTL deadline"
+        );
+    }
+
+    #[tokio::test]
+    async fn annotation_does_not_evict() {
+        // Short TTLs on both caches; annotation uses DashMap (permanent), so
+        // it should survive past the TTL window.
+        let store = InMemoryBackend::with_ttls(
+            std::time::Duration::from_millis(50),
+            std::time::Duration::from_millis(50),
+        );
+        let hash = store
+            .store(b"permanent-annotation".to_vec(), Category::Annotation, None, None)
+            .await
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+        assert!(
+            store.retrieve(&hash).await.unwrap().is_some(),
+            "annotation (DashMap-backed) should never be evicted by TTL"
+        );
+    }
+
+    // ── Gap 9: Concurrency tests ────────────────────────────────────────
+
+    #[tokio::test]
+    async fn concurrent_stores_no_corruption() {
+        let store = Arc::new(InMemoryBackend::new());
+        let barrier = Arc::new(tokio::sync::Barrier::new(10));
+        let mut handles = Vec::new();
+
+        for i in 0..10 {
+            let s = Arc::clone(&store);
+            let b = Arc::clone(&barrier);
+            handles.push(tokio::spawn(async move {
+                b.wait().await;
+                let payload = format!("payload-{}", i).into_bytes();
+                s.store(payload, Category::Audit, None, None).await.unwrap()
+            }));
+        }
+
+        let mut hashes = Vec::new();
+        for h in handles {
+            hashes.push(h.await.unwrap());
+        }
+
+        // All 10 entries should exist.
+        let listed = store.list_by_category(Category::Audit).await.unwrap();
+        assert_eq!(listed.len(), 10, "expected 10 audit entries from concurrent stores");
+
+        // Each hash should retrieve its original payload.
+        for (i, hash) in hashes.iter().enumerate() {
+            let entry = store.retrieve(hash).await.unwrap().unwrap();
+            assert_eq!(
+                entry.bytes,
+                format!("payload-{}", i).into_bytes(),
+                "payload mismatch for concurrent store #{i}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrent_retrieve_during_ttl_window() {
+        // Short compression TTL; verdict is long so it does not interfere.
+        let store = Arc::new(InMemoryBackend::with_ttls(
+            std::time::Duration::from_millis(100),
+            std::time::Duration::from_secs(60),
+        ));
+        let hash = store
+            .store(b"ttl-race-entry".to_vec(), Category::Compression, None, None)
+            .await
+            .unwrap();
+
+        // Spawn 5 reader tasks that all retrieve before TTL expires.
+        let mut handles = Vec::new();
+        for _ in 0..5 {
+            let s = Arc::clone(&store);
+            let h = hash;
+            handles.push(tokio::spawn(async move {
+                s.retrieve(&h).await.unwrap()
+            }));
+        }
+
+        for handle in handles {
+            let result = handle.await.unwrap();
+            assert!(
+                result.is_some(),
+                "concurrent readers should all see the entry before TTL expires"
+            );
+        }
+
+        // Wait past TTL.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert!(
+            store.retrieve(&hash).await.unwrap().is_none(),
+            "entry should be evicted after TTL, even after concurrent reads"
+        );
+    }
 }
