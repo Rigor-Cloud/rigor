@@ -3993,6 +3993,10 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    /// Serializes tests that depend on the global RELEVANCE_SEMAPHORE / RELEVANCE_CACHE.
+    /// Without this, parallel test execution races on the shared atomic state.
+    static RELEVANCE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     // ---- apply_provider_auth -----------------------------------------------
 
     fn auth_header(req: reqwest::RequestBuilder, name: &str) -> Option<String> {
@@ -4522,6 +4526,7 @@ mod tests {
 
     #[tokio::test]
     async fn score_claim_relevance_no_api_key() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
         clear_relevance_cache();
         reset_relevance_semaphore();
 
@@ -4550,6 +4555,7 @@ mod tests {
 
     #[tokio::test]
     async fn score_claim_relevance_caching() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
         clear_relevance_cache();
         reset_relevance_semaphore();
 
@@ -4585,6 +4591,7 @@ mod tests {
 
     #[tokio::test]
     async fn score_claim_relevance_single_flight() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
         clear_relevance_cache();
         reset_relevance_semaphore();
 
@@ -4634,6 +4641,7 @@ mod tests {
 
     #[tokio::test]
     async fn score_claim_relevance_concurrent_single_flight() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
         clear_relevance_cache();
         reset_relevance_semaphore();
 
