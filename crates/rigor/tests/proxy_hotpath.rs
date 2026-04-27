@@ -6,8 +6,11 @@
 //! These functions are private in proxy.rs, so we exercise them through the public
 //! HTTP interface via TestProxy + MockLlmServer from rigor-harness.
 
+use rigor::daemon::ws::DaemonEvent;
 use rigor_harness::{extract_text_from_sse, parse_sse_events, MockLlmServerBuilder, SseFormat,
     TestProxy};
+use std::time::Duration;
+use tokio::sync::broadcast::error::TryRecvError;
 
 /// Minimal valid rigor.yaml (empty constraints -- no violations expected).
 const MINIMAL_YAML: &str =
@@ -174,14 +177,17 @@ async fn evaluate_text_inline_benign_text_returns_allow() {
     );
 }
 
-/// evaluate_text_inline with PII returns "block":
-/// When the streaming response contains PII (SSN pattern 123-45-6789),
-/// the proxy's PII-OUT detection in extract_and_evaluate_text detects it.
-/// For streaming, the SSE chunks are forwarded as they arrive and PII is
-/// checked at sentence boundaries. If PII is found mid-stream, the proxy
-/// may inject an error SSE event into the stream or kill the upstream.
-/// We verify the proxy handles PII-containing responses without crashing
-/// and that the response indicates the PII was processed.
+/// PII-OUT detection emits PiiDetected + Violation events on the broadcast channel.
+///
+/// Reads `proxy.rs::extract_and_evaluate_text` (lines 3287-3318): when PII is
+/// found in `assistant_text`, the proxy emits one `DaemonEvent::PiiDetected`
+/// per match (direction="out") plus a `DaemonEvent::Violation` with
+/// constraint_id="pii-leak", followed by `DaemonEvent::Decision{decision:"block"}`.
+///
+/// The streaming HTTP response is NOT modified for PII alone — chunks are
+/// forwarded to the client BEFORE post-stream evaluation runs (line 1834).
+/// So the only observable contract is the broadcast event stream, which the
+/// dashboard / WebSocket subscribers consume. This test asserts that contract.
 #[tokio::test]
 async fn evaluate_text_inline_blocks_pii_in_response() {
     let mock = MockLlmServerBuilder::new()
@@ -192,26 +198,76 @@ async fn evaluate_text_inline_blocks_pii_in_response() {
         .await;
 
     let proxy = TestProxy::start_with_mock(MINIMAL_YAML, &mock.url()).await;
+    // Subscribe BEFORE making the request so we don't miss any events.
+    let mut events = proxy.subscribe();
+
     let body = anthropic_request_body(true, "Give me a test SSN");
     let resp = proxy_post(&proxy.url(), &body).await;
+    // Drain the SSE stream so the proxy reaches its post-stream evaluation.
+    let _resp_body = resp.text().await.unwrap();
 
-    // The proxy should return 200 (SSE stream already started) but may contain
-    // a block event injected by the PII detector, or it may pass through if
-    // PII is detected post-stream in the background task.
-    assert!(
-        resp.status() == 200,
-        "PII response should be 200 (stream already started). Got: {}",
-        resp.status()
-    );
+    // The post-stream evaluation runs in a spawned task — wait up to 5s for
+    // the PiiDetected event. Discard non-PII events along the way.
+    let mut pii_event: Option<(String, String, String)> = None;
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while std::time::Instant::now() < deadline {
+        match tokio::time::timeout(Duration::from_millis(200), events.recv()).await {
+            Ok(Ok(DaemonEvent::PiiDetected { direction, pii_type, action, .. })) => {
+                pii_event = Some((direction, pii_type, action));
+                break;
+            }
+            Ok(Ok(_)) => continue,
+            Ok(Err(_)) => break,
+            Err(_) => continue,
+        }
+    }
 
-    let resp_body = resp.text().await.unwrap();
-    // The response body should contain SSE events (stream was started before
-    // PII detection could intervene). The key test is that the proxy does not
-    // crash and produces a valid SSE stream.
+    let (direction, pii_type, action) =
+        pii_event.expect("proxy must emit DaemonEvent::PiiDetected for SSN in response");
+    assert_eq!(direction, "out", "PII detected on the response side");
     assert!(
-        !resp_body.is_empty(),
-        "Response body should not be empty even with PII"
+        pii_type.to_lowercase().contains("ssn") || pii_type.to_lowercase().contains("social"),
+        "pii_type should identify SSN. Got: {}",
+        pii_type
     );
+    assert_eq!(action, "block", "PII-OUT action must be 'block'");
+}
+
+/// Negative control for PII-OUT: clean response must NOT emit PiiDetected.
+///
+/// If proxy.rs starts firing PII events on benign text (false positives), this
+/// test catches it. Pairs with `evaluate_text_inline_blocks_pii_in_response`
+/// to ensure PII detection is both correct AND specific.
+#[tokio::test]
+async fn evaluate_text_inline_no_pii_event_on_clean_response() {
+    let mock = MockLlmServerBuilder::new()
+        .anthropic_chunks("The capital of France is Paris. The Eiffel Tower is in Paris.")
+        .build()
+        .await;
+
+    let proxy = TestProxy::start_with_mock(MINIMAL_YAML, &mock.url()).await;
+    let mut events = proxy.subscribe();
+
+    let body = anthropic_request_body(true, "Tell me about France");
+    let resp = proxy_post(&proxy.url(), &body).await;
+    let _ = resp.text().await.unwrap();
+
+    // Wait long enough for the post-stream evaluation to run, then drain all
+    // events and verify NONE were PiiDetected.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    loop {
+        match events.try_recv() {
+            Ok(DaemonEvent::PiiDetected { direction, pii_type, matched, .. }) => {
+                panic!(
+                    "Clean response must not trigger PiiDetected. Got direction={} pii_type={} matched={}",
+                    direction, pii_type, matched
+                );
+            }
+            Ok(_) => continue,
+            Err(TryRecvError::Empty) | Err(TryRecvError::Lagged(_)) => break,
+            Err(TryRecvError::Closed) => break,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -328,3 +384,4 @@ async fn proxy_request_non_streaming_returns_200() {
         "Non-streaming response body should not be empty"
     );
 }
+

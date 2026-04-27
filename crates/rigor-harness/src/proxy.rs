@@ -1,12 +1,10 @@
+use crate::env_lock::ENV_LOCK;
 use crate::home::IsolatedHome;
+use rigor::daemon::ws::{DaemonEvent, EventSender};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use tokio::sync::oneshot;
+use tokio::sync::{broadcast, oneshot};
 use tower::Service;
-
-// Serializes env var mutations in spawn_blocking across parallel tests.
-// Without this, concurrent start/start_with_mock calls race on RIGOR_HOME/RIGOR_TARGET_API.
-static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// A test proxy wrapping the production `build_router` + `DaemonState` on an ephemeral port.
 ///
@@ -16,6 +14,10 @@ static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub struct TestProxy {
     addr: SocketAddr,
     pub home: IsolatedHome,
+    /// Broadcast sender for daemon events. Tests can call `subscribe()` to
+    /// observe `DaemonEvent::PiiDetected`, `DaemonEvent::Violation`,
+    /// `DaemonEvent::Decision`, etc. emitted by the proxy hot path.
+    event_tx: EventSender,
     shutdown_tx: Option<oneshot::Sender<()>>,
     _handle: tokio::task::JoinHandle<()>,
 }
@@ -42,7 +44,7 @@ impl TestProxy {
             let event_tx = event_tx.clone();
             let rigor_home_str = rigor_home_str.clone();
             tokio::task::spawn_blocking(move || {
-                let _guard = ENV_MUTEX.lock().unwrap();
+                let _guard = ENV_LOCK.lock().unwrap();
                 let original_rigor_home = std::env::var("RIGOR_HOME").ok();
                 unsafe { std::env::set_var("RIGOR_HOME", &rigor_home_str) };
                 let result = rigor::daemon::DaemonState::load(yaml_path, event_tx);
@@ -106,6 +108,7 @@ impl TestProxy {
         Self {
             addr,
             home,
+            event_tx,
             shutdown_tx: Some(shutdown_tx),
             _handle: handle,
         }
@@ -129,7 +132,7 @@ impl TestProxy {
             let rigor_home_str = rigor_home_str.clone();
             let mock_url = mock_url.clone();
             tokio::task::spawn_blocking(move || {
-                let _guard = ENV_MUTEX.lock().unwrap();
+                let _guard = ENV_LOCK.lock().unwrap();
                 let original_rigor_home = std::env::var("RIGOR_HOME").ok();
                 let original_target = std::env::var("RIGOR_TARGET_API").ok();
                 unsafe {
@@ -201,6 +204,7 @@ impl TestProxy {
         Self {
             addr,
             home,
+            event_tx,
             shutdown_tx: Some(shutdown_tx),
             _handle: handle,
         }
@@ -214,6 +218,16 @@ impl TestProxy {
     /// The socket address the proxy is listening on.
     pub fn addr(&self) -> SocketAddr {
         self.addr
+    }
+
+    /// Subscribe to the daemon event broadcast channel.
+    ///
+    /// Tests use this to observe `DaemonEvent::PiiDetected`,
+    /// `DaemonEvent::Violation`, `DaemonEvent::Decision`, and other events
+    /// emitted by the proxy hot path. Subscribe BEFORE making the request to
+    /// avoid missing events.
+    pub fn subscribe(&self) -> broadcast::Receiver<DaemonEvent> {
+        self.event_tx.subscribe()
     }
 }
 
