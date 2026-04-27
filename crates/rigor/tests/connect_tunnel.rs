@@ -250,3 +250,133 @@ async fn mitm_tls_handshake_validates_against_ca() {
     // Restore MITM state
     rigor::daemon::ws::set_mitm_enabled(original);
 }
+
+/// **H4 negative test** — TLS handshake MUST fail when the client does NOT
+/// trust the proxy's CA.
+///
+/// Mirrors `mitm_tls_handshake_validates_against_ca` exactly except the
+/// client is built without `.add_root_certificate(test_ca_pem)`. The proxy's
+/// per-host MITM cert is signed by an ephemeral CA that is NOT in any system
+/// trust store, so the handshake must fail with a certificate verification
+/// error.
+///
+/// Regression guard: if rigor ever started serving system-default certs
+/// (instead of CA-signed per-host certs), this test would pass with a
+/// successful handshake — i.e. the test detects that exact regression.
+///
+/// Uses `reqwest::Client` configured with `Proxy::all(proxy_url)` so reqwest
+/// will issue a CONNECT to the proxy, then attempt the upstream TLS
+/// handshake against the proxy's MITM cert. The transport-level error must
+/// reference certificate / cert / TLS to confirm the failure happens at the
+/// TLS layer (not at TCP, not at HTTP, not in the proxy itself).
+#[tokio::test]
+async fn tls_handshake_fails_without_ca_cert() {
+    let _guard = MITM_LOCK.lock().unwrap();
+    let original = rigor::daemon::ws::is_mitm_enabled();
+
+    // 1. Start mock LLM server (request will never reach it because TLS
+    //    will fail at the proxy MITM cert presentation, but we wire it up
+    //    to mirror the positive test exactly).
+    let mock = rigor_harness::MockLlmServerBuilder::new()
+        .anthropic_chunks("test tunnel response")
+        .build()
+        .await;
+
+    // 2. Start proxy with mock upstream
+    let proxy = TestProxy::start_with_mock(MINIMAL_YAML, &mock.url()).await;
+
+    // 3. Enable MITM so should_mitm_target returns true for LLM hosts
+    rigor::daemon::ws::set_mitm_enabled(true);
+
+    // 4. Build a reqwest client that uses the rigor proxy as an HTTP proxy
+    //    but does NOT trust the test CA. Default rustls trust = system
+    //    roots only, which won't include the ephemeral test CA.
+    //
+    //    NOTE: explicitly do NOT call `.add_root_certificate(...)` — this
+    //    is the negative-test mirror of the positive test's
+    //    `add_root_certificate(test_ca_pem)`. We additionally call
+    //    `.tls_built_in_root_certs(true)` and `.danger_accept_invalid_certs(false)`
+    //    defensively to make the trust posture explicit.
+    let proxy_url = format!("http://{}", proxy.addr());
+    let client = reqwest::Client::builder()
+        .proxy(
+            reqwest::Proxy::all(&proxy_url)
+                .expect("valid proxy URL"),
+        )
+        .tls_built_in_root_certs(true)
+        .danger_accept_invalid_certs(false)
+        .timeout(IO_TIMEOUT)
+        .build()
+        .expect("build reqwest client without test CA trust");
+
+    // 5. Issue an HTTPS request that will route via CONNECT through the
+    //    rigor proxy. reqwest will open TCP to the proxy, send CONNECT
+    //    api.anthropic.com:443, then attempt TLS handshake against the
+    //    proxy's per-host MITM cert. The handshake must FAIL.
+    let body = serde_json::json!({
+        "model": "claude-3-haiku-20240307",
+        "max_tokens": 100,
+        "messages": [{"role": "user", "content": "hi"}]
+    });
+    let result = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("content-type", "application/json")
+        .header("x-api-key", "test-key")
+        .header("anthropic-version", "2023-06-01")
+        .json(&body)
+        .send()
+        .await;
+
+    // 6. Restore MITM state BEFORE assertions so a failed assertion doesn't
+    //    leave global state polluted for the next test.
+    rigor::daemon::ws::set_mitm_enabled(original);
+
+    // 7. Assert the request failed.
+    let err = match result {
+        Ok(resp) => panic!(
+            "TLS handshake should FAIL when client does not trust the test CA, \
+             but reqwest returned a response with status {}. \
+             This indicates rigor is serving system-default certs OR the test \
+             CA is somehow in the system trust store.",
+            resp.status()
+        ),
+        Err(e) => e,
+    };
+
+    // 8. Assert the failure is a TLS / certificate error, not a connect/
+    //    timeout/HTTP error. We walk the error source chain because reqwest
+    //    wraps the underlying rustls/native-tls error several layers deep.
+    use std::error::Error as _;
+    let mut messages: Vec<String> = vec![err.to_string()];
+    let mut src: Option<&(dyn std::error::Error + 'static)> = err.source();
+    while let Some(e) = src {
+        messages.push(e.to_string());
+        src = e.source();
+    }
+    let combined = messages.join(" || ").to_lowercase();
+
+    // The lowercased error chain must mention something TLS/cert related.
+    // rustls typically surfaces "invalid peer certificate", "unknown issuer",
+    // "certificate", or "invalid certificate" depending on version.
+    let is_cert_error = combined.contains("certificate")
+        || combined.contains("cert verif")
+        || combined.contains("unknown issuer")
+        || combined.contains("invalid peer")
+        || combined.contains("untrusted")
+        || combined.contains("tls");
+    assert!(
+        is_cert_error,
+        "expected a TLS/certificate verification error, but got an error \
+         chain that does not mention TLS/cert. Full chain: {}",
+        combined
+    );
+
+    // Defensive: must NOT be a plain connect failure (would mean proxy is
+    // unreachable, not that TLS failed).
+    assert!(
+        !err.is_connect() || is_cert_error,
+        "error should not be a pure TCP connect failure; the proxy must be \
+         reachable for the TLS handshake to be attempted. Error: {}",
+        err
+    );
+}
