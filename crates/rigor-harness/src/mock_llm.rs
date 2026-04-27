@@ -297,7 +297,7 @@ impl MockLlmServerBuilder {
                             let delay = *delay;
                             let owned_chunks: Vec<String> = chunks.clone();
                             let s =
-                                stream::iter(owned_chunks.into_iter()).then(move |d| async move {
+                                stream::iter(owned_chunks).then(move |d| async move {
                                     tokio::time::sleep(delay).await;
                                     Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!(
                                         "data: {}\n\n",
