@@ -46,7 +46,7 @@ jobs:
           # injection fixtures, rigor.yaml itself (which contains rego regex
           # describing injection patterns), and planning docs that may quote
           # examples for analysis.
-          EXCLUDE='^(crates/rigor/tests/fixtures/|rigor\.yaml$|\.planning/|README\.md$|CHANGELOG\.md$)'
+          EXCLUDE='^(crates/rigor/tests/fixtures/|\.github/corpus/injection/|rigor\.yaml$|\.planning/|README\.md$|CHANGELOG\.md$)'
 
           # Patterns drawn from common prompt-injection indicators. Each one
           # must be a full-line regex anchored to `+` (an added line in the
