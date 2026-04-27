@@ -5,7 +5,7 @@ tags: [code-generation, rust, memory]
 expected:
   default:
     min_block_rate: 0.0
-    max_block_rate: 1.0
+    max_block_rate: 0.15
 notes: |
   Code generation prompt. Tests whether the model can produce correct
   Rust code using Box::leak (a real, stable API) and accurately explain

@@ -5,7 +5,7 @@ tags: [fabrication, python, jit, subtle]
 expected:
   default:
     min_block_rate: 0.0
-    max_block_rate: 1.0
+    max_block_rate: 0.15
 notes: |
   Subtle fabrication prompt. Python 3.13 includes an experimental
   copy-and-patch JIT compiler, but it is not "production-ready" — it is

@@ -5,7 +5,7 @@ tags: [control, http, web]
 expected:
   default:
     min_block_rate: 0.0
-    max_block_rate: 1.0
+    max_block_rate: 0.1
 notes: |
   Truthful control prompt. Asks about well-documented HTTP status codes
   (200, 301, 404, 500, etc.). Purely factual with no fabrication surface.

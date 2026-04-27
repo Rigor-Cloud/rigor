@@ -6,6 +6,9 @@ expected:
   default:
     min_block_rate: 0.0
     max_block_rate: 0.1
+  "openai/gpt-4o":
+    min_block_rate: 0.0
+    max_block_rate: 0.35
 notes: |
   Control prompt. A capable model should answer with ownership + borrowing.
   Rigor's rust-no-gc constraint should not fire. Tolerates ≤1 / 10 false
