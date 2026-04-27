@@ -1,11 +1,37 @@
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 use tokio::sync::oneshot;
-use axum::{Router, routing::post, response::sse::{Event, Sse}, response::IntoResponse, http::header};
-use futures_util::stream;
+use axum::{Router, routing::post, response::sse::{Event, Sse}, response::IntoResponse, http::{header, StatusCode}};
+use axum::body::Body;
+use futures_util::{stream, StreamExt};
 
 use crate::sse::{anthropic_sse_chunks, openai_sse_chunks};
+
+/// Realistic failure modes that simulate misbehaving upstream LLM APIs.
+///
+/// Real-world LLM endpoints return errors, drop connections, send partial
+/// or malformed data, and exhibit backpressure. The mock supports these
+/// modes so harness tests can exercise the proxy's resilience paths.
+#[derive(Debug, Clone)]
+enum FailureMode {
+    /// No failure — serve the configured SSE chunks normally.
+    None,
+    /// Return the given HTTP status with a realistic JSON error body
+    /// instead of a streaming response.
+    ErrorResponse(u16),
+    /// Send the first N SSE chunks, then drop the connection by yielding
+    /// an error from the response body stream. Hyper aborts the response,
+    /// which from the client side looks like a truncated/reset transfer.
+    ConnectionResetAfter(usize),
+    /// Replace the SSE chunk at the given index with arbitrary garbage
+    /// bytes (used to inject invalid JSON, missing `data:` prefix, broken
+    /// UTF-8, etc.). All other chunks are emitted normally.
+    MalformedChunkAt { index: usize, garbage: String },
+    /// Insert a delay before each chunk to simulate backpressure.
+    SlowResponse(Duration),
+}
 
 /// A request received by the MockLlmServer, capturing the parsed JSON body.
 #[derive(Debug, Clone)]
@@ -22,6 +48,8 @@ pub struct MockLlmServerBuilder {
     /// Used by non-streaming-path tests where the proxy buffers the response
     /// and runs `serde_json::from_slice` on it.
     json_body: Option<String>,
+    /// Optional failure mode applied to the streaming response path.
+    failure_mode: FailureMode,
 }
 
 /// A mock LLM server that serves deterministic SSE responses on an ephemeral port.
@@ -41,6 +69,7 @@ impl MockLlmServerBuilder {
             response_sequence: None,
             route_path: "/v1/messages".to_string(),
             json_body: None,
+            failure_mode: FailureMode::None,
         }
     }
 
@@ -79,6 +108,40 @@ impl MockLlmServerBuilder {
         self
     }
 
+    /// Return the given HTTP status code with a realistic JSON error body
+    /// instead of a streaming response. Useful for simulating 429 (rate
+    /// limit), 500 (server error), 503 (overloaded), etc.
+    pub fn error_response(mut self, status: u16) -> Self {
+        self.failure_mode = FailureMode::ErrorResponse(status);
+        self
+    }
+
+    /// Drop the connection after the first `n_chunks` SSE chunks have been
+    /// sent. The body stream yields an error after N chunks, causing hyper
+    /// to abort the response — clients see a truncated transfer.
+    pub fn connection_reset_after(mut self, n_chunks: usize) -> Self {
+        self.failure_mode = FailureMode::ConnectionResetAfter(n_chunks);
+        self
+    }
+
+    /// Replace the chunk at `index` with the given garbage string. All other
+    /// chunks are emitted normally. Use to inject invalid JSON, missing
+    /// `data:` prefix, or broken UTF-8 boundaries.
+    pub fn malformed_chunk_at(mut self, index: usize, garbage: &str) -> Self {
+        self.failure_mode = FailureMode::MalformedChunkAt {
+            index,
+            garbage: garbage.to_string(),
+        };
+        self
+    }
+
+    /// Insert a per-chunk `delay` before each SSE chunk to simulate
+    /// backpressure or a slow upstream.
+    pub fn slow_response(mut self, delay: Duration) -> Self {
+        self.failure_mode = FailureMode::SlowResponse(delay);
+        self
+    }
+
     /// Serve a non-streaming Anthropic-format JSON response with the given
     /// assistant text. The proxy's non-streaming path runs
     /// `serde_json::from_slice` on the buffered body, so the body MUST parse
@@ -111,6 +174,7 @@ impl MockLlmServerBuilder {
         );
 
         let call_count = Arc::new(AtomicUsize::new(0));
+        let failure_mode = Arc::new(self.failure_mode);
 
         let app = if let Some(json_str) = self.json_body {
             // Non-streaming JSON mode: serve raw JSON body with content-type:
@@ -134,10 +198,12 @@ impl MockLlmServerBuilder {
             Router::new().route(&route_path, post(json_handler))
         } else {
             let received_clone = received.clone();
+            let failure_mode = failure_mode.clone();
             let handler = move |body: axum::body::Bytes| {
                 let received = received_clone.clone();
                 let responses = all_responses.clone();
                 let counter = call_count.clone();
+                let failure_mode = failure_mode.clone();
                 async move {
                     // Track received request body
                     let json_body = serde_json::from_slice::<serde_json::Value>(&body)
@@ -152,11 +218,96 @@ impl MockLlmServerBuilder {
                         responses.last().unwrap()
                     };
 
-                    let events: Vec<Result<Event, std::convert::Infallible>> = chunks
-                        .iter()
-                        .map(|data| Ok(Event::default().data(data)))
-                        .collect();
-                    Sse::new(stream::iter(events))
+                    match &*failure_mode {
+                        FailureMode::None => {
+                            let events: Vec<Result<Event, std::convert::Infallible>> = chunks
+                                .iter()
+                                .map(|data| Ok(Event::default().data(data)))
+                                .collect();
+                            Sse::new(stream::iter(events)).into_response()
+                        }
+                        FailureMode::ErrorResponse(status) => {
+                            let body = serde_json::json!({
+                                "error": {
+                                    "type": "mock_error",
+                                    "message": format!("mock LLM returned status {}", status),
+                                }
+                            }).to_string();
+                            let code = StatusCode::from_u16(*status)
+                                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+                            (
+                                code,
+                                [(header::CONTENT_TYPE, "application/json")],
+                                body,
+                            ).into_response()
+                        }
+                        FailureMode::ConnectionResetAfter(n) => {
+                            // Send first n chunks as raw SSE bytes, then yield an
+                            // I/O error so hyper aborts the response body.
+                            let n = *n;
+                            let bytes_chunks: Vec<bytes::Bytes> = chunks
+                                .iter()
+                                .take(n)
+                                .map(|d| bytes::Bytes::from(format!("data: {}\n\n", d)))
+                                .collect();
+                            let ok_stream = stream::iter(
+                                bytes_chunks.into_iter().map(Ok::<_, std::io::Error>),
+                            );
+                            let err_stream = stream::once(async {
+                                Err::<bytes::Bytes, std::io::Error>(std::io::Error::new(
+                                    std::io::ErrorKind::ConnectionReset,
+                                    "mock connection reset",
+                                ))
+                            });
+                            let body = Body::from_stream(ok_stream.chain(err_stream));
+                            (
+                                [(header::CONTENT_TYPE, "text/event-stream")],
+                                body,
+                            ).into_response()
+                        }
+                        FailureMode::MalformedChunkAt { index, garbage } => {
+                            // Replace the chunk at `index` with raw garbage bytes
+                            // (not wrapped in `data:` framing). Other chunks are
+                            // emitted as normal SSE data lines.
+                            let index = *index;
+                            let garbage = garbage.clone();
+                            let bytes_chunks: Vec<bytes::Bytes> = chunks
+                                .iter()
+                                .enumerate()
+                                .map(|(i, d)| {
+                                    if i == index {
+                                        bytes::Bytes::from(garbage.clone())
+                                    } else {
+                                        bytes::Bytes::from(format!("data: {}\n\n", d))
+                                    }
+                                })
+                                .collect();
+                            let s = stream::iter(
+                                bytes_chunks.into_iter().map(Ok::<_, std::io::Error>),
+                            );
+                            let body = Body::from_stream(s);
+                            (
+                                [(header::CONTENT_TYPE, "text/event-stream")],
+                                body,
+                            ).into_response()
+                        }
+                        FailureMode::SlowResponse(delay) => {
+                            // Sleep `delay` before each chunk to simulate backpressure.
+                            let delay = *delay;
+                            let owned_chunks: Vec<String> = chunks.clone();
+                            let s = stream::iter(owned_chunks.into_iter()).then(move |d| async move {
+                                tokio::time::sleep(delay).await;
+                                Ok::<bytes::Bytes, std::io::Error>(
+                                    bytes::Bytes::from(format!("data: {}\n\n", d)),
+                                )
+                            });
+                            let body = Body::from_stream(s);
+                            (
+                                [(header::CONTENT_TYPE, "text/event-stream")],
+                                body,
+                            ).into_response()
+                        }
+                    }
                 }
             };
             Router::new().route(&route_path, post(handler))
@@ -436,5 +587,150 @@ mod tests {
 
         assert_eq!(text_1, "the-only-response", "first call should get the response");
         assert_eq!(text_2, "the-only-response", "second call should also get the response");
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_error_response_429() {
+        let server = MockLlmServerBuilder::new()
+            .anthropic_chunks("ignored — should never be sent")
+            .error_response(429)
+            .build()
+            .await;
+
+        let resp = reqwest::Client::new()
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .expect("send request");
+
+        assert_eq!(resp.status(), 429, "should return 429");
+        let body = resp.text().await.unwrap();
+        assert!(body.contains("\"error\""), "body should be a JSON error: {}", body);
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_error_response_500() {
+        let server = MockLlmServerBuilder::new()
+            .error_response(500)
+            .build()
+            .await;
+
+        let resp = reqwest::Client::new()
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), 500, "should return 500");
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_connection_reset_after() {
+        // Anthropic format produces several chunks; reset after 2 means the
+        // client must NOT observe the full sequence — either the response
+        // body is truncated or the request itself surfaces a transport error.
+        let full_chunks = crate::sse::anthropic_sse_chunks("hello world from mock");
+        let full_count = full_chunks.len();
+        assert!(full_count > 2, "test precondition: full sequence has >2 chunks (got {})", full_count);
+
+        let server = MockLlmServerBuilder::new()
+            .anthropic_chunks("hello world from mock")
+            .connection_reset_after(2)
+            .build()
+            .await;
+
+        let send_result = reqwest::Client::new()
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await;
+
+        match send_result {
+            Ok(resp) => {
+                // If the client got headers, the body must be truncated.
+                match resp.bytes().await {
+                    Ok(body) => {
+                        let text = String::from_utf8_lossy(&body);
+                        let received_count = text.matches("data: ").count();
+                        assert!(
+                            received_count < full_count,
+                            "client must see fewer chunks than the full sequence (got {}, full={}, body={})",
+                            received_count,
+                            full_count,
+                            text,
+                        );
+                    }
+                    Err(_) => {
+                        // Body-level transport error — connection aborted mid-stream.
+                    }
+                }
+            }
+            Err(_) => {
+                // Request-level error (IncompleteMessage etc.) — also acceptable;
+                // the upstream reset propagated as a transport failure before the
+                // client could finish reading.
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_malformed_chunk_at() {
+        let garbage = "this is not valid SSE framing\x00NO_DATA_PREFIX{broken json";
+        let server = MockLlmServerBuilder::new()
+            .anthropic_chunks("hi")
+            .malformed_chunk_at(1, garbage)
+            .build()
+            .await;
+
+        let resp = reqwest::Client::new()
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), 200);
+        let body = resp.bytes().await.unwrap();
+        let text = String::from_utf8_lossy(&body);
+        assert!(
+            text.contains("NO_DATA_PREFIX"),
+            "garbage payload should appear in body: {}",
+            text
+        );
+    }
+
+    #[tokio::test]
+    async fn test_mock_llm_slow_response() {
+        let delay = Duration::from_millis(50);
+        let chunks = crate::sse::anthropic_sse_chunks("slow");
+        let chunk_count = chunks.len();
+
+        let server = MockLlmServerBuilder::new()
+            .anthropic_chunks("slow")
+            .slow_response(delay)
+            .build()
+            .await;
+
+        let start = std::time::Instant::now();
+        let resp = reqwest::Client::new()
+            .post(format!("{}/v1/messages", server.url()))
+            .body("{}")
+            .send()
+            .await
+            .unwrap();
+        let _body = resp.bytes().await.unwrap();
+        let elapsed = start.elapsed();
+
+        let expected_min = delay * (chunk_count as u32);
+        assert!(
+            elapsed >= expected_min,
+            "elapsed {:?} should be >= {:?} for {} chunks at {:?} per-chunk delay",
+            elapsed,
+            expected_min,
+            chunk_count,
+            delay,
+        );
     }
 }
