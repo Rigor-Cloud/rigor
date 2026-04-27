@@ -39,13 +39,6 @@ const CLEAN_TEXT: &str = "The weather today is pleasant and sunny.";
 /// system prompt; client receives clean retry response (not error SSE).
 #[tokio::test]
 async fn b2_retry_injects_epistemic_correction() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    // Ensure RIGOR_NO_RETRY is NOT set (retries must be enabled)
-    let orig = std::env::var("RIGOR_NO_RETRY").ok();
-    if orig.is_some() {
-        unsafe { std::env::remove_var("RIGOR_NO_RETRY") };
-    }
-
     let violation_chunks = rigor_harness::sse::anthropic_sse_chunks(VIOLATION_TEXT);
     let clean_chunks = rigor_harness::sse::anthropic_sse_chunks(CLEAN_TEXT);
     let mock = MockLlmServerBuilder::new()
@@ -53,6 +46,13 @@ async fn b2_retry_injects_epistemic_correction() {
         .build()
         .await;
     let proxy = TestProxy::start_with_mock(BLOCK_CONSTRAINT_YAML, &mock.url()).await;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // Ensure RIGOR_NO_RETRY is NOT set (retries must be enabled)
+    let orig = std::env::var("RIGOR_NO_RETRY").ok();
+    if orig.is_some() {
+        unsafe { std::env::remove_var("RIGOR_NO_RETRY") };
+    }
 
     // Request body WITH a "system" field -- the retry path appends feedback to body["system"]
     let body = serde_json::json!({
@@ -129,18 +129,18 @@ async fn b2_retry_injects_epistemic_correction() {
 /// by looking for the correction marker in body["system"] (proxy.rs line 2010-2014).
 #[tokio::test]
 async fn b2_retry_at_most_once() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    // Ensure RIGOR_NO_RETRY is NOT set -- retry logic is enabled but should NOT fire
-    let orig = std::env::var("RIGOR_NO_RETRY").ok();
-    if orig.is_some() {
-        unsafe { std::env::remove_var("RIGOR_NO_RETRY") };
-    }
-
     let mock = MockLlmServerBuilder::new()
         .anthropic_chunks(VIOLATION_TEXT)
         .build()
         .await;
     let proxy = TestProxy::start_with_mock(BLOCK_CONSTRAINT_YAML, &mock.url()).await;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // Ensure RIGOR_NO_RETRY is NOT set -- retry logic is enabled but should NOT fire
+    let orig = std::env::var("RIGOR_NO_RETRY").ok();
+    if orig.is_some() {
+        unsafe { std::env::remove_var("RIGOR_NO_RETRY") };
+    }
 
     // Request body with [RIGOR EPISTEMIC CORRECTION] already in system prompt.
     // The proxy will detect this as `already_retried` and skip the retry path.

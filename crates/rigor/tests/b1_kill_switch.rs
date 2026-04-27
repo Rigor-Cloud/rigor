@@ -67,15 +67,18 @@ async fn proxy_post(proxy_url: &str, body: &serde_json::Value) -> reqwest::Respo
 /// error SSE event containing "rigor BLOCKED" and "event: error".
 #[tokio::test]
 async fn b1_block_drops_upstream_and_injects_error_sse() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let orig = std::env::var("RIGOR_NO_RETRY").ok();
-    unsafe { std::env::set_var("RIGOR_NO_RETRY", "1") };
-
     let mock = MockLlmServerBuilder::new()
         .anthropic_chunks(VIOLATION_TEXT)
         .build()
         .await;
     let proxy = TestProxy::start_with_mock(BLOCK_CONSTRAINT_YAML, &mock.url()).await;
+
+    // Acquire ENV_LOCK only for the actual request — TestProxy already held it
+    // during construction, so we can't hold it concurrently with start_with_mock.
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let orig = std::env::var("RIGOR_NO_RETRY").ok();
+    unsafe { std::env::set_var("RIGOR_NO_RETRY", "1") };
+
     let body = anthropic_request_body(true, "Tell me something");
     let resp = proxy_post(&proxy.url(), &body).await;
     let resp_body = resp.text().await.unwrap();
@@ -104,15 +107,16 @@ async fn b1_block_drops_upstream_and_injects_error_sse() {
 /// code is 200 and the error is communicated via SSE event.
 #[tokio::test]
 async fn b1_block_returns_200_status() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let orig = std::env::var("RIGOR_NO_RETRY").ok();
-    unsafe { std::env::set_var("RIGOR_NO_RETRY", "1") };
-
     let mock = MockLlmServerBuilder::new()
         .anthropic_chunks(VIOLATION_TEXT)
         .build()
         .await;
     let proxy = TestProxy::start_with_mock(BLOCK_CONSTRAINT_YAML, &mock.url()).await;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let orig = std::env::var("RIGOR_NO_RETRY").ok();
+    unsafe { std::env::set_var("RIGOR_NO_RETRY", "1") };
+
     let body = anthropic_request_body(true, "Tell me something");
     let resp = proxy_post(&proxy.url(), &body).await;
     let status = resp.status();

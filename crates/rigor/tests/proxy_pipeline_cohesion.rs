@@ -101,8 +101,9 @@ fn restore_retry(orig: Option<String>) {
 /// 6. Proxy injects error SSE event with "rigor BLOCKED" marker
 #[tokio::test]
 async fn violating_response_triggers_block_through_full_pipeline() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let orig = disable_retry();
+    // ENV_LOCK acquired AFTER TestProxy::start_with_mock to avoid deadlock
+    // (TestProxy itself acquires ENV_LOCK during construction). disable_retry()
+    // is moved below proxy construction.
 
     let violating_text =
         "The system uses FORBIDDEN_KEYWORD_XYZ for internal processing.";
@@ -113,6 +114,9 @@ async fn violating_response_triggers_block_through_full_pipeline() {
         .await;
 
     let proxy = TestProxy::start_with_mock(COHESION_CONSTRAINT_YAML, &mock.url()).await;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let orig = disable_retry();
 
     let body = anthropic_request_body("Tell me about the system.");
     let sse_body = proxy_post(&proxy.url(), &body).await;
@@ -142,8 +146,9 @@ async fn violating_response_triggers_block_through_full_pipeline() {
 /// Verifies that the proxy allows clean responses through without modification.
 #[tokio::test]
 async fn clean_response_passes_through_full_pipeline() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let orig = disable_retry();
+    // ENV_LOCK acquired AFTER TestProxy::start_with_mock to avoid deadlock
+    // (TestProxy itself acquires ENV_LOCK during construction). disable_retry()
+    // is moved below proxy construction.
 
     let clean_text = "The system uses standard algorithms for processing data efficiently.";
 
@@ -153,6 +158,9 @@ async fn clean_response_passes_through_full_pipeline() {
         .await;
 
     let proxy = TestProxy::start_with_mock(COHESION_CONSTRAINT_YAML, &mock.url()).await;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let orig = disable_retry();
 
     let body = anthropic_request_body("Tell me about the system.");
     let sse_body = proxy_post(&proxy.url(), &body).await;
@@ -184,8 +192,9 @@ async fn clean_response_passes_through_full_pipeline() {
 async fn sequential_block_then_allow_same_proxy() {
     use rigor_harness::sse::anthropic_sse_chunks;
 
-    let _guard = ENV_LOCK.lock().unwrap();
-    let orig = disable_retry();
+    // ENV_LOCK acquired AFTER TestProxy::start_with_mock to avoid deadlock
+    // (TestProxy itself acquires ENV_LOCK during construction). disable_retry()
+    // is moved below proxy construction.
 
     let violating_text =
         "The system relies on FORBIDDEN_KEYWORD_XYZ for all operations.";
@@ -200,6 +209,9 @@ async fn sequential_block_then_allow_same_proxy() {
         .await;
 
     let proxy = TestProxy::start_with_mock(COHESION_CONSTRAINT_YAML, &mock.url()).await;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let orig = disable_retry();
 
     // Request 1: violating response -> BLOCK
     let body1 = anthropic_request_body("First request");
