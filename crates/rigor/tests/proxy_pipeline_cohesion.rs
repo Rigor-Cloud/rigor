@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! Proxy pipeline cohesion test.
 //!
 //! Exercises the complete proxy decision chain as a connected flow:
@@ -105,8 +111,7 @@ async fn violating_response_triggers_block_through_full_pipeline() {
     // (TestProxy itself acquires ENV_LOCK during construction). disable_retry()
     // is moved below proxy construction.
 
-    let violating_text =
-        "The system uses FORBIDDEN_KEYWORD_XYZ for internal processing.";
+    let violating_text = "The system uses FORBIDDEN_KEYWORD_XYZ for internal processing.";
 
     let mock = MockLlmServerBuilder::new()
         .anthropic_chunks(violating_text)
@@ -196,8 +201,7 @@ async fn sequential_block_then_allow_same_proxy() {
     // (TestProxy itself acquires ENV_LOCK during construction). disable_retry()
     // is moved below proxy construction.
 
-    let violating_text =
-        "The system relies on FORBIDDEN_KEYWORD_XYZ for all operations.";
+    let violating_text = "The system relies on FORBIDDEN_KEYWORD_XYZ for all operations.";
     let clean_text = "The system relies on well-tested algorithms for all operations.";
 
     let violating_chunks = anthropic_sse_chunks(violating_text);

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! E2E tests for the stop-hook evaluation path via rigor-harness subprocess helpers.
 //!
 //! Proves that the harness subprocess helpers (run_rigor, run_rigor_with_claims,
@@ -10,8 +16,7 @@ use rigor_harness::{
 };
 
 /// Minimal valid rigor.yaml with no constraints (always allows).
-const MINIMAL_YAML: &str =
-    "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
+const MINIMAL_YAML: &str = "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
 
 /// rigor.yaml with a single belief constraint that detects `VIOLATION_MARKER` in claim text.
 /// Beliefs have base strength 0.8 which exceeds the default block threshold of 0.7,
@@ -124,11 +129,7 @@ fn stop_hook_metadata_includes_version() {
     let input = default_hook_input(&home);
     let (stdout, stderr, exit_code) = run_rigor(&home, &input);
 
-    assert_eq!(
-        exit_code, 0,
-        "rigor should exit 0. stderr: {}",
-        stderr,
-    );
+    assert_eq!(exit_code, 0, "rigor should exit 0. stderr: {}", stderr,);
 
     let response = parse_response(&stdout);
     let version = response
@@ -279,9 +280,7 @@ fn stop_hook_handles_invalid_rego() {
     // Either fail-open allow (no decision) OR an explicit error decision —
     // both are acceptable per the H6 spec. Block is NOT acceptable: a
     // broken constraint must never produce a violation.
-    let decision = response
-        .get("decision")
-        .and_then(|d| d.as_str());
+    let decision = response.get("decision").and_then(|d| d.as_str());
     assert!(
         decision != Some("block"),
         "Invalid Rego must not produce a block decision. Got: {}",

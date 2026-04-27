@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! E2E tests for the PID file crash recovery lifecycle.
 //!
 //! Exercises the scenario where a daemon writes a PID, "crashes" (stale PID

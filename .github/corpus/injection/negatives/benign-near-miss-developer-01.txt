@@ -1,0 +1,4 @@
+# Fixture: benign-near-miss-developer-01.txt | Pattern: none (near-miss pat05) | Expected: CLEAN
+The developer overrode the default config value to increase the buffer
+size. This was necessary because the production workload exceeded the
+original capacity estimate.

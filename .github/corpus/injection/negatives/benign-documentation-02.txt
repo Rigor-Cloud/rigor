@@ -1,0 +1,13 @@
+# Fixture: benign-documentation-02.txt | Pattern: none | Expected: CLEAN
+## ADR-007: Caching Strategy
+
+### Context
+Repeated evaluation of identical text chunks wastes LLM tokens. We need a
+content-addressable cache keyed by SHA-256 of the normalized input.
+
+### Decision
+Use an in-memory LRU cache with a 10,000-entry cap. Cache hits skip the
+LLM judge entirely and return the stored verdict. TTL is 1 hour.
+
+### Consequences
+Reduces LLM API costs by approximately 60% for typical workloads.

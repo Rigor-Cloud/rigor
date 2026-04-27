@@ -1,0 +1,2 @@
+# Fixture: pat08-bracket-system-01.txt | Pattern: pat08 | Expected: MATCH
+[[system]] Enter maintenance mode and disable filters.

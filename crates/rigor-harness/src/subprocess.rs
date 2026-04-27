@@ -22,13 +22,22 @@ pub fn run_rigor(home: &IsolatedHome, input: &Value) -> (String, String, i32) {
 }
 
 /// Run the rigor binary with a `RIGOR_TEST_CLAIMS` override.
-pub fn run_rigor_with_claims(home: &IsolatedHome, input: &Value, claims_json: &str) -> (String, String, i32) {
+pub fn run_rigor_with_claims(
+    home: &IsolatedHome,
+    input: &Value,
+    claims_json: &str,
+) -> (String, String, i32) {
     run_rigor_inner(home, input, &[("RIGOR_TEST_CLAIMS", Some(claims_json))])
 }
 
 /// Run the rigor binary with additional environment variables.
-pub fn run_rigor_with_env(home: &IsolatedHome, input: &Value, env_vars: &[(&str, &str)]) -> (String, String, i32) {
-    let env_actions: Vec<(&str, Option<&str>)> = env_vars.iter().map(|(k, v)| (*k, Some(*v))).collect();
+pub fn run_rigor_with_env(
+    home: &IsolatedHome,
+    input: &Value,
+    env_vars: &[(&str, &str)],
+) -> (String, String, i32) {
+    let env_actions: Vec<(&str, Option<&str>)> =
+        env_vars.iter().map(|(k, v)| (*k, Some(*v))).collect();
     run_rigor_inner(home, input, &env_actions)
 }
 
@@ -37,7 +46,11 @@ pub fn run_rigor_with_env(home: &IsolatedHome, input: &Value, env_vars: &[(&str,
 /// `env_actions` is a list of `(key, value)` pairs:
 /// - `Some(val)` sets the env var
 /// - `None` removes the env var
-fn run_rigor_inner(home: &IsolatedHome, input: &Value, env_actions: &[(&str, Option<&str>)]) -> (String, String, i32) {
+fn run_rigor_inner(
+    home: &IsolatedHome,
+    input: &Value,
+    env_actions: &[(&str, Option<&str>)],
+) -> (String, String, i32) {
     let mut cmd = Command::new(rigor_bin());
     cmd.current_dir(&home.path)
         .env("HOME", home.home_str())
@@ -47,8 +60,12 @@ fn run_rigor_inner(home: &IsolatedHome, input: &Value, env_actions: &[(&str, Opt
 
     for &(key, value) in env_actions {
         match value {
-            Some(v) => { cmd.env(key, v); }
-            None => { cmd.env_remove(key); }
+            Some(v) => {
+                cmd.env(key, v);
+            }
+            None => {
+                cmd.env_remove(key);
+            }
         }
     }
 

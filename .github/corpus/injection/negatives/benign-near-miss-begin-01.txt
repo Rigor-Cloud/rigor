@@ -1,0 +1,4 @@
+# Fixture: benign-near-miss-begin-01.txt | Pattern: none (near-miss pat09) | Expected: CLEAN
+We begin the system integration tests tomorrow. The override mechanism
+for feature flags will be tested in the second sprint. Instructions for
+the QA team have been posted in the shared drive.

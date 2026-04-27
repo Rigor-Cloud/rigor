@@ -537,7 +537,12 @@ mod tests {
             std::time::Duration::from_millis(50),
         );
         let hash = store
-            .store(b"verdict-short-lived".to_vec(), Category::Verdict, None, None)
+            .store(
+                b"verdict-short-lived".to_vec(),
+                Category::Verdict,
+                None,
+                None,
+            )
             .await
             .unwrap();
         assert!(
@@ -562,7 +567,12 @@ mod tests {
             std::time::Duration::from_millis(50),
         );
         let hash = store
-            .store(b"permanent-annotation".to_vec(), Category::Annotation, None, None)
+            .store(
+                b"permanent-annotation".to_vec(),
+                Category::Annotation,
+                None,
+                None,
+            )
             .await
             .unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(120)).await;
@@ -597,7 +607,11 @@ mod tests {
 
         // All 10 entries should exist.
         let listed = store.list_by_category(Category::Audit).await.unwrap();
-        assert_eq!(listed.len(), 10, "expected 10 audit entries from concurrent stores");
+        assert_eq!(
+            listed.len(),
+            10,
+            "expected 10 audit entries from concurrent stores"
+        );
 
         // Each hash should retrieve its original payload.
         for (i, hash) in hashes.iter().enumerate() {
@@ -618,7 +632,12 @@ mod tests {
             std::time::Duration::from_secs(60),
         ));
         let hash = store
-            .store(b"ttl-race-entry".to_vec(), Category::Compression, None, None)
+            .store(
+                b"ttl-race-entry".to_vec(),
+                Category::Compression,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -627,9 +646,7 @@ mod tests {
         for _ in 0..5 {
             let s = Arc::clone(&store);
             let h = hash;
-            handles.push(tokio::spawn(async move {
-                s.retrieve(&h).await.unwrap()
-            }));
+            handles.push(tokio::spawn(async move { s.retrieve(&h).await.unwrap() }));
         }
 
         for handle in handles {

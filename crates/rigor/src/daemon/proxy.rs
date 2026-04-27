@@ -3694,18 +3694,12 @@ pub async fn score_claim_relevance(
         // Call via JudgeClient trait
         match client.call_judge(api_url, api_key, &body, 30).await {
             Ok(j) => {
-                eprintln!(
-                    "rigor relevance: API status: 200 (attempt {})",
-                    attempt + 1
-                );
+                eprintln!("rigor relevance: API status: 200 (attempt {})", attempt + 1);
                 resp_json = j;
                 break;
             }
             Err(JudgeError::HttpError(429)) => {
-                eprintln!(
-                    "rigor relevance: API status: 429 (attempt {})",
-                    attempt + 1
-                );
+                eprintln!("rigor relevance: API status: 429 (attempt {})", attempt + 1);
                 // Rate limited — will retry if more attempts remain
                 if attempt < delays.len() - 1 {
                     continue;
@@ -3990,6 +3984,11 @@ fn extract_usage(body: &serde_json::Value, path: &str) -> (u64, u64) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::await_holding_lock,
+        clippy::bool_assert_comparison,
+        clippy::single_match
+    )]
     use super::*;
     use serde_json::json;
 
@@ -4372,7 +4371,13 @@ mod tests {
         let mock = MockJudgeClient::with_text("YES The action is within scope.");
         let etx = test_event_tx();
         let (within, reason) = scope_judge_check(
-            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
         )
         .await;
         assert!(within, "expected within_scope=true for YES response");
@@ -4388,7 +4393,13 @@ mod tests {
         let mock = MockJudgeClient::with_text("NO The user did not request this.");
         let etx = test_event_tx();
         let (within, _reason) = scope_judge_check(
-            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
         )
         .await;
         assert!(!within, "expected within_scope=false for NO response");
@@ -4400,7 +4411,13 @@ mod tests {
         let mock = MockJudgeClient::with_error(JudgeErrorKind::Timeout);
         let etx = test_event_tx();
         let (within, reason) = scope_judge_check(
-            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
         )
         .await;
         assert!(within, "timeout should fail open (within_scope=true)");
@@ -4415,7 +4432,13 @@ mod tests {
         let mock = MockJudgeClient::with_error(JudgeErrorKind::HttpError(401));
         let etx = test_event_tx();
         let (within, reason) = scope_judge_check(
-            &mock, "http://test", "sk-test", "model", "help me", "do thing", &etx,
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
         )
         .await;
         assert!(within, "HTTP 401 should fail open (within_scope=true)");
@@ -4498,11 +4521,12 @@ mod tests {
             &etx,
         )
         .await;
-        assert!(
-            !result,
-            "expected false when violations list is empty"
+        assert!(!result, "expected false when violations list is empty");
+        assert_eq!(
+            mock.calls(),
+            0,
+            "should not call judge with empty violations"
         );
-        assert_eq!(mock.calls(), 0, "should not call judge with empty violations");
     }
 
     #[tokio::test]
@@ -4542,7 +4566,10 @@ mod tests {
             None, // no API key
             "model",
             &[("claim1".to_string(), "the sky is blue".to_string())],
-            &[("constraint1".to_string(), "Sky: The sky is blue".to_string())],
+            &[(
+                "constraint1".to_string(),
+                "Sky: The sky is blue".to_string(),
+            )],
             &etx,
         )
         .await;
@@ -4567,19 +4594,37 @@ mod tests {
         let etx = test_event_tx();
 
         let claims = vec![("claim1".to_string(), "the sky is blue".to_string())];
-        let constraints =
-            vec![("constraint1".to_string(), "Sky: The sky is blue".to_string())];
+        let constraints = vec![(
+            "constraint1".to_string(),
+            "Sky: The sky is blue".to_string(),
+        )];
 
         // First call — should invoke the judge
         score_claim_relevance(
-            &mock, "http://test", Some("sk-test"), "model", &claims, &constraints, &etx,
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &claims,
+            &constraints,
+            &etx,
         )
         .await;
-        assert_eq!(counter.load(Ordering::SeqCst), 1, "first call should invoke judge");
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "first call should invoke judge"
+        );
 
         // Second call with same claims — should be served from cache
         score_claim_relevance(
-            &mock, "http://test", Some("sk-test"), "model", &claims, &constraints, &etx,
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &claims,
+            &constraints,
+            &etx,
         )
         .await;
         assert_eq!(
@@ -4627,7 +4672,10 @@ mod tests {
             "http://test",
             Some("sk-test"),
             "model",
-            &[("claim1".to_string(), "unique_claim_for_single_flight".to_string())],
+            &[(
+                "claim1".to_string(),
+                "unique_claim_for_single_flight".to_string(),
+            )],
             &[("constraint1".to_string(), "Sky: blue".to_string())],
             &etx,
         )

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! H5 — DF-QuAD multi-constraint cohesion test.
 //!
 //! `proxy_pipeline_cohesion.rs` only exercises single-constraint configs, so
@@ -228,8 +234,7 @@ fn restore_retry(orig: Option<String>) {
 /// and asserts the decision flips.
 #[tokio::test]
 async fn dfquad_no_attack_chain_blocks() {
-    let triggering_text =
-        "The system uses ALPHA_KEY_TRIGGER for protected operations.";
+    let triggering_text = "The system uses ALPHA_KEY_TRIGGER for protected operations.";
 
     let mock = MockLlmServerBuilder::new()
         .anthropic_chunks(triggering_text)
@@ -272,8 +277,7 @@ async fn dfquad_no_attack_chain_blocks() {
 /// would observe a BLOCK (same as the control) and fail.
 #[tokio::test]
 async fn dfquad_attack_chain_downgrades_block_to_warn() {
-    let triggering_text =
-        "The system uses ALPHA_KEY_TRIGGER for protected operations.";
+    let triggering_text = "The system uses ALPHA_KEY_TRIGGER for protected operations.";
 
     let mock = MockLlmServerBuilder::new()
         .anthropic_chunks(triggering_text)

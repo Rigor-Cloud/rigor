@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! Integration tests for the Rigor stop hook.
 //!
 //! These tests verify the complete flow from stdin JSON to stdout JSON response.

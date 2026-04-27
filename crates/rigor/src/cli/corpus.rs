@@ -99,7 +99,16 @@ pub fn run_corpus_command(cmd: CorpusCommands) -> Result<()> {
             output,
             resume,
             prompt,
-        } => run_record(prompts, models, samples, temperature, max_tokens, output, resume, prompt),
+        } => run_record(
+            prompts,
+            models,
+            samples,
+            temperature,
+            max_tokens,
+            output,
+            resume,
+            prompt,
+        ),
         CorpusCommands::Stats {
             recordings,
             rigor_yaml,
@@ -158,12 +167,8 @@ fn run_record(
                 }
             }
             eprintln!("Recording: {} ...", manifest.id);
-            let stats =
-                crate::corpus::record_prompt(&client, manifest, &output_dir, &cfg).await?;
-            eprintln!(
-                "  recorded={}, skipped={}",
-                stats.recorded, stats.skipped
-            );
+            let stats = crate::corpus::record_prompt(&client, manifest, &output_dir, &cfg).await?;
+            eprintln!("  recorded={}, skipped={}", stats.recorded, stats.skipped);
         }
         Ok::<(), anyhow::Error>(())
     })?;
@@ -171,7 +176,11 @@ fn run_record(
     Ok(())
 }
 
-fn run_stats(recordings_dir: PathBuf, rigor_yaml: Option<PathBuf>, format: StatsFormat) -> Result<()> {
+fn run_stats(
+    recordings_dir: PathBuf,
+    rigor_yaml: Option<PathBuf>,
+    format: StatsFormat,
+) -> Result<()> {
     let recordings = crate::corpus::load_recordings(&recordings_dir)?;
 
     if recordings.is_empty() {
@@ -275,11 +284,16 @@ fn run_replay(
     for row in &rows {
         if let Some(manifest) = manifest_map.get(&row.prompt_id) {
             let expected = &manifest.expected.default;
-            if row.block_rate() < expected.min_block_rate || row.block_rate() > expected.max_block_rate {
+            if row.block_rate() < expected.min_block_rate
+                || row.block_rate() > expected.max_block_rate
+            {
                 drifted.push(format!(
                     "  {} / {}: block_rate={:.2} outside [{:.2}, {:.2}]",
-                    row.prompt_id, row.model, row.block_rate(),
-                    expected.min_block_rate, expected.max_block_rate,
+                    row.prompt_id,
+                    row.model,
+                    row.block_rate(),
+                    expected.min_block_rate,
+                    expected.max_block_rate,
                 ));
             }
         }
@@ -298,7 +312,10 @@ fn run_replay(
             eprintln!("{}", d);
         }
         if fail_on_drift {
-            anyhow::bail!("{} prompt/model pairs drifted outside manifest windows", drifted.len());
+            anyhow::bail!(
+                "{} prompt/model pairs drifted outside manifest windows",
+                drifted.len()
+            );
         }
     }
 
@@ -329,13 +346,21 @@ fn format_table(
     println!("Per-Prompt Statistics");
     println!(
         "{:<prompt_w$}  {:<model_w$}  {:>7}  {:>6}  {:>10}",
-        "PROMPT_ID", "MODEL", "SAMPLES", "BLOCKS", "BLOCK_RATE",
+        "PROMPT_ID",
+        "MODEL",
+        "SAMPLES",
+        "BLOCKS",
+        "BLOCK_RATE",
         prompt_w = prompt_w,
         model_w = model_w,
     );
     println!(
         "{:-<prompt_w$}  {:-<model_w$}  {:->7}  {:->6}  {:->10}",
-        "", "", "", "", "",
+        "",
+        "",
+        "",
+        "",
+        "",
         prompt_w = prompt_w,
         model_w = model_w,
     );
@@ -357,12 +382,18 @@ fn format_table(
     println!("Per-Model Aggregates");
     println!(
         "{:<model_w$}  {:>7}  {:>6}  {:>10}",
-        "MODEL", "SAMPLES", "BLOCKS", "BLOCK_RATE",
+        "MODEL",
+        "SAMPLES",
+        "BLOCKS",
+        "BLOCK_RATE",
         model_w = model_w,
     );
     println!(
         "{:-<model_w$}  {:->7}  {:->6}  {:->10}",
-        "", "", "", "",
+        "",
+        "",
+        "",
+        "",
         model_w = model_w,
     );
     for a in aggregates {
@@ -417,10 +448,7 @@ fn format_json(
 }
 
 /// CSV output for spreadsheet consumption.
-fn format_csv(
-    rows: &[crate::corpus::ModelStats],
-    aggregates: &[crate::corpus::PerModelAggregate],
-) {
+fn format_csv(rows: &[crate::corpus::ModelStats], aggregates: &[crate::corpus::PerModelAggregate]) {
     // Per-prompt rows
     println!("prompt_id,model,samples,blocks,block_rate");
     for r in rows {
@@ -466,7 +494,7 @@ fn run_validate(prompts_dir: PathBuf, recordings_dir: PathBuf) -> Result<()> {
                 continue;
             }
         };
-        for (_model_slug, samples) in per_model {
+        for samples in per_model.values() {
             for sample in samples {
                 checked += 1;
                 // Use sample.model (original unslugged name) for hash recomputation

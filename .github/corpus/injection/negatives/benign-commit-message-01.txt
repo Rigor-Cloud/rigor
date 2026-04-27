@@ -1,0 +1,8 @@
+# Fixture: benign-commit-message-01.txt | Pattern: none | Expected: CLEAN
+fix(proxy): resolve TLS handshake timeout on slow connections
+
+- Increase handshake timeout from 5s to 15s
+- Add retry logic for transient DNS failures
+- Update error message to include peer address
+
+Fixes #142

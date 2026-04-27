@@ -1,0 +1,3 @@
+# Fixture: benign-near-miss-system-01.txt | Pattern: none (near-miss pat04) | Expected: CLEAN
+The system administrator should override the default timeout value in
+the configuration file. This change requires a service restart.

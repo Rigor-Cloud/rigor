@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! PR-2.7 F3 scaffold — corpus replay test.
 //!
 //! Walks `.planning/corpus/recordings/` and for each (prompt, model) pair

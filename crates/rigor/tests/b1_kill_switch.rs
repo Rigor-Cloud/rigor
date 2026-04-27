@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! B1: Streaming kill-switch integration test.
 //!
 //! Proves: when the proxy detects a constraint violation mid-stream and

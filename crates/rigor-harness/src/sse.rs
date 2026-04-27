@@ -16,10 +16,8 @@ pub fn parse_sse_events(body: &str) -> Vec<String> {
             }
             if let Some(data) = trimmed.strip_prefix("data: ") {
                 Some(data.to_string())
-            } else if let Some(data) = trimmed.strip_prefix("data:") {
-                Some(data.to_string())
             } else {
-                None
+                trimmed.strip_prefix("data:").map(|d| d.to_string())
             }
         })
         .collect()
@@ -88,7 +86,8 @@ pub fn anthropic_sse_chunks(text: &str) -> Vec<String> {
     );
 
     chunks.push(
-        r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#.to_string()
+        r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#
+            .to_string(),
     );
 
     let word_list: Vec<&str> = text.split_inclusive(' ').collect();
@@ -127,9 +126,7 @@ pub fn anthropic_sse_chunks(text: &str) -> Vec<String> {
 pub fn openai_sse_chunks(text: &str) -> Vec<String> {
     let mut chunks = Vec::new();
 
-    chunks.push(
-        r#"{"choices":[{"delta":{"role":"assistant"},"index":0}]}"#.to_string()
-    );
+    chunks.push(r#"{"choices":[{"delta":{"role":"assistant"},"index":0}]}"#.to_string());
 
     let word_list: Vec<&str> = text.split_inclusive(' ').collect();
     let word_list: Vec<&str> = if word_list.is_empty() && !text.is_empty() {

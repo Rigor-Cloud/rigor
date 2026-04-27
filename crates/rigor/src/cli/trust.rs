@@ -46,7 +46,7 @@ fn find_real_binary(tool: &str) -> Result<String> {
 
 fn shell_profile_path() -> Option<PathBuf> {
     let home = dirs::home_dir()?; // rigor-home-ok
-    // Prefer zshrc on macOS
+                                  // Prefer zshrc on macOS
     let zshrc = home.join(".zshrc");
     if zshrc.exists() {
         return Some(zshrc);
@@ -60,7 +60,10 @@ fn shell_profile_path() -> Option<PathBuf> {
 
 fn is_rigor_bin_in_path() -> bool {
     let path_var = std::env::var("PATH").unwrap_or_default();
-    let rigor_bin = crate::paths::rigor_home().join("bin").to_string_lossy().to_string();
+    let rigor_bin = crate::paths::rigor_home()
+        .join("bin")
+        .to_string_lossy()
+        .to_string();
     path_var.split(':').any(|p| p == rigor_bin)
 }
 

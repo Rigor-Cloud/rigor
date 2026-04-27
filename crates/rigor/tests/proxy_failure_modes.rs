@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! H2: Proxy resilience under upstream failure modes.
 //!
 //! Exercises the proxy's behavior when the upstream LLM endpoint exhibits

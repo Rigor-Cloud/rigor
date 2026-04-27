@@ -32,6 +32,7 @@ impl TestProxy {
     /// RIGOR_HOME isolation: Uses `tokio::task::spawn_blocking` to temporarily set
     /// RIGOR_HOME for the `DaemonState::load` call (which internally calls
     /// `rigor_home()` via `RigorCA::load_or_generate` and `judge_config`).
+    #[allow(clippy::await_holding_lock)] // Intentional: ENV_LOCK serializes env mutation across the spawn_blocking
     pub async fn start(rigor_yaml: &str) -> Self {
         let home = IsolatedHome::new();
         let yaml_path = home.write_rigor_yaml(rigor_yaml);
@@ -117,6 +118,7 @@ impl TestProxy {
     ///
     /// Sets `RIGOR_TARGET_API` to `mock_url` before creating `DaemonState`,
     /// ensuring the proxy forwards to the mock instead of hitting a real API.
+    #[allow(clippy::await_holding_lock)] // Intentional: ENV_LOCK serializes env mutation across the spawn_blocking
     pub async fn start_with_mock(rigor_yaml: &str, mock_url: &str) -> Self {
         let home = IsolatedHome::new();
         let yaml_path = home.write_rigor_yaml(rigor_yaml);
@@ -241,7 +243,8 @@ mod tests {
     use super::*;
 
     /// Minimal valid rigor.yaml (ConstraintsSection is a struct, not a list).
-    const MINIMAL_YAML: &str = "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
+    const MINIMAL_YAML: &str =
+        "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
 
     #[tokio::test]
     async fn test_proxy_starts_on_ephemeral_port() {
@@ -253,6 +256,10 @@ mod tests {
     async fn test_proxy_url_format() {
         let proxy = TestProxy::start(MINIMAL_YAML).await;
         let url = proxy.url();
-        assert!(url.starts_with("http://127.0.0.1:"), "url should be http://127.0.0.1:PORT, got: {}", url);
+        assert!(
+            url.starts_with("http://127.0.0.1:"),
+            "url should be http://127.0.0.1:PORT, got: {}",
+            url
+        );
     }
 }

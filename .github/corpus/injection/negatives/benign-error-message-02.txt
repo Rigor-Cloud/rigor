@@ -1,0 +1,11 @@
+# Fixture: benign-error-message-02.txt | Pattern: none | Expected: CLEAN
+error[E0308]: mismatched types
+  --> src/proxy.rs:127:5
+   |
+127 |     Ok(response)
+   |     ^^^^^^^^^^^^ expected `Result<Response, Error>`, found `Response`
+   |
+help: try wrapping the expression in `Ok`
+   |
+127 |     Ok(Ok(response))
+   |     +++            +

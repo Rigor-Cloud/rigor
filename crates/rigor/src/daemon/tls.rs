@@ -306,7 +306,10 @@ mod tests {
             let _ca2 = RigorCA::load_or_generate().expect("second load_or_generate should succeed");
             let cert_pem_2 = std::fs::read_to_string(rigor_dir.join("ca.pem")).unwrap();
 
-            assert_eq!(cert_pem_1, cert_pem_2, "CA cert PEM should be identical after roundtrip");
+            assert_eq!(
+                cert_pem_1, cert_pem_2,
+                "CA cert PEM should be identical after roundtrip"
+            );
         });
     }
 
@@ -315,7 +318,10 @@ mod tests {
         with_temp_rigor_home(|_rigor_dir| {
             let ca = RigorCA::load_or_generate().unwrap();
             let config = ca.server_config_for_host("test.example.com");
-            assert!(config.is_ok(), "server_config_for_host should return Ok for a valid hostname");
+            assert!(
+                config.is_ok(),
+                "server_config_for_host should return Ok for a valid hostname"
+            );
         });
     }
 
@@ -347,7 +353,10 @@ mod tests {
             // Create the .rigor directory but do NOT generate any CA
             std::fs::create_dir_all(rigor_dir).unwrap();
             let result = install_ca_trust();
-            assert!(result.is_err(), "install_ca_trust should fail when ca.pem is missing");
+            assert!(
+                result.is_err(),
+                "install_ca_trust should fail when ca.pem is missing"
+            );
             let err_msg = result.unwrap_err().to_string();
             assert!(
                 err_msg.contains("CA cert not found"),

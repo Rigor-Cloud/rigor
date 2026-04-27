@@ -3,7 +3,9 @@
 //! Launches an in-process mock LLM and proxy, sends requests through the proxy,
 //! and verifies the rigor pipeline produces expected decisions.
 
-use rigor_harness::{MockLlmServerBuilder, TestProxy, SseFormat, parse_sse_events, extract_text_from_sse};
+use rigor_harness::{
+    extract_text_from_sse, parse_sse_events, MockLlmServerBuilder, SseFormat, TestProxy,
+};
 
 /// Rego keyword constraint that fires `violated: true` when claim text
 /// contains "VIOLATION_MARKER". Copied from b1_kill_switch.rs.

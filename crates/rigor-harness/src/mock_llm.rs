@@ -1,11 +1,17 @@
+use axum::body::Body;
+use axum::{
+    http::{header, StatusCode},
+    response::sse::{Event, Sse},
+    response::IntoResponse,
+    routing::post,
+    Router,
+};
+use futures_util::{stream, StreamExt};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::oneshot;
-use axum::{Router, routing::post, response::sse::{Event, Sse}, response::IntoResponse, http::{header, StatusCode}};
-use axum::body::Body;
-use futures_util::{stream, StreamExt};
 
 use crate::sse::{anthropic_sse_chunks, openai_sse_chunks};
 
@@ -169,9 +175,8 @@ impl MockLlmServerBuilder {
         // Build the list of response sets. When response_sequence is provided,
         // each call index selects its own chunk set. Otherwise wrap the single
         // chunks vec so the handler can use the same code path.
-        let all_responses: Arc<Vec<Vec<String>>> = Arc::new(
-            self.response_sequence.unwrap_or_else(|| vec![self.chunks])
-        );
+        let all_responses: Arc<Vec<Vec<String>>> =
+            Arc::new(self.response_sequence.unwrap_or_else(|| vec![self.chunks]));
 
         let call_count = Arc::new(AtomicUsize::new(0));
         let failure_mode = Arc::new(self.failure_mode);
@@ -187,7 +192,10 @@ impl MockLlmServerBuilder {
                 async move {
                     let parsed = serde_json::from_slice::<serde_json::Value>(&body)
                         .unwrap_or(serde_json::Value::Null);
-                    received.lock().unwrap().push(ReceivedRequest { body: parsed });
+                    received
+                        .lock()
+                        .unwrap()
+                        .push(ReceivedRequest { body: parsed });
                     (
                         [(header::CONTENT_TYPE, "application/json")],
                         (*json).clone(),
@@ -208,7 +216,10 @@ impl MockLlmServerBuilder {
                     // Track received request body
                     let json_body = serde_json::from_slice::<serde_json::Value>(&body)
                         .unwrap_or(serde_json::Value::Null);
-                    received.lock().unwrap().push(ReceivedRequest { body: json_body });
+                    received
+                        .lock()
+                        .unwrap()
+                        .push(ReceivedRequest { body: json_body });
 
                     // Select response by call index; repeat last if index exceeds length
                     let call_idx = counter.fetch_add(1, Ordering::SeqCst);
@@ -232,14 +243,12 @@ impl MockLlmServerBuilder {
                                     "type": "mock_error",
                                     "message": format!("mock LLM returned status {}", status),
                                 }
-                            }).to_string();
+                            })
+                            .to_string();
                             let code = StatusCode::from_u16(*status)
                                 .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-                            (
-                                code,
-                                [(header::CONTENT_TYPE, "application/json")],
-                                body,
-                            ).into_response()
+                            (code, [(header::CONTENT_TYPE, "application/json")], body)
+                                .into_response()
                         }
                         FailureMode::ConnectionResetAfter(n) => {
                             // Send first n chunks as raw SSE bytes, then yield an
@@ -250,9 +259,8 @@ impl MockLlmServerBuilder {
                                 .take(n)
                                 .map(|d| bytes::Bytes::from(format!("data: {}\n\n", d)))
                                 .collect();
-                            let ok_stream = stream::iter(
-                                bytes_chunks.into_iter().map(Ok::<_, std::io::Error>),
-                            );
+                            let ok_stream =
+                                stream::iter(bytes_chunks.into_iter().map(Ok::<_, std::io::Error>));
                             let err_stream = stream::once(async {
                                 Err::<bytes::Bytes, std::io::Error>(std::io::Error::new(
                                     std::io::ErrorKind::ConnectionReset,
@@ -260,10 +268,7 @@ impl MockLlmServerBuilder {
                                 ))
                             });
                             let body = Body::from_stream(ok_stream.chain(err_stream));
-                            (
-                                [(header::CONTENT_TYPE, "text/event-stream")],
-                                body,
-                            ).into_response()
+                            ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
                         }
                         FailureMode::MalformedChunkAt { index, garbage } => {
                             // Replace the chunk at `index` with raw garbage bytes
@@ -282,30 +287,25 @@ impl MockLlmServerBuilder {
                                     }
                                 })
                                 .collect();
-                            let s = stream::iter(
-                                bytes_chunks.into_iter().map(Ok::<_, std::io::Error>),
-                            );
+                            let s =
+                                stream::iter(bytes_chunks.into_iter().map(Ok::<_, std::io::Error>));
                             let body = Body::from_stream(s);
-                            (
-                                [(header::CONTENT_TYPE, "text/event-stream")],
-                                body,
-                            ).into_response()
+                            ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
                         }
                         FailureMode::SlowResponse(delay) => {
                             // Sleep `delay` before each chunk to simulate backpressure.
                             let delay = *delay;
                             let owned_chunks: Vec<String> = chunks.clone();
-                            let s = stream::iter(owned_chunks.into_iter()).then(move |d| async move {
-                                tokio::time::sleep(delay).await;
-                                Ok::<bytes::Bytes, std::io::Error>(
-                                    bytes::Bytes::from(format!("data: {}\n\n", d)),
-                                )
-                            });
+                            let s =
+                                stream::iter(owned_chunks.into_iter()).then(move |d| async move {
+                                    tokio::time::sleep(delay).await;
+                                    Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!(
+                                        "data: {}\n\n",
+                                        d
+                                    )))
+                                });
                             let body = Body::from_stream(s);
-                            (
-                                [(header::CONTENT_TYPE, "text/event-stream")],
-                                body,
-                            ).into_response()
+                            ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
                         }
                     }
                 }
@@ -339,16 +339,15 @@ impl MockLlmServerBuilder {
 }
 
 impl Default for MockLlmServerBuilder {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MockLlmServer {
     /// Convenience constructor: start with raw SSE data-line chunks on the default route.
     pub async fn start(chunks: Vec<String>) -> Self {
-        MockLlmServerBuilder::new()
-            .raw_chunks(chunks)
-            .build()
-            .await
+        MockLlmServerBuilder::new().raw_chunks(chunks).build().await
     }
 
     /// The socket address the server is listening on.
@@ -417,8 +416,16 @@ mod tests {
 
         let body = resp.text().await.unwrap();
         // SSE events should contain content_block_delta
-        assert!(body.contains("content_block_delta"), "body should contain anthropic delta events: {}", body);
-        assert!(body.contains("message_stop"), "body should contain message_stop: {}", body);
+        assert!(
+            body.contains("content_block_delta"),
+            "body should contain anthropic delta events: {}",
+            body
+        );
+        assert!(
+            body.contains("message_stop"),
+            "body should contain message_stop: {}",
+            body
+        );
     }
 
     #[tokio::test]
@@ -438,8 +445,16 @@ mod tests {
             .unwrap();
 
         let body = resp.text().await.unwrap();
-        assert!(body.contains("\"content\":"), "body should contain openai content deltas: {}", body);
-        assert!(body.contains("[DONE]"), "body should contain [DONE]: {}", body);
+        assert!(
+            body.contains("\"content\":"),
+            "body should contain openai content deltas: {}",
+            body
+        );
+        assert!(
+            body.contains("[DONE]"),
+            "body should contain [DONE]: {}",
+            body
+        );
     }
 
     #[tokio::test]
@@ -585,8 +600,14 @@ mod tests {
         let text_1 = extract_text_from_sse(&events_1, SseFormat::Anthropic);
         let text_2 = extract_text_from_sse(&events_2, SseFormat::Anthropic);
 
-        assert_eq!(text_1, "the-only-response", "first call should get the response");
-        assert_eq!(text_2, "the-only-response", "second call should also get the response");
+        assert_eq!(
+            text_1, "the-only-response",
+            "first call should get the response"
+        );
+        assert_eq!(
+            text_2, "the-only-response",
+            "second call should also get the response"
+        );
     }
 
     #[tokio::test]
@@ -606,7 +627,11 @@ mod tests {
 
         assert_eq!(resp.status(), 429, "should return 429");
         let body = resp.text().await.unwrap();
-        assert!(body.contains("\"error\""), "body should be a JSON error: {}", body);
+        assert!(
+            body.contains("\"error\""),
+            "body should be a JSON error: {}",
+            body
+        );
     }
 
     #[tokio::test]
@@ -633,7 +658,11 @@ mod tests {
         // body is truncated or the request itself surfaces a transport error.
         let full_chunks = crate::sse::anthropic_sse_chunks("hello world from mock");
         let full_count = full_chunks.len();
-        assert!(full_count > 2, "test precondition: full sequence has >2 chunks (got {})", full_count);
+        assert!(
+            full_count > 2,
+            "test precondition: full sequence has >2 chunks (got {})",
+            full_count
+        );
 
         let server = MockLlmServerBuilder::new()
             .anthropic_chunks("hello world from mock")

@@ -27,13 +27,20 @@ pub(crate) static RIGOR_HOME_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex:
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::await_holding_lock,
+        clippy::bool_assert_comparison,
+        clippy::single_match
+    )]
     use super::*;
     use std::sync::Mutex;
 
     // Re-use the crate-wide lock for env-var-mutating tests.
     // (Legacy alias — existing tests reference ENV_LOCK, so keep it as a ref to the shared lock.)
     fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-        RIGOR_HOME_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+        RIGOR_HOME_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
     }
 
     // Kept for reference only — unused after migration to shared lock.

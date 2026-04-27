@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! E2E tests for the CONNECT tunnel handler in `catch_all_proxy`.
 //!
 //! Exercises two distinct code paths:
@@ -20,8 +26,7 @@ use tokio::net::TcpStream;
 use tokio::time::timeout;
 
 /// Minimal valid rigor.yaml matching other integration tests.
-const MINIMAL_YAML: &str =
-    "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
+const MINIMAL_YAML: &str = "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
 
 /// Serializes tests that toggle the global MITM_ENABLED AtomicBool.
 /// Same pattern as `MITM_LOCK` in daemon/mod.rs tests.
@@ -70,10 +75,7 @@ async fn send_connect(proxy_addr: std::net::SocketAddr, target: &str) -> TcpStre
         .expect("connect timeout")
         .expect("connect to proxy");
 
-    let connect_req = format!(
-        "CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n",
-        target, target
-    );
+    let connect_req = format!("CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n", target, target);
     timeout(IO_TIMEOUT, stream.write_all(connect_req.as_bytes()))
         .await
         .expect("write timeout")
@@ -108,13 +110,10 @@ fn load_ca_client_config(ca_pem_path: &std::path::Path) -> rustls::ClientConfig 
         .unwrap_or_else(|e| panic!("read CA PEM at {}: {}", ca_pem_path.display(), e));
 
     // Parse PEM using rcgen (same pattern as production RigorCA::load_or_generate)
-    let ca_key_pem = std::fs::read_to_string(
-        ca_pem_path.with_file_name("ca-key.pem"),
-    )
-    .expect("read CA key PEM");
+    let ca_key_pem =
+        std::fs::read_to_string(ca_pem_path.with_file_name("ca-key.pem")).expect("read CA key PEM");
     let ca_key = rcgen::KeyPair::from_pem(&ca_key_pem).expect("parse CA key");
-    let ca_params =
-        rcgen::CertificateParams::from_ca_cert_pem(&ca_pem).expect("parse CA cert PEM");
+    let ca_params = rcgen::CertificateParams::from_ca_cert_pem(&ca_pem).expect("parse CA cert PEM");
     let ca_cert = ca_params.self_signed(&ca_key).expect("re-sign CA cert");
 
     let ca_der = ca_cert.der().clone();
@@ -164,7 +163,8 @@ async fn blind_tunnel_non_llm_host() {
         .expect("read echo response");
 
     assert_eq!(
-        &buf[..n], payload,
+        &buf[..n],
+        payload,
         "blind tunnel should echo bytes unchanged"
     );
 }
@@ -200,19 +200,15 @@ async fn mitm_tls_handshake_validates_against_ca() {
 
     // 6. Perform TLS handshake on the upgraded stream
     let connector = tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_config));
-    let server_name = rustls::pki_types::ServerName::try_from("api.anthropic.com")
-        .expect("valid server name");
+    let server_name =
+        rustls::pki_types::ServerName::try_from("api.anthropic.com").expect("valid server name");
 
-    let tls_result = timeout(
-        IO_TIMEOUT,
-        connector.connect(server_name, stream),
-    )
-    .await
-    .expect("TLS handshake timeout");
+    let tls_result = timeout(IO_TIMEOUT, connector.connect(server_name, stream))
+        .await
+        .expect("TLS handshake timeout");
 
-    let mut tls_stream = tls_result.expect(
-        "TLS handshake should succeed when client trusts the proxy CA",
-    );
+    let mut tls_stream =
+        tls_result.expect("TLS handshake should succeed when client trusts the proxy CA");
 
     // 7. Send an HTTP request over the TLS stream to verify the full
     //    MITM pipeline: proxy decrypts, routes via axum to MockLlmServer
@@ -299,10 +295,7 @@ async fn tls_handshake_fails_without_ca_cert() {
     //    defensively to make the trust posture explicit.
     let proxy_url = format!("http://{}", proxy.addr());
     let client = reqwest::Client::builder()
-        .proxy(
-            reqwest::Proxy::all(&proxy_url)
-                .expect("valid proxy URL"),
-        )
+        .proxy(reqwest::Proxy::all(&proxy_url).expect("valid proxy URL"))
         .tls_built_in_root_certs(true)
         .danger_accept_invalid_certs(false)
         .timeout(IO_TIMEOUT)

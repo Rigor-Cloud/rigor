@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! Integration tests for proxy.rs hot-path functions:
 //! - extract_and_evaluate (tested indirectly via proxy_request non-streaming path)
 //! - evaluate_text_inline (tested indirectly via proxy_request streaming evaluation)
@@ -7,14 +13,14 @@
 //! HTTP interface via TestProxy + MockLlmServer from rigor-harness.
 
 use rigor::daemon::ws::DaemonEvent;
-use rigor_harness::{extract_text_from_sse, parse_sse_events, MockLlmServerBuilder, SseFormat,
-    TestProxy};
+use rigor_harness::{
+    extract_text_from_sse, parse_sse_events, MockLlmServerBuilder, SseFormat, TestProxy,
+};
 use std::time::Duration;
 use tokio::sync::broadcast::error::TryRecvError;
 
 /// Minimal valid rigor.yaml (empty constraints -- no violations expected).
-const MINIMAL_YAML: &str =
-    "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
+const MINIMAL_YAML: &str = "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
 
 /// rigor.yaml with a belief constraint (triggers claim extraction + evaluation).
 const YAML_WITH_BELIEF: &str = r#"constraints:
@@ -42,10 +48,7 @@ fn anthropic_request_body(stream: bool, user_msg: &str) -> serde_json::Value {
 }
 
 /// Helper: send a POST to the proxy and return the response.
-async fn proxy_post(
-    proxy_url: &str,
-    body: &serde_json::Value,
-) -> reqwest::Response {
+async fn proxy_post(proxy_url: &str, body: &serde_json::Value) -> reqwest::Response {
     reqwest::Client::new()
         .post(format!("{}/v1/messages", proxy_url))
         .header("content-type", "application/json")
@@ -87,10 +90,7 @@ async fn extract_and_evaluate_parse_failure_emits_allow() {
 
     // The response body should contain SSE data (raw upstream body passed through)
     let resp_body = resp.text().await.unwrap();
-    assert!(
-        !resp_body.is_empty(),
-        "Response body should not be empty"
-    );
+    assert!(!resp_body.is_empty(), "Response body should not be empty");
 }
 
 /// extract_and_evaluate no-text path (non-streaming):
@@ -212,7 +212,12 @@ async fn evaluate_text_inline_blocks_pii_in_response() {
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     while std::time::Instant::now() < deadline {
         match tokio::time::timeout(Duration::from_millis(200), events.recv()).await {
-            Ok(Ok(DaemonEvent::PiiDetected { direction, pii_type, action, .. })) => {
+            Ok(Ok(DaemonEvent::PiiDetected {
+                direction,
+                pii_type,
+                action,
+                ..
+            })) => {
                 pii_event = Some((direction, pii_type, action));
                 break;
             }
@@ -257,7 +262,12 @@ async fn evaluate_text_inline_no_pii_event_on_clean_response() {
     tokio::time::sleep(Duration::from_millis(500)).await;
     loop {
         match events.try_recv() {
-            Ok(DaemonEvent::PiiDetected { direction, pii_type, matched, .. }) => {
+            Ok(DaemonEvent::PiiDetected {
+                direction,
+                pii_type,
+                matched,
+                ..
+            }) => {
                 panic!(
                     "Clean response must not trigger PiiDetected. Got direction={} pii_type={} matched={}",
                     direction, pii_type, matched
@@ -301,10 +311,7 @@ async fn proxy_request_allow_clean_stream() {
 
     // Verify the SSE stream is complete and well-formed
     let events = parse_sse_events(&resp_body);
-    assert!(
-        !events.is_empty(),
-        "Response should contain SSE events"
-    );
+    assert!(!events.is_empty(), "Response should contain SSE events");
 
     // Verify the text content was passed through
     let text = extract_text_from_sse(&events, SseFormat::Anthropic);
@@ -432,7 +439,11 @@ async fn proxy_request_non_streaming_block_emits_violation() {
     let resp = proxy_post(&proxy.url(), &body).await;
     // HTTP status is 200 — proxy buffers response and returns it before
     // background evaluation completes (proxy.rs:2858).
-    assert_eq!(resp.status(), 200, "non-streaming returns 200 even on block");
+    assert_eq!(
+        resp.status(),
+        200,
+        "non-streaming returns 200 even on block"
+    );
     let _ = resp.text().await.unwrap();
 
     // The spawned evaluation task emits DaemonEvent::Violation +

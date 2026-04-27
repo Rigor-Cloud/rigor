@@ -21,7 +21,11 @@ impl IsolatedHome {
         let path = temp.path().to_path_buf();
         let rigor_dir = path.join(".rigor");
         std::fs::create_dir_all(&rigor_dir).expect("failed to create .rigor dir");
-        Self { _temp: temp, path, rigor_dir }
+        Self {
+            _temp: temp,
+            path,
+            rigor_dir,
+        }
     }
 
     /// Write a rigor.yaml into the isolated home directory.
@@ -43,7 +47,9 @@ impl IsolatedHome {
 }
 
 impl Default for IsolatedHome {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]

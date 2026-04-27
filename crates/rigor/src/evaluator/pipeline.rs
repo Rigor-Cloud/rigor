@@ -633,8 +633,7 @@ violation contains v if {
     fn test_failing_evaluator_returns_allow() {
         // Verify that an evaluator following the fail-open contract
         // (returning allow with error reason) never produces a violation.
-        let constraint =
-            make_constraint("c1", "violation contains v if { false; v := 0 }", vec![]);
+        let constraint = make_constraint("c1", "violation contains v if { false; v := 0 }", vec![]);
         let mut pipeline = EvaluatorPipeline::new();
         pipeline.register(Box::new(FailingEvaluator));
 
@@ -667,7 +666,11 @@ violation contains v if {
         let ev = RegexEvaluator::new(&config).unwrap();
 
         // Evaluate against a constraint NOT loaded into the engine
-        let unloaded = make_constraint("unloaded", "violation contains v if { false; v := 0 }", vec![]);
+        let unloaded = make_constraint(
+            "unloaded",
+            "violation contains v if { false; v := 0 }",
+            vec![],
+        );
         let claim = make_claim("c1", "some text");
         let result = ev.evaluate(&claim, &unloaded);
         assert!(

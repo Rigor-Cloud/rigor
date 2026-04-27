@@ -31,12 +31,7 @@ pub trait InferenceHost: Send + Sync {
     /// SHA-256 digest of the file for integrity verification.
     ///
     /// Returns the filesystem path to the cached model file.
-    fn load(
-        &self,
-        model_id: &str,
-        filename: &str,
-        expected_sha256: &str,
-    ) -> Result<PathBuf>;
+    fn load(&self, model_id: &str, filename: &str, expected_sha256: &str) -> Result<PathBuf>;
 }
 
 // ── ONNX implementation ────────────────────────────────────────────────────
@@ -49,6 +44,12 @@ pub trait InferenceHost: Send + Sync {
 /// If a cached file exists and matches the digest, no download occurs.
 pub struct OnnxModelHost {
     cache_dir: PathBuf,
+}
+
+impl Default for OnnxModelHost {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl OnnxModelHost {
@@ -70,8 +71,12 @@ impl OnnxModelHost {
 
     /// Compute SHA-256 hex digest of a file on disk.
     fn verify_sha256(path: &PathBuf, expected: &str) -> Result<()> {
-        let bytes = std::fs::read(path)
-            .with_context(|| format!("failed to read model file for hash verification: {}", path.display()))?;
+        let bytes = std::fs::read(path).with_context(|| {
+            format!(
+                "failed to read model file for hash verification: {}",
+                path.display()
+            )
+        })?;
         let digest = Sha256::digest(&bytes);
         let actual = format!("{:x}", digest);
         if actual != expected {
@@ -96,8 +101,9 @@ impl OnnxModelHost {
         expected_sha256: &str,
     ) -> Result<PathBuf> {
         let target_dir = self.cache_dir.join(expected_sha256);
-        std::fs::create_dir_all(&target_dir)
-            .with_context(|| format!("failed to create model cache dir: {}", target_dir.display()))?;
+        std::fs::create_dir_all(&target_dir).with_context(|| {
+            format!("failed to create model cache dir: {}", target_dir.display())
+        })?;
 
         let target_path = target_dir.join(filename);
 
@@ -108,8 +114,8 @@ impl OnnxModelHost {
             "downloading model from HuggingFace Hub",
         );
 
-        let api = hf_hub::api::sync::Api::new()
-            .context("failed to initialize HuggingFace Hub API")?;
+        let api =
+            hf_hub::api::sync::Api::new().context("failed to initialize HuggingFace Hub API")?;
 
         let repo = api.model(model_id.to_string());
         let downloaded_path = repo
@@ -130,12 +136,7 @@ impl OnnxModelHost {
 }
 
 impl InferenceHost for OnnxModelHost {
-    fn load(
-        &self,
-        model_id: &str,
-        filename: &str,
-        expected_sha256: &str,
-    ) -> Result<PathBuf> {
+    fn load(&self, model_id: &str, filename: &str, expected_sha256: &str) -> Result<PathBuf> {
         let cached_path = self.cache_dir.join(expected_sha256).join(filename);
 
         // Check cache first.
@@ -230,7 +231,11 @@ mod tests {
         let result = OnnxModelHost::verify_sha256(&file_path, "0000000000000000");
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("SHA-256 mismatch"), "unexpected error: {}", msg);
+        assert!(
+            msg.contains("SHA-256 mismatch"),
+            "unexpected error: {}",
+            msg
+        );
     }
 
     #[test]
@@ -274,7 +279,10 @@ mod tests {
         // load() should detect corruption and try to re-download.
         // Since we're using a fake model_id, the download will fail.
         let result = host.load("nonexistent/model", "model.onnx", &sha);
-        assert!(result.is_err(), "expected error for corrupt cache + failed download");
+        assert!(
+            result.is_err(),
+            "expected error for corrupt cache + failed download"
+        );
 
         // The corrupt file should have been removed.
         assert!(

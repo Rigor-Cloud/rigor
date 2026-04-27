@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! B2: Auto-retry exactly-once integration test.
 //!
 //! Proves: when the proxy detects a constraint violation mid-stream (with retries
@@ -7,8 +13,9 @@
 //! is forwarded to the client.
 
 use rigor_harness::env_lock::ENV_LOCK;
-use rigor_harness::{extract_text_from_sse, parse_sse_events, MockLlmServerBuilder, SseFormat,
-    TestProxy};
+use rigor_harness::{
+    extract_text_from_sse, parse_sse_events, MockLlmServerBuilder, SseFormat, TestProxy,
+};
 
 /// Same keyword constraint as B1 -- triggers BLOCK on VIOLATION_MARKER text.
 const BLOCK_CONSTRAINT_YAML: &str = r#"constraints:

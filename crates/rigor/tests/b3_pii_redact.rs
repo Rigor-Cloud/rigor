@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! B3: PII redact-before-forward integration test.
 //!
 //! Proves: when a user message contains PII (email addresses, SSNs), the proxy's
@@ -9,8 +15,7 @@ use rigor_harness::{MockLlmServerBuilder, TestProxy};
 
 /// Minimal constraint YAML -- no violations expected. B3 tests PII redaction,
 /// not the BLOCK path.
-const MINIMAL_YAML: &str =
-    "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
+const MINIMAL_YAML: &str = "constraints:\n  beliefs: []\n  justifications: []\n  defeaters: []\n";
 
 /// Extract the last user message content from a received request body.
 fn extract_last_user_content(body: &serde_json::Value) -> Option<String> {
@@ -114,10 +119,7 @@ async fn b3_pii_redaction_transparent_to_client() {
         status, 200,
         "PII redaction should be transparent -- client gets 200"
     );
-    assert!(
-        !resp_body.is_empty(),
-        "Response body should not be empty"
-    );
+    assert!(!resp_body.is_empty(), "Response body should not be empty");
 }
 
 /// B3: Negative test -- a clean message (no PII) is forwarded verbatim.

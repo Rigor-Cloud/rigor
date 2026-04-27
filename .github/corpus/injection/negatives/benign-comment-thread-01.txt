@@ -1,0 +1,8 @@
+# Fixture: benign-comment-thread-01.txt | Pattern: none | Expected: CLEAN
+@alice: I think we should add rate limiting before the v1.0 release.
+The proxy currently has no backpressure mechanism and could be overwhelmed.
+
+@bob: Agreed. I was thinking a token bucket with 100 req/s per client IP.
+We can use the governor crate which has good async support.
+
+@alice: Sounds good. Can you open an issue so we can track it?

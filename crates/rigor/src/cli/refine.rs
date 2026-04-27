@@ -652,9 +652,7 @@ pub fn export_corpus(
 
         // Apply --since filter
         if let Some(ts) = since_ts {
-            if let Ok(entry_ts) =
-                chrono::DateTime::parse_from_rfc3339(&entry.session.timestamp)
-            {
+            if let Ok(entry_ts) = chrono::DateTime::parse_from_rfc3339(&entry.session.timestamp) {
                 if entry_ts.with_timezone(&chrono::Utc) < ts {
                     continue;
                 }

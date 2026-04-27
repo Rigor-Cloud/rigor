@@ -313,7 +313,7 @@ mod tests {
         data.extend_from_slice(&[0, 0, 0]); // length placeholder
         data.extend_from_slice(&[0x03, 0x03]); // version
         data.extend_from_slice(&[0u8; 32]); // random
-        // Truncate here -- no session_id length byte
+                                            // Truncate here -- no session_id length byte
         assert_eq!(parse_sni_from_client_hello(&data), None);
     }
 
@@ -331,7 +331,7 @@ mod tests {
         data.extend_from_slice(&[0xc0, 0x2f]); // one cipher suite
         data.push(1); // compression methods length
         data.push(0); // null compression
-        // Extensions total length says 100 bytes, but no extension data follows
+                      // Extensions total length says 100 bytes, but no extension data follows
         data.extend_from_slice(&[0, 100]);
         assert_eq!(parse_sni_from_client_hello(&data), None);
     }
@@ -342,10 +342,16 @@ mod tests {
         let tls_record = wrap_in_tls_record(&client_hello);
 
         let mut cursor = io::Cursor::new(tls_record.clone());
-        let (buf, sni) = peek_client_hello(&mut cursor).await.expect("peek should succeed");
+        let (buf, sni) = peek_client_hello(&mut cursor)
+            .await
+            .expect("peek should succeed");
 
         assert_eq!(sni.as_deref(), Some("example.com"));
-        assert_eq!(buf.len(), tls_record.len(), "returned buffer should be 5 + record_len");
+        assert_eq!(
+            buf.len(),
+            tls_record.len(),
+            "returned buffer should be 5 + record_len"
+        );
     }
 
     #[tokio::test]
@@ -355,7 +361,9 @@ mod tests {
         data.extend_from_slice(&[0x01, 0x00]); // alert body (not consumed by peek)
 
         let mut cursor = io::Cursor::new(data);
-        let (buf, sni) = peek_client_hello(&mut cursor).await.expect("peek should succeed");
+        let (buf, sni) = peek_client_hello(&mut cursor)
+            .await
+            .expect("peek should succeed");
 
         assert_eq!(sni, None, "non-TLS-handshake should yield None for SNI");
         assert_eq!(buf.len(), 5, "only the 5-byte header should be returned");

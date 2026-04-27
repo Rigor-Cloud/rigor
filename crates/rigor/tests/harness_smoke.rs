@@ -1,11 +1,16 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! Smoke tests for rigor-harness primitives.
 //!
 //! Verifies that IsolatedHome, TestCA, MockLlmServer, TestProxy, and SSE helpers
 //! compose correctly. This is the acceptance gate for Phase 7 (issue #8).
 
 use rigor_harness::{
-    IsolatedHome, MockLlmServerBuilder,
-    SseFormat, parse_sse_events, extract_text_from_sse,
+    extract_text_from_sse, parse_sse_events, IsolatedHome, MockLlmServerBuilder, SseFormat,
 };
 
 /// Minimal valid rigor.yaml for tests (ConstraintsSection is a struct, not a list).

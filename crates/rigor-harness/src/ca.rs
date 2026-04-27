@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use anyhow::{Context, Result};
 use rustls::ServerConfig;
+use std::sync::Arc;
 
 /// Ephemeral test CA for TLS testing.
 ///

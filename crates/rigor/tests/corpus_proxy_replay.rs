@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! F6: Full-proxy corpus replay integration test.
 //!
 //! Drives recorded corpus responses through the complete proxy pipeline
@@ -22,8 +28,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use rigor::corpus::{self, PromptManifest};
-use rigor_harness::{MockLlmServerBuilder, TestProxy};
 use rigor_harness::sse::anthropic_sse_chunks;
+use rigor_harness::{MockLlmServerBuilder, TestProxy};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -200,7 +206,10 @@ async fn f6_full_proxy_corpus_replay() {
     }
 
     let replay_count = entries.len();
-    assert!(replay_count > 0, "Expected at least one recording to replay");
+    assert!(
+        replay_count > 0,
+        "Expected at least one recording to replay"
+    );
 
     eprintln!(
         "corpus_proxy_replay: replaying {}/{} recordings through full proxy pipeline{}",
@@ -220,8 +229,7 @@ async fn f6_full_proxy_corpus_replay() {
         .await;
 
     // Create single TestProxy with focused constraint set
-    let proxy =
-        TestProxy::start_with_mock(REPLAY_CONSTRAINT_YAML, &mock.url()).await;
+    let proxy = TestProxy::start_with_mock(REPLAY_CONSTRAINT_YAML, &mock.url()).await;
 
     // Send each recording through the proxy and collect decisions
     let mut decisions: Vec<(&str, String, String, u32)> = Vec::new();
@@ -254,7 +262,10 @@ async fn f6_full_proxy_corpus_replay() {
                 "  [{}/{}] processed ({} blocks so far)",
                 i + 1,
                 replay_count,
-                decisions.iter().filter(|(d, _, _, _)| *d == "block").count()
+                decisions
+                    .iter()
+                    .filter(|(d, _, _, _)| *d == "block")
+                    .count()
             );
         }
     }

@@ -165,6 +165,11 @@ pub fn cleanup_expired_gates(state: &SharedState) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::await_holding_lock,
+        clippy::bool_assert_comparison,
+        clippy::single_match
+    )]
     use super::*;
     use std::sync::{Arc, Mutex};
 
@@ -278,7 +283,10 @@ mod tests {
         with_temp_rigor_home(|| {
             let (state, _event_tx) = make_test_state();
             let result = apply_decision(&state, "nonexistent-gate", true);
-            assert!(result.is_err(), "apply_decision on nonexistent gate should error");
+            assert!(
+                result.is_err(),
+                "apply_decision on nonexistent gate should error"
+            );
             assert!(
                 result.unwrap_err().contains("not found"),
                 "error message should mention 'not found'"

@@ -778,9 +778,15 @@ mod tests {
         with_temp_rigor_home(|rigor_dir| {
             write_pid_file().expect("write_pid_file should succeed");
             let pid_path = rigor_dir.join("daemon.pid");
-            assert!(pid_path.exists(), "PID file should exist after write_pid_file");
+            assert!(
+                pid_path.exists(),
+                "PID file should exist after write_pid_file"
+            );
             let content = std::fs::read_to_string(&pid_path).unwrap();
-            let pid: u32 = content.trim().parse().expect("PID file should contain a number");
+            let pid: u32 = content
+                .trim()
+                .parse()
+                .expect("PID file should contain a number");
             assert_eq!(pid, std::process::id());
         });
     }
@@ -793,7 +799,10 @@ mod tests {
             assert!(pid_path.exists());
 
             remove_pid_file();
-            assert!(!pid_path.exists(), "PID file should be gone after remove_pid_file");
+            assert!(
+                !pid_path.exists(),
+                "PID file should be gone after remove_pid_file"
+            );
         });
     }
 
@@ -801,7 +810,10 @@ mod tests {
     fn test_daemon_alive_returns_true_for_current_process() {
         with_temp_rigor_home(|_rigor_dir| {
             write_pid_file().unwrap();
-            assert!(daemon_alive(), "daemon_alive should return true when PID file contains our own PID");
+            assert!(
+                daemon_alive(),
+                "daemon_alive should return true when PID file contains our own PID"
+            );
         });
     }
 
@@ -810,7 +822,10 @@ mod tests {
         with_temp_rigor_home(|rigor_dir| {
             // Create the .rigor directory but no PID file
             std::fs::create_dir_all(rigor_dir).unwrap();
-            assert!(!daemon_alive(), "daemon_alive should return false when no PID file exists");
+            assert!(
+                !daemon_alive(),
+                "daemon_alive should return false when no PID file exists"
+            );
         });
     }
 
@@ -821,7 +836,10 @@ mod tests {
             let pid_path = rigor_dir.join("daemon.pid");
             // PID 2000000 is extremely unlikely to be a real running process
             std::fs::write(&pid_path, "2000000\n").unwrap();
-            assert!(!daemon_alive(), "daemon_alive should return false for a dead/non-existent PID");
+            assert!(
+                !daemon_alive(),
+                "daemon_alive should return false for a dead/non-existent PID"
+            );
         });
     }
 
@@ -831,7 +849,10 @@ mod tests {
             std::fs::create_dir_all(rigor_dir).unwrap();
             let pid_path = rigor_dir.join("daemon.pid");
             std::fs::write(&pid_path, "not_a_number\n").unwrap();
-            assert!(!daemon_alive(), "daemon_alive should return false for non-numeric PID file content");
+            assert!(
+                !daemon_alive(),
+                "daemon_alive should return false for non-numeric PID file content"
+            );
         });
     }
 }

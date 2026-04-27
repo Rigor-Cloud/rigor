@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! E1 — Real-LLM proof-of-life (PR-2.6 Tier 1).
 //!
 //! Auto-skips when `OPENROUTER_API_KEY` is unset. When the key is present,

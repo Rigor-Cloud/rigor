@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! B-series invariant tests — PR-2.6 Tier 1.
 //!
 //! - B4: DF-QuAD determinism — 100 identical inputs must produce 100 identical
