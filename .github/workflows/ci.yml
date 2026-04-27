@@ -91,7 +91,7 @@ jobs:
           VIOLATIONS=$(grep -rn 'dirs::home_dir\|env::var("HOME")\|env::var_os("HOME")' \
             crates/rigor/src/ \
             --include='*.rs' \
-            | grep -v 'src/paths.rs' \
+            | grep -v 'paths\.rs' \
             | grep -v 'rigor-home-ok' \
             || true)
           if [ -n "$VIOLATIONS" ]; then
