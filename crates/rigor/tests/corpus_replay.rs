@@ -47,7 +47,17 @@ fn replay_one_sample(sample: &RecordedSample, config_path: &std::path::Path) -> 
     }
 }
 
+// Marked `#[ignore]` so the default `cargo test` run does not silently pass
+// when the corpus has not been recorded. Run explicitly with
+// `cargo test --ignored` (or `cargo test -- --ignored`) after running
+// `rigor corpus record` to populate `.planning/corpus/`.
+//
+// Previously this test silently `return`ed when the corpus directories were
+// absent, which meant CI could pass without ever exercising the replay
+// pipeline. Now the test is opt-in and panics loudly when explicitly run
+// against an empty corpus.
 #[test]
+#[ignore = "requires recorded corpus; run `rigor corpus record` then `cargo test --ignored`"]
 fn corpus_replay_scaffold() {
     let root = repo_root();
     let prompts_dir = root.join(".planning/corpus/prompts");
@@ -55,12 +65,11 @@ fn corpus_replay_scaffold() {
     let rigor_yaml = root.join("rigor.yaml");
 
     if !prompts_dir.exists() || !recordings_dir.exists() {
-        eprintln!(
-            "corpus_replay: no corpus directories yet (expected at {} / {}) — skipping.",
+        panic!(
+            "corpus directories required at {} / {} — run `rigor corpus record` first",
             prompts_dir.display(),
             recordings_dir.display()
         );
-        return;
     }
 
     let manifests: Vec<PromptManifest> =
