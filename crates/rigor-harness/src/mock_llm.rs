@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::oneshot;
-use axum::{Router, routing::post, response::sse::{Event, Sse}};
+use axum::{Router, routing::post, response::sse::{Event, Sse}, response::IntoResponse, http::header};
 use futures_util::stream;
 
 use crate::sse::{anthropic_sse_chunks, openai_sse_chunks};
@@ -18,6 +18,10 @@ pub struct MockLlmServerBuilder {
     chunks: Vec<String>,
     response_sequence: Option<Vec<Vec<String>>>,
     route_path: String,
+    /// When set, the server returns this raw JSON body (not SSE).
+    /// Used by non-streaming-path tests where the proxy buffers the response
+    /// and runs `serde_json::from_slice` on it.
+    json_body: Option<String>,
 }
 
 /// A mock LLM server that serves deterministic SSE responses on an ephemeral port.
@@ -36,6 +40,7 @@ impl MockLlmServerBuilder {
             chunks: Vec::new(),
             response_sequence: None,
             route_path: "/v1/messages".to_string(),
+            json_body: None,
         }
     }
 
@@ -74,6 +79,24 @@ impl MockLlmServerBuilder {
         self
     }
 
+    /// Serve a non-streaming Anthropic-format JSON response with the given
+    /// assistant text. The proxy's non-streaming path runs
+    /// `serde_json::from_slice` on the buffered body, so the body MUST parse
+    /// as JSON for the post-response evaluation pipeline to fire.
+    pub fn anthropic_json(mut self, text: &str) -> Self {
+        let body = serde_json::json!({
+            "id": "msg_test",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-sonnet-4-20250514",
+            "content": [{"type": "text", "text": text}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 20}
+        });
+        self.json_body = Some(body.to_string());
+        self
+    }
+
     /// Start the server and return a running MockLlmServer.
     pub async fn build(self) -> MockLlmServer {
         let route_path = self.route_path;
@@ -89,34 +112,55 @@ impl MockLlmServerBuilder {
 
         let call_count = Arc::new(AtomicUsize::new(0));
 
-        let received_clone = received.clone();
-        let handler = move |body: axum::body::Bytes| {
-            let received = received_clone.clone();
-            let responses = all_responses.clone();
-            let counter = call_count.clone();
-            async move {
-                // Track received request body
-                let json_body = serde_json::from_slice::<serde_json::Value>(&body)
-                    .unwrap_or(serde_json::Value::Null);
-                received.lock().unwrap().push(ReceivedRequest { body: json_body });
+        let app = if let Some(json_str) = self.json_body {
+            // Non-streaming JSON mode: serve raw JSON body with content-type:
+            // application/json so the proxy's `serde_json::from_slice` succeeds.
+            let json_arc = Arc::new(json_str);
+            let received_clone = received.clone();
+            let json_handler = move |body: axum::body::Bytes| {
+                let received = received_clone.clone();
+                let json = json_arc.clone();
+                async move {
+                    let parsed = serde_json::from_slice::<serde_json::Value>(&body)
+                        .unwrap_or(serde_json::Value::Null);
+                    received.lock().unwrap().push(ReceivedRequest { body: parsed });
+                    (
+                        [(header::CONTENT_TYPE, "application/json")],
+                        (*json).clone(),
+                    )
+                        .into_response()
+                }
+            };
+            Router::new().route(&route_path, post(json_handler))
+        } else {
+            let received_clone = received.clone();
+            let handler = move |body: axum::body::Bytes| {
+                let received = received_clone.clone();
+                let responses = all_responses.clone();
+                let counter = call_count.clone();
+                async move {
+                    // Track received request body
+                    let json_body = serde_json::from_slice::<serde_json::Value>(&body)
+                        .unwrap_or(serde_json::Value::Null);
+                    received.lock().unwrap().push(ReceivedRequest { body: json_body });
 
-                // Select response by call index; repeat last if index exceeds length
-                let call_idx = counter.fetch_add(1, Ordering::SeqCst);
-                let chunks = if call_idx < responses.len() {
-                    &responses[call_idx]
-                } else {
-                    responses.last().unwrap()
-                };
+                    // Select response by call index; repeat last if index exceeds length
+                    let call_idx = counter.fetch_add(1, Ordering::SeqCst);
+                    let chunks = if call_idx < responses.len() {
+                        &responses[call_idx]
+                    } else {
+                        responses.last().unwrap()
+                    };
 
-                let events: Vec<Result<Event, std::convert::Infallible>> = chunks
-                    .iter()
-                    .map(|data| Ok(Event::default().data(data)))
-                    .collect();
-                Sse::new(stream::iter(events))
-            }
+                    let events: Vec<Result<Event, std::convert::Infallible>> = chunks
+                        .iter()
+                        .map(|data| Ok(Event::default().data(data)))
+                        .collect();
+                    Sse::new(stream::iter(events))
+                }
+            };
+            Router::new().route(&route_path, post(handler))
         };
-
-        let app = Router::new().route(&route_path, post(handler));
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await

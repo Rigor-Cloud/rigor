@@ -385,3 +385,83 @@ async fn proxy_request_non_streaming_returns_200() {
     );
 }
 
+/// C5: non-streaming BLOCK path coverage.
+///
+/// Mock serves a non-streaming Anthropic JSON response containing
+/// "VIOLATION_MARKER". The keyword constraint's Rego rule fires `violated:
+/// true` when claim text contains that marker. The proxy's non-streaming
+/// path buffers the JSON, then `extract_and_evaluate` (proxy.rs:2906) runs
+/// in a spawned task, reaches `extract_and_evaluate_text` (line 3257) which
+/// extracts claims, evaluates them through the policy pipeline, collects
+/// violations, and emits `DaemonEvent::Decision{decision:"block"}` plus
+/// `DaemonEvent::Violation` events.
+///
+/// The non-streaming path does NOT mutate the HTTP response body for blocks
+/// (the body was already buffered and returned by line 2858 before evaluation
+/// finishes). The observable contract is the broadcast event stream.
+const C5_BLOCK_KEYWORD_YAML: &str = r#"constraints:
+  beliefs:
+    - id: c5-keyword-detector
+      epistemic_type: belief
+      name: C5 Keyword Detector
+      description: Blocks if claim text contains VIOLATION_MARKER
+      rego: |
+        violation contains v if {
+          some c in input.claims
+          contains(c.text, "VIOLATION_MARKER")
+          v := {"constraint_id": "c5-keyword-detector", "violated": true, "claims": [c.id], "reason": "keyword found"}
+        }
+      message: Keyword violation detected
+  justifications: []
+  defeaters: []
+"#;
+
+#[tokio::test]
+async fn proxy_request_non_streaming_block_emits_violation() {
+    let mock = MockLlmServerBuilder::new()
+        .anthropic_json(
+            "The system contains VIOLATION_MARKER in its output. This is a factual statement.",
+        )
+        .build()
+        .await;
+
+    let proxy = TestProxy::start_with_mock(C5_BLOCK_KEYWORD_YAML, &mock.url()).await;
+    let mut events = proxy.subscribe();
+
+    let body = anthropic_request_body(false, "Tell me about the system.");
+    let resp = proxy_post(&proxy.url(), &body).await;
+    // HTTP status is 200 — proxy buffers response and returns it before
+    // background evaluation completes (proxy.rs:2858).
+    assert_eq!(resp.status(), 200, "non-streaming returns 200 even on block");
+    let _ = resp.text().await.unwrap();
+
+    // The spawned evaluation task emits DaemonEvent::Violation +
+    // DaemonEvent::Decision{decision:"block"} on the broadcast channel.
+    let mut got_violation = false;
+    let mut got_block_decision = false;
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while std::time::Instant::now() < deadline && !(got_violation && got_block_decision) {
+        match tokio::time::timeout(Duration::from_millis(200), events.recv()).await {
+            Ok(Ok(DaemonEvent::Violation { constraint_id, .. }))
+                if constraint_id == "c5-keyword-detector" =>
+            {
+                got_violation = true;
+            }
+            Ok(Ok(DaemonEvent::Decision { decision, .. })) if decision == "block" => {
+                got_block_decision = true;
+            }
+            Ok(Ok(_)) => continue,
+            Ok(Err(_)) => break,
+            Err(_) => continue,
+        }
+    }
+
+    assert!(
+        got_violation,
+        "non-streaming block path must emit DaemonEvent::Violation for the keyword constraint"
+    );
+    assert!(
+        got_block_decision,
+        "non-streaming block path must emit DaemonEvent::Decision{{decision:\"block\"}}"
+    );
+}
