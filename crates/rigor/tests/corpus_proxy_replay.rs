@@ -308,23 +308,23 @@ async fn f6_full_proxy_corpus_replay() {
         }
     }
 
-    // Log mismatches as warnings (not hard failures -- single-constraint
-    // evaluation may differ from full production constraint set)
-    if !rate_mismatches.is_empty() {
-        eprintln!(
-            "\nINFO: {} rate mismatches with single-constraint evaluation:\n  {}",
-            rate_mismatches.len(),
-            rate_mismatches.join("\n  ")
-        );
-    }
-
-    // Final assertion: all recordings processed without crash
+    // All recordings processed without crash
     assert_eq!(
         decisions.len(),
         replay_count,
         "Expected {} decisions, got {}",
         replay_count,
         decisions.len()
+    );
+
+    // Hard assertion: every observed (prompt, model) block rate must lie
+    // inside its manifest window. This is the drift-detection assertion --
+    // a real failure surfaces when behavior changes outside the calibrated
+    // tolerance.
+    assert!(
+        rate_mismatches.is_empty(),
+        "Block rate drift detected:\n{}",
+        rate_mismatches.join("\n")
     );
 
     eprintln!(
