@@ -6,6 +6,7 @@
 
 pub mod home;
 pub mod ca;
+pub mod env_lock;
 pub mod mock_llm;
 pub mod proxy;
 pub mod sse;

@@ -6,6 +6,7 @@
 //! and sends exactly one retry to the upstream. The retry response (call index 1)
 //! is forwarded to the client.
 
+use rigor_harness::env_lock::ENV_LOCK;
 use rigor_harness::{extract_text_from_sse, parse_sse_events, MockLlmServerBuilder, SseFormat,
     TestProxy};
 
@@ -33,9 +34,6 @@ const VIOLATION_TEXT: &str =
 
 /// Clean text for retry response (call 1). No constraint keywords, no PII.
 const CLEAN_TEXT: &str = "The weather today is pleasant and sunny.";
-
-/// Serializes env var mutations for RIGOR_NO_RETRY across parallel tests.
-static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// B2: BLOCK triggers retry; retry request has [RIGOR EPISTEMIC CORRECTION] in
 /// system prompt; client receives clean retry response (not error SSE).

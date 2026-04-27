@@ -7,14 +7,8 @@
 //! These tests mutate the global `RIGOR_HOME` env var, so they are serialized
 //! via a local static mutex. They run with `#[test]` (synchronous).
 
-use std::sync::Mutex;
-
 use rigor::daemon::{daemon_alive, remove_pid_file, write_pid_file};
-
-/// Process-wide mutex for serializing tests that mutate `RIGOR_HOME`.
-/// Integration tests cannot access the crate-internal `RIGOR_HOME_TEST_LOCK`,
-/// so we define a local equivalent.
-static PID_TEST_LOCK: Mutex<()> = Mutex::new(());
+use rigor_harness::env_lock::ENV_LOCK as PID_TEST_LOCK;
 
 /// Run a closure with `RIGOR_HOME` temporarily set to a fresh tempdir.
 ///

@@ -16,10 +16,8 @@
 //! rather than transparent retry+resubmit. This is serialized via ENV_LOCK
 //! to prevent races with parallel tests.
 
+use rigor_harness::env_lock::ENV_LOCK;
 use rigor_harness::{MockLlmServerBuilder, TestProxy};
-
-/// Serializes env var mutations for RIGOR_NO_RETRY across parallel tests.
-static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Constraint YAML with a regex that fires when the response contains "FORBIDDEN_KEYWORD_XYZ".
 /// This is a synthetic constraint designed for deterministic testing.

@@ -4,6 +4,7 @@
 //! RIGOR_NO_RETRY=1, it drops the upstream connection and injects an
 //! `event: error` SSE event into the client stream containing "rigor BLOCKED".
 
+use rigor_harness::env_lock::ENV_LOCK;
 use rigor_harness::{MockLlmServerBuilder, TestProxy};
 
 /// Rego keyword constraint that fires `violated: true` when claim text
@@ -39,10 +40,6 @@ const BLOCK_CONSTRAINT_YAML: &str = r#"constraints:
 /// (d) Is a declarative assertion (not question/hypothetical)
 const VIOLATION_TEXT: &str =
     "The system contains VIOLATION_MARKER in its output. This is a factual statement.";
-
-/// Serializes env var mutations for RIGOR_NO_RETRY across parallel tests.
-/// Prevents races with B2 tests which must NOT have RIGOR_NO_RETRY set.
-static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Helper: build a valid Anthropic request body.
 fn anthropic_request_body(stream: bool, user_msg: &str) -> serde_json::Value {
