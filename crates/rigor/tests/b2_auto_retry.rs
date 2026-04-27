@@ -190,3 +190,159 @@ async fn b2_retry_at_most_once() {
         resp_body
     );
 }
+
+/// H3: When BOTH the original and the retry response contain VIOLATION_TEXT,
+/// the proxy must retry exactly once (not loop) and surface an error to the
+/// client without panicking. Proves the at-most-once retry invariant on the
+/// "retry-also-violates" cascade path.
+///
+/// The proxy's retry guard is `already_retried`, which checks for the
+/// `[RIGOR EPISTEMIC CORRECTION]` marker in `body["system"]` (proxy.rs
+/// ~line 2010). The original request body intentionally does NOT contain
+/// the marker so the first BLOCK fires the retry path; the retry request
+/// the proxy builds itself injects the marker, so a second BLOCK on the
+/// (also-violating) retry response must NOT fire a second retry.
+///
+/// Key invariants verified:
+/// 1. The proxy issues exactly 2 upstream-LLM requests (original + 1 retry,
+///    never more — proves the at-most-once cascade).
+/// 2. The retry request carries the `[RIGOR EPISTEMIC CORRECTION]` marker.
+/// 3. The original request does NOT carry the marker (test setup sanity).
+/// 4. The proxy returns a response (no panic, no hang) within a bounded
+///    duration.
+///
+/// Note: the mock may receive additional non-LLM judge queries (proxy.rs
+/// `check_violations_persist` falls back to the captured `x-api-key` from
+/// the request when no judge api_key is configured, and re-uses
+/// `target_api`). Those queries have a distinct body shape (no `system`
+/// field, prompt content under `messages[0].content` containing
+/// "factual accuracy judge"). We count only the LLM-style requests by
+/// matching on the original user message — judge prompts do not contain
+/// the user's "Tell me something" string.
+#[tokio::test]
+async fn b2_retry_also_violates_surfaces_error() {
+    // Both call 0 and call 1 return violation text — the upstream cannot
+    // produce a clean response.
+    let violation_chunks_0 = rigor_harness::sse::anthropic_sse_chunks(VIOLATION_TEXT);
+    let violation_chunks_1 = rigor_harness::sse::anthropic_sse_chunks(VIOLATION_TEXT);
+    let mock = MockLlmServerBuilder::new()
+        .response_sequence(vec![violation_chunks_0, violation_chunks_1])
+        .build()
+        .await;
+    let proxy = TestProxy::start_with_mock(BLOCK_CONSTRAINT_YAML, &mock.url()).await;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // Retries enabled — RIGOR_NO_RETRY must NOT be set (note: the proxy
+    // checks `is_ok()` on the env var, so any value enables disabling).
+    let orig = std::env::var("RIGOR_NO_RETRY").ok();
+    if orig.is_some() {
+        unsafe { std::env::remove_var("RIGOR_NO_RETRY") };
+    }
+
+    // Distinctive user message used to distinguish original-LLM requests
+    // (which echo this string in messages[].content) from judge queries
+    // (which embed a YES/NO judge prompt instead).
+    let user_msg = "Tell me something distinctive_h3_user_marker";
+
+    // Request body WITHOUT the correction marker — original request must
+    // appear as a fresh (non-retried) request to the proxy.
+    let body = serde_json::json!({
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": 100,
+        "stream": true,
+        "system": "You are a helpful assistant.",
+        "messages": [{"role": "user", "content": user_msg}]
+    });
+
+    // Bound the test on a generous timeout — if the proxy ever loops, the
+    // mock would log many calls and the request would never finish.
+    let request_fut = reqwest::Client::new()
+        .post(format!("{}/v1/messages", proxy.url()))
+        .header("content-type", "application/json")
+        .header("x-api-key", "sk-ant-api03-test")
+        .json(&body)
+        .send();
+    let resp = tokio::time::timeout(std::time::Duration::from_secs(15), request_fut)
+        .await
+        .expect("retry-also-violates path must not hang")
+        .expect("proxy request should not fail at transport level");
+
+    let resp_body = tokio::time::timeout(std::time::Duration::from_secs(15), resp.text())
+        .await
+        .expect("response body read must not hang")
+        .expect("response body should be readable");
+
+    // Restore env
+    match orig {
+        Some(v) => unsafe { std::env::set_var("RIGOR_NO_RETRY", v) },
+        None => {}
+    }
+
+    // Filter to LLM-style requests by matching on the distinctive user
+    // message — judge queries embed an unrelated YES/NO prompt instead.
+    let received = mock.received_requests();
+    let llm_requests: Vec<_> = received
+        .iter()
+        .filter(|r| {
+            r.body
+                .get("messages")
+                .and_then(|m| m.as_array())
+                .map(|arr| {
+                    arr.iter().any(|msg| {
+                        msg.get("content")
+                            .and_then(|c| c.as_str())
+                            .map(|s| s.contains("distinctive_h3_user_marker"))
+                            .unwrap_or(false)
+                    })
+                })
+                .unwrap_or(false)
+        })
+        .collect();
+
+    // Invariant 1: exactly 2 LLM requests — original + 1 retry, never more.
+    assert_eq!(
+        llm_requests.len(),
+        2,
+        "Proxy must issue exactly 2 upstream LLM requests (original + 1 retry, no infinite loop). \
+         Got {} LLM requests out of {} total mock calls.",
+        llm_requests.len(),
+        received.len()
+    );
+
+    // Invariant 2: the retry request (index 1) carries the
+    // [RIGOR EPISTEMIC CORRECTION] marker — confirms the retry path was
+    // traversed (rather than the proxy bailing out before retry).
+    let retry_system = llm_requests[1]
+        .body
+        .get("system")
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    assert!(
+        retry_system.contains("[RIGOR EPISTEMIC CORRECTION]"),
+        "Retry request must carry the correction marker (proves retry path was traversed). \
+         Got system: '{}'",
+        retry_system
+    );
+
+    // Invariant 3: the original request (index 0) did NOT carry the marker
+    // — confirms our test setup actually exercised the retry trigger.
+    let orig_system = llm_requests[0]
+        .body
+        .get("system")
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    assert!(
+        !orig_system.contains("[RIGOR EPISTEMIC CORRECTION]"),
+        "Original request must NOT carry the correction marker (test setup error). \
+         Got system: '{}'",
+        orig_system
+    );
+
+    // Sanity: the proxy returned *something* — it didn't panic mid-stream
+    // and leave the client with an empty body.
+    assert!(
+        !resp_body.is_empty(),
+        "Response body must be non-empty (proxy must produce SOME output even on \
+         retry-also-violates). Got empty body."
+    );
+}
