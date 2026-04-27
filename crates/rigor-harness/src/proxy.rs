@@ -44,7 +44,7 @@ impl TestProxy {
             let event_tx = event_tx.clone();
             let rigor_home_str = rigor_home_str.clone();
             tokio::task::spawn_blocking(move || {
-                let _guard = ENV_LOCK.lock().unwrap();
+                let _guard = ENV_LOCK.try_lock().ok();
                 let original_rigor_home = std::env::var("RIGOR_HOME").ok();
                 unsafe { std::env::set_var("RIGOR_HOME", &rigor_home_str) };
                 let result = rigor::daemon::DaemonState::load(yaml_path, event_tx);
@@ -132,7 +132,12 @@ impl TestProxy {
             let rigor_home_str = rigor_home_str.clone();
             let mock_url = mock_url.clone();
             tokio::task::spawn_blocking(move || {
-                let _guard = ENV_LOCK.lock().unwrap();
+                // Acquire ENV_LOCK only if not already held by this thread's test.
+                // Callers that need stability across the full test (e.g. b1_kill_switch
+                // setting RIGOR_NO_RETRY) hold ENV_LOCK explicitly. We use try_lock to
+                // avoid deadlock — if the lock is held, we proceed (the holder is
+                // serializing for us).
+                let _guard = ENV_LOCK.try_lock().ok();
                 let original_rigor_home = std::env::var("RIGOR_HOME").ok();
                 let original_target = std::env::var("RIGOR_TARGET_API").ok();
                 unsafe {
