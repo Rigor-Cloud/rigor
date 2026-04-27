@@ -296,14 +296,13 @@ impl MockLlmServerBuilder {
                             // Sleep `delay` before each chunk to simulate backpressure.
                             let delay = *delay;
                             let owned_chunks: Vec<String> = chunks.clone();
-                            let s =
-                                stream::iter(owned_chunks).then(move |d| async move {
-                                    tokio::time::sleep(delay).await;
-                                    Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!(
-                                        "data: {}\n\n",
-                                        d
-                                    )))
-                                });
+                            let s = stream::iter(owned_chunks).then(move |d| async move {
+                                tokio::time::sleep(delay).await;
+                                Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!(
+                                    "data: {}\n\n",
+                                    d
+                                )))
+                            });
                             let body = Body::from_stream(s);
                             ([(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
                         }

@@ -232,12 +232,16 @@ fn build_graph_data(yaml_path: &Path) -> Result<GraphData> {
 }
 
 fn serve_asset(path: &str) -> Response {
-    let mime = if path.ends_with(".js") {
+    let mime = if path.ends_with(".js") || path.ends_with(".jsx") {
         "application/javascript"
     } else if path.ends_with(".css") {
         "text/css"
     } else if path.ends_with(".html") {
         "text/html"
+    } else if path.ends_with(".woff2") {
+        "font/woff2"
+    } else if path.ends_with(".svg") {
+        "image/svg+xml"
     } else {
         "application/octet-stream"
     };
