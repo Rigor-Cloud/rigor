@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T10:17:33.167485Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n## Overview\nThis script demonstrates manual control of Python's garbage collection using the `gc` module, including cycle detection, threshold management, and memory monitoring.\n\n```python\n\"\"\"\nPython Garbage Collection Control Script\nDemonstrates manual GC management, cycle detection, and memory optimization.\n\"\"\"\n\nimport gc\nimport sys\nimport weakref\nimport logging\nimport time\nfrom typing import Optional\nfrom dataclasses import dataclass, field\n\n# Configure logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\",\n    datefmt=\"%H:%M:%S\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# Helper: Memory Usage\n# ─────────────────────────────────────────────\n\ndef get_memory_usage() -> str:\n    \"\"\"Return current memory usage (cross-platform).\"\"\"\n    try:\n        import resource\n        mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss\n        return f\"{mem / 1024:.1f} MB\"\n    except ImportError:\n        try:\n            import psutil, os\n            proc = psutil.Process(os.getpid())\n            return f\"{proc.memory_info().rss / (1024 ** 2):.1f} MB\"\n        except ImportError:\n            return \"N/A (install psutil for memory stats)\"\n\n\n# ─────────────────────────────────────────────\n# 1. GC State Inspector\n# ─────────────────────────────────────────────\n\nclass GCInspector:\n    \"\"\"Inspect and report the current state of the garbage collector.\"\"\"\n\n    @staticmethod\n    def report() -> None:\n        \"\"\"Print a full GC status report.\"\"\"\n        print(\"\\n\" + \"=\" * 50)\n        print(\"       GARBAGE COLLECTOR STATUS REPORT\")\n        print(\"=\" * 50)\n\n        # Enable/disable status\n        status = \"ENABLED\" if gc.isenabled() else \"DISABLED\"\n        print(f\"  GC Status        :",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025845-z8XaL8zkSJJkZPSTKhl2"
+}

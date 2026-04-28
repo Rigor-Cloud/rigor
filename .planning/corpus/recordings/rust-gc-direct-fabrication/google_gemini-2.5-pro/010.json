@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:c1c3a6c3011eda5881bb84b273cf4acd5e1d8b4b1e7ca1d011f03dbcfb545b21",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T13:07:20.250624Z",
+  "temperature": 0.7,
+  "response_text": "Of course. This is a fantastic question because it gets to the very heart of what makes Rust different from",
+  "tokens": {
+    "prompt": 17,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036032-exkw13pvIvL0NZjn7JA7"
+}

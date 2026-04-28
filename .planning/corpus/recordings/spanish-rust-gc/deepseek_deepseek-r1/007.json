@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:6d56c84c410a5ac9fbe6f5ddc4937b4d9c3cc3e8cf5a85402e05005435f8bcb0",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T13:28:53.519582Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura en Rust vs Java\n\n## 📦 En Rust: **Sin Recolector de Basura Tradicional**\n\nRust utiliza un sistema de **propiedad (ownership)** y **préstamos (borrowing)** que garantiza la seguridad de memoria en **tiempo de compilación**:\n\n### Mecanismos principales:\n1. **Sistema de Ownership**\n   - Cada valor tiene un único dueño\n   - Cuando el dueño sale del ámbito, la memoria se libera automáticamente\n   - Evita \"use-after-free\" y \"double-free\"\n\n2. **Borrowing & Lifetimes**\n   - Referencias inmutables (`&T`) o mutables (`&mut T`)\n   - El compilador verifica que las referencias no sobrevivan a los datos referenciados\n   - Garantizado en tiempo de compilación\n\n3. **Tipos de Conteo Inteligente**\n   - `Rc<T>`/`Arc<T>` para múltiples dueños con conteo de referencias\n   - Se liberan cuando el conteo llega a cero\n   - No es un GC tradicional sino gestión manual determinista\n\n### Ejemplo:\n```rust\nfn main() {\n    let s1 = String::from(\"hola\"); // s1 es dueño\n    let s2 = s1; // s1 se mueve a s2, s1 ya no es válido\n    // s1 no se puede usar aquí\n} // s2 sale del ámbito, memoria ",
+  "tokens": {
+    "prompt": 32,
+    "completion": 1466
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037286-iKN9yLP1OUnSF6hrz08f"
+}

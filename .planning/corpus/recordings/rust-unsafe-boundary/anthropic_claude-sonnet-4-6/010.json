@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T13:15:36.980382Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or turn off Rust's type system. It unlocks **five specific capabilities** that the compiler cannot verify:\n\n```rust\nunsafe {\n    // 1. Dereference raw pointers\n    let ptr: *const i32 = &42;\n    println!(\"{}\", *ptr);\n\n    // 2. Call unsafe functions\n    some_unsafe_fn();\n\n    // 3. Access/modify mutable statics\n    static mut COUNTER: u32 = 0;\n    COUNTER += 1;\n\n    // 4. Implement unsafe traits\n    // (done at item level, not block level)\n\n    // 5. Access fields of unions\n    let u = MyUnion { field: 42 };\n    println!(\"{}\", u.field);\n}\n```\n\n## What the Compiler Still Guarantees Inside `unsafe`\n\nThis is the critical part most people misunderstand:\n\n```rust\nunsafe {\n    let s = String::from(\"hello\");\n    let r1 = &s;\n    let r2 = &s;\n    // ✅ Borrow checker still works - this is fine\n\n    let mut v = vec![1, 2, 3];\n    let r = &v[0];\n    v.push(4);      // ❌ Still a compile error - borrow checker active\n    println!(\"{r}\");\n\n    // ✅ Type system still fully active\n    let x: i32 = \"hello\"; // ❌ Still a type error\n\n    // ✅ Lifetimes still checked\n    // ✅ Move semantics still enforced\n    // ✅ Pattern matching still exhaustive\n    // ✅ Integer overflow still checked in debug mode\n}\n```\n\n**You only bypass verification of the five unsafe superpowers - nothing else.**\n\n## When You Should Use `unsafe`\n\n### ✅ Legitimate Use Cases\n\n**1. FFI (Foreign Function Interface)**\n```rust\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n\nfn safe_abs(x",
+  "tokens": {
+    "prompt": 29,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036526-9l4pabpnpptng1pkWZrh"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:38:52.015551Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## The Core Philosophy Difference\n\n```\nGitFlow: Multiple long-lived branches, structured releases\nTrunk-Based: Single main branch, continuous integration\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain          ──●──────────────────────────●──────────── (production releases)\n                │                          │\ndevelop       ──●──●──●──●──●──●──●──●──●──●──●──●──── (integration)\n                   │        │         │\nfeature/login ─────●──●──●──┘         │              (feature branches)\n                             │        │\nrelease/1.2  ────────────────●──●──●──┘              (release prep)\n                                   │\nhotfix/bug   ──────────────────────●──●──●           (emergency fixes)\n```\n\n### Branch Types & Rules\n\n| Branch | Purpose | Branches From | Merges Into |\n|--------|---------|--------------|-------------|\n| `main` | Production code | — | — |\n| `develop` | Integration branch | `main` | — |\n| `feature/*` | New features | `develop` | `develop` |\n| `release/*` | Release prep | `develop` | `main` + `develop` |\n| `hotfix/*` | Emergency fixes | `main` | `main` + `develop` |\n\n### GitFlow Workflow Example\n```bash\n# Start a feature\ngit checkout develop\ngit checkout -b feature/user-authentication\n\n# Work on feature...\ngit add .\ngit commit -m \"Add login endpoint\"\ngit commit -m \"Add JWT validation\"\n\n# Finish feature - merge back to develop\ngit checkout develop\ngit merge --no-ff feature/user-authentication\ngit branch -d feature/user-authentication\n\n# Start a release\ngit checkout -b release/1.2.0 develop\n# Fix bugs, update version numbers...\ngit commit -m \"Bump version to 1.2.0\"\n\n# Finish release - merge to BOTH main and develop\ngit checkout main\ngit merge --no-ff release/1.2.0\ngit tag -",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027119-YVDTijPFO19jGwtAd4oy"
+}

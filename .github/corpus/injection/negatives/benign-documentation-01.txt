@@ -1,0 +1,10 @@
+# Fixture: benign-documentation-01.txt | Pattern: none | Expected: CLEAN
+## POST /api/v1/evaluate
+
+Evaluates a text chunk against the active constraint set.
+
+**Request body:**
+- `text` (string, required): The text to evaluate.
+- `constraints` (array, optional): Override constraint IDs.
+
+**Response:** 200 OK with `{ "verdict": "pass" | "block", "score": float }`.

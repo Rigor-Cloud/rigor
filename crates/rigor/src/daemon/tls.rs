@@ -17,17 +17,11 @@ use rustls::ServerConfig;
 
 /// Paths for the CA cert and key.
 fn ca_cert_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".rigor")
-        .join("ca.pem")
+    crate::paths::rigor_home().join("ca.pem")
 }
 
 fn ca_key_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".rigor")
-        .join("ca-key.pem")
+    crate::paths::rigor_home().join("ca-key.pem")
 }
 
 /// The rigor CA — generates and caches per-host TLS certificates.
@@ -196,7 +190,7 @@ pub fn install_ca_trust() -> Result<()> {
             "-k",
             &format!(
                 "{}/Library/Keychains/login.keychain-db",
-                dirs::home_dir().unwrap_or_default().display()
+                dirs::home_dir().unwrap_or_default().display() // rigor-home-ok
             ),
             &cert_path.to_string_lossy(),
         ])
@@ -263,4 +257,122 @@ pub fn generate_tls_config(hosts: &[&str]) -> Result<ServerConfig> {
         .with_single_cert(certs, key)?;
 
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    /// Helper: save RIGOR_HOME, set to tempdir/.rigor, run closure, restore.
+    /// Uses the crate-wide RIGOR_HOME_TEST_LOCK to serialize across all
+    /// test modules that mutate this env var.
+    fn with_temp_rigor_home<F: FnOnce(&std::path::Path)>(f: F) {
+        let _guard = crate::paths::RIGOR_HOME_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let original = std::env::var("RIGOR_HOME").ok();
+        let tmp = tempfile::TempDir::new().unwrap();
+        let rigor_dir = tmp.path().join(".rigor");
+        unsafe { std::env::set_var("RIGOR_HOME", &rigor_dir) };
+
+        f(&rigor_dir);
+
+        match original {
+            Some(v) => unsafe { std::env::set_var("RIGOR_HOME", v) },
+            None => unsafe { std::env::remove_var("RIGOR_HOME") },
+        }
+    }
+
+    #[test]
+    fn test_load_or_generate_creates_new_ca() {
+        with_temp_rigor_home(|rigor_dir| {
+            let ca = RigorCA::load_or_generate().expect("load_or_generate should succeed");
+            let cert_path = rigor_dir.join("ca.pem");
+            let key_path = rigor_dir.join("ca-key.pem");
+            assert!(cert_path.exists(), "ca.pem should be created");
+            assert!(key_path.exists(), "ca-key.pem should be created");
+            // Verify we can get the CA cert path from the instance
+            assert_eq!(ca.ca_cert_path(), cert_path);
+        });
+    }
+
+    #[test]
+    fn test_load_or_generate_roundtrip() {
+        with_temp_rigor_home(|rigor_dir| {
+            // First call: generates new CA
+            let _ca1 = RigorCA::load_or_generate().expect("first load_or_generate should succeed");
+            let cert_pem_1 = std::fs::read_to_string(rigor_dir.join("ca.pem")).unwrap();
+
+            // Second call: loads existing CA from disk
+            let _ca2 = RigorCA::load_or_generate().expect("second load_or_generate should succeed");
+            let cert_pem_2 = std::fs::read_to_string(rigor_dir.join("ca.pem")).unwrap();
+
+            assert_eq!(
+                cert_pem_1, cert_pem_2,
+                "CA cert PEM should be identical after roundtrip"
+            );
+        });
+    }
+
+    #[test]
+    fn test_server_config_for_host_generates_valid_config() {
+        with_temp_rigor_home(|_rigor_dir| {
+            let ca = RigorCA::load_or_generate().unwrap();
+            let config = ca.server_config_for_host("test.example.com");
+            assert!(
+                config.is_ok(),
+                "server_config_for_host should return Ok for a valid hostname"
+            );
+        });
+    }
+
+    #[test]
+    fn test_server_config_for_host_caches() {
+        with_temp_rigor_home(|_rigor_dir| {
+            let ca = RigorCA::load_or_generate().unwrap();
+
+            let config1 = ca
+                .server_config_for_host("cache-test.example.com")
+                .expect("first call should succeed");
+            let config2 = ca
+                .server_config_for_host("cache-test.example.com")
+                .expect("second call should succeed (from cache)");
+
+            // Both should return valid configs; the cache hit is implicit
+            // (second call succeeds without regenerating).
+            // We can also verify they are the same Arc by pointer equality.
+            assert!(
+                Arc::ptr_eq(&config1, &config2),
+                "cached call should return the same Arc"
+            );
+        });
+    }
+
+    #[test]
+    fn test_install_ca_trust_fails_when_cert_missing() {
+        with_temp_rigor_home(|rigor_dir| {
+            // Create the .rigor directory but do NOT generate any CA
+            std::fs::create_dir_all(rigor_dir).unwrap();
+            let result = install_ca_trust();
+            assert!(
+                result.is_err(),
+                "install_ca_trust should fail when ca.pem is missing"
+            );
+            let err_msg = result.unwrap_err().to_string();
+            assert!(
+                err_msg.contains("CA cert not found"),
+                "error should mention 'CA cert not found', got: {}",
+                err_msg
+            );
+        });
+    }
+
+    #[test]
+    fn test_generate_tls_config_creates_self_signed() {
+        // Pure function -- does not use rigor_home(), no ENV_LOCK needed
+        let result = generate_tls_config(&["localhost", "127.0.0.1"]);
+        assert!(
+            result.is_ok(),
+            "generate_tls_config should produce a valid self-signed config"
+        );
+    }
 }

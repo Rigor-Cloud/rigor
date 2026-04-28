@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T10:18:32.654828Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n## Overview\nThis script demonstrates how to use Python's `gc` module to manually control garbage collection, detect memory leaks, and optimize memory management.\n\n```python\n\"\"\"\nPython Garbage Collection Control Script\nDemonstrates manual GC management, leak detection, and memory optimization.\n\"\"\"\n\nimport gc\nimport sys\nimport weakref\nimport logging\nfrom typing import Any\nfrom dataclasses import dataclass, field\n\n# Configure logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\",\n    datefmt=\"%H:%M:%S\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# Helper utilities\n# ─────────────────────────────────────────────\n\ndef get_gc_stats() -> dict:\n    \"\"\"Collect current GC statistics.\"\"\"\n    counts = gc.get_count()          # (gen0, gen1, gen2) object counts\n    thresholds = gc.get_threshold()  # collection thresholds\n\n    return {\n        \"counts\": {\"gen0\": counts[0], \"gen1\": counts[1], \"gen2\": counts[2]},\n        \"thresholds\": {\n            \"gen0\": thresholds[0],\n            \"gen1\": thresholds[1],\n            \"gen2\": thresholds[2],\n        },\n        \"garbage_objects\": len(gc.garbage),  # uncollectable objects\n        \"tracked_objects\": len(gc.get_objects()),\n    }\n\n\ndef print_gc_stats(label: str = \"\") -> None:\n    \"\"\"Pretty-print current GC statistics.\"\"\"\n    stats = get_gc_stats()\n    header = f\"  GC Stats [{label}]\" if label else \"  GC Stats\"\n    print(f\"\\n{'─' * 50}\")\n    print(header)\n    print(f\"{'─' * 50}\")\n    print(f\"  Object counts : Gen0={stats['counts']['gen0']:>6}  \"\n          f\"Gen1={stats['counts']['gen1']:>6}  ",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025904-LCeXpJsCnG1R26gXz3fB"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:089ae6b182301f72a5166ba04ff998ef798e768f5d683679a2ffed6e429a8f08",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:18:24.806606Z",
+  "temperature": 0.7,
+  "response_text": "# Python Garbage Collection Control Script\n\n## Overview\nThis script demonstrates manual control of Python's garbage collector using the `gc` module, including cycle detection, threshold management, and memory leak identification.\n\n```python\n\"\"\"\nPython Garbage Collection Control Script\nDemonstrates manual GC management, cycle detection, and memory profiling.\n\"\"\"\n\nimport gc\nimport sys\nimport weakref\nimport logging\nfrom typing import Any\nfrom dataclasses import dataclass, field\n\n# Configure logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(asctime)s [%(levelname)s] %(message)s\",\n    datefmt=\"%H:%M:%S\"\n)\nlogger = logging.getLogger(__name__)\n\n\n# ─────────────────────────────────────────────\n# Helper Classes for Demonstrating GC Behavior\n# ─────────────────────────────────────────────\n\nclass TrackedObject:\n    \"\"\"Object that logs its own creation and destruction.\"\"\"\n\n    _count = 0\n\n    def __init__(self, name: str):\n        TrackedObject._count += 1\n        self.name = name\n        self.ref = None                          # used to create cycles\n        logger.debug(f\"  [+] Created:   {self.name} (total: {TrackedObject._count})\")\n\n    def __del__(self):\n        TrackedObject._count -= 1\n        logger.debug(f\"  [-] Destroyed: {self.name} (total: {TrackedObject._count})\")\n\n    def __repr__(self):\n        return f\"TrackedObject({self.name!r})\"\n\n\n@dataclass\nclass Node:\n    \"\"\"Doubly-linked node — easy to form reference cycles.\"\"\"\n    value: Any\n    next_node: \"Node | None\" = field(default=None, repr=False)\n    prev_node: \"Node | None\" = field(default=None, repr=False)\n\n    def __del__(self):\n        logger.debug(f\"  [-] Node({self.value}) collected\")\n\n\n# ─────────────────────────────────────────────\n# GC Manager\n# ─────────────────────────────────────────────\n\nclass",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025895-aOY38BQSrTlJFk6jFfsI"
+}

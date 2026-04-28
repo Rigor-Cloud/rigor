@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T13:23:43.099359Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura: Rust vs Java\n\n## El concepto fundamental\n\nAntes de comparar, hay que aclarar algo importante:\n\n> **Rust no tiene recolector de basura (GC).** Este es precisamente uno de sus puntos diferenciadores más importantes.\n\n---\n\n## Cómo gestiona Rust la memoria\n\nRust usa un sistema llamado **Ownership + Borrowing + Lifetimes**, verificado completamente en **tiempo de compilación**.\n\n### 1. Ownership (Propiedad)\n\n```rust\nfn main() {\n    let s1 = String::from(\"hola\");  // s1 es dueño de la memoria\n    let s2 = s1;                     // ownership se MUEVE a s2\n    \n    // println!(\"{}\", s1);  // ❌ ERROR en compilación: s1 ya no es válido\n    println!(\"{}\", s2);     // ✅ OK\n}   // s2 sale de scope → memoria liberada AUTOMÁTICAMENTE aquí\n```\n\n**Reglas de Ownership:**\n- Cada valor tiene exactamente **un dueño**\n- Cuando el dueño sale de scope, el valor se **libera** (`drop`)\n- Solo puede haber **un dueño a la vez**\n\n---\n\n### 2. Borrowing (Préstamos)\n\n```rust\nfn main() {\n    let s1 = String::from(\"hola\");\n    \n    let len = calcular_longitud(&s1);  // préstamo, no movimiento\n    \n    println!(\"{} tiene {} caracteres\", s1, len);  // ✅ s1 sigue siendo válido\n}\n\nfn calcular_longitud(s: &String) -> usize {  // recibe referencia\n    s.len()\n}   // s sale de scope pero NO libera memoria (no es dueño)\n```\n\n**Reglas de Borrowing:**\n```\nEn cualquier momento puedes tener:\n  ├── UNA referencia mutable   (&mut T)\n  └── MÚLTIPLES referencias inmutables (&",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037013-7sW2LnDhyYiSUx8Q78l6"
+}

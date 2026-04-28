@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:0289edff6b6dfe3c6aaffd93e79ffc9974d73dd7acae32aeb824709613ffb809",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:35:01.830768Z",
+  "temperature": 0.7,
+  "response_text": "No, it is **generally not safe** to use `==` for comparing floating-point numbers in IEEE 754 arithmetic, **except in specific, controlled cases**. Here’s why:\n\n---\n\n### **Why it’s problematic**\n1. **Representation errors**  \n   Many decimal numbers (e.g., `0.1`) cannot be represented exactly in binary floating-point. Small rounding errors occur during arithmetic, making exact equality unlikely.\n\n   Example (in many languages):\n   ```python\n   0.1 + 0.2 == 0.3  # Often false!\n   ```\n   The sum `0.1 + 0.2` yields `0.30000000000000004` due to binary rounding.\n\n2. **Accumulated errors**  \n   Repeated operations (like in loops or algorithms) can amplify tiny errors.\n\n---\n\n### **When `==` *can* be used safely**\n- **Comparing exact literals** (e.g., `x == 0.0` or `y == 1.0`) if `x`/`y` are not results of prior computations.\n- **Checking for special values** like `NaN` or `Infinity` (though `isnan()`/`isinf()` functions are clearer).\n- **Comparing integers within representable range** (e.g., `x == 2.0` if `x` is known to be an integer value).\n- **Bitwise equality checks** (e.g., for serialization or hash maps) where you want *exact* representation match.\n\n---\n\n### **Better alternatives*",
+  "tokens": {
+    "prompt": 25,
+    "completion": 561
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026881-YELKmbuwzkmggcVirvyU"
+}

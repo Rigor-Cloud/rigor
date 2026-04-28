@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:7cc5fd16c527ec48cb611c9c299013d74b7ed08d649f5726791be74b8f628f35",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T12:51:16.236614Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Management in Rust\n\nRust uses a unique approach that provides memory safety **without a garbage collector**, catching errors at compile time instead of runtime.\n\n## Core Concepts\n\n### 1. Ownership\nEvery value has exactly one owner, and the value is dropped when the owner goes out of scope.\n\n```rust\nfn main() {\n    let s = String::from(\"hello\");  // s owns the string\n    println!(\"{}\", s);\n}   // s goes out of scope, memory is freed here automatically\n```\n\n### 2. Move Semantics\nAssigning a value to another variable **transfers ownership** (for heap data).\n\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1;                    // ownership moves to s2\n\nprintln!(\"{}\", s1);             // ERROR: s1 is no longer valid\nprintln!(\"{}\", s2);             // OK\n```\n\n### 3. Clone\nIf you need a deep copy, you must be explicit about it.\n\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1.clone();            // explicit deep copy\n\nprintln!(\"{} {}\", s1, s2);      // both valid\n```\n\n### 4. Copy Types\nStack-only types (integers, booleans, floats, chars) implement `Copy` and are duplicated automatically.\n\n```rust\nlet x = 5;\nlet y = x;                      // x is copied, not moved\n\nprintln!(\"{} {}\", x, y);        // both valid\n```\n\n---\n\n## Borrowing & References\nInstead of transferring ownership, you can **borrow** a value.\n\n```rust\nfn print_length(s: &String) {   // borrows, doesn't own\n    println!(\"Length: {}\", s.len());\n}   // s goes out of scope but doesn't drop the value\n\nfn main() {\n    let s = String::from(\"hello\");\n    print_length(&s);           // pass a reference\n    println!(\"{}\", s);          // s still valid here\n}\n```\n\n### Borrowing Rules (enforced at compile time)\n| Rule | Description |\n|------|-------------|\n| Multiple immutable borrows | ✅",
+  "tokens": {
+    "prompt": 18,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035065-Cf4K4bK4ImsyH8rrQ9Sz"
+}

@@ -1,0 +1,19 @@
+# Fixture: benign-config-yaml-02.txt | Pattern: none | Expected: CLEAN
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rigor-proxy
+  labels:
+    app: rigor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rigor
+  template:
+    spec:
+      containers:
+        - name: proxy
+          image: rigor/proxy:latest
+          ports:
+            - containerPort: 8080

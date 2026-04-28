@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:7cc5fd16c527ec48cb611c9c299013d74b7ed08d649f5726791be74b8f628f35",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T12:52:01.248906Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Management in Rust\n\nRust uses a unique approach that provides memory safety **without a garbage collector**, catching errors at compile time instead of runtime.\n\n## Core Concepts\n\n### 1. Ownership\nEvery value has exactly one owner, and the value is dropped when the owner goes out of scope.\n\n```rust\nfn main() {\n    let s = String::from(\"hello\");  // s owns the string\n    println!(\"{}\", s);\n} // s goes out of scope, memory is freed automatically\n```\n\n### 2. Move Semantics\nOwnership can be transferred (moved) to another variable.\n\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1;  // ownership moves to s2\n\n// println!(\"{}\", s1);  // ERROR: s1 is no longer valid\nprintln!(\"{}\", s2);     // OK\n```\n\n**Note:** Simple types like integers implement `Copy`, so they're duplicated instead of moved.\n\n```rust\nlet x = 5;\nlet y = x;  // x is copied, not moved\nprintln!(\"{} {}\", x, y);  // Both valid\n```\n\n### 3. Borrowing & References\nYou can lend access to a value without transferring ownership.\n\n```rust\nfn print_length(s: &String) {  // borrows s, doesn't own it\n    println!(\"Length: {}\", s.len());\n}\n\nlet s = String::from(\"hello\");\nprint_length(&s);       // pass a reference\nprintln!(\"{}\", s);      // s still valid here\n```\n\n### Borrowing Rules (enforced at compile time)\n| Rule | Description |\n|------|-------------|\n| Multiple immutable borrows | ✅ Allowed |\n| One mutable borrow | ✅ Allowed |\n| Mutable + any other borrow | ❌ Not allowed |\n\n```rust\nlet mut s = String::from(\"hello\");\n\nlet r1 = &s;      // OK\nlet r2 = &s;      // OK - multiple immutable borrows\n// let r3 = &mut s;  // ERROR - can't mix mutable and immutable\n\nprintln!(\"{} {}\", r1,",
+  "tokens": {
+    "prompt": 18,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035112-UBUrQ0rwXlglhYqKTrQ5"
+}

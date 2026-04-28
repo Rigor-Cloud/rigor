@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T13:18:34.059413Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question! Understanding `unsafe` is crucial for writing correct, robust Rust code. Here’s a detailed breakdown of when to use it and what guarantees remain.\n\n---\n\n## **When to Use `unsafe`**\n\n`unsafe` in Rust is a keyword that allows you to perform operations that the compiler cannot statically verify as safe. It **does not turn off Rust’s safety guarantees**—it simply unlocks a few specific \"superpowers\" that you, the programmer, must manually verify as correct.\n\nYou should use `unsafe` **only** in the following scenarios:\n\n### 1. **Dereferencing Raw Pointers**\n   - Raw pointers (`*const T` and `*mut T`) can be created anywhere, but can only be dereferenced inside an `unsafe` block.\n   - Use case: Interfacing with C code, building low-level data structures (like `Vec` or `Rc`).\n\n### 2. **Calling Unsafe Functions**\n   - Functions marked `unsafe` (including many C library bindings) must be called in an `unsafe` block.\n   - Use case: Calling OS APIs, FFI, or functions with extra invariants not expressible in Rust’s type system.\n\n### 3. **Accessing or Modifying Mutable Static Variables**\n   - Global mutable state is inherently thread-unsafe and requires `unsafe` to read or write.\n   - Use case: Low-level system programming, embedded hardware registers.\n\n### 4. **Implementing Unsafe Traits**\n   - Traits like ",
+  "tokens": {
+    "prompt": 30,
+    "completion": 622
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036692-o6bsEmCpsfS55rdpgVLK"
+}

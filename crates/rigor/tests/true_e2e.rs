@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! True end-to-end tests: transcript file -> claim extraction -> policy evaluation -> decision.
 //!
 //! These tests exercise the FULL pipeline without the RIGOR_TEST_CLAIMS shortcut.

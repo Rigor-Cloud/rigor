@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:e7d280eddf99433b6286fbe697c4928b39cea5c3428e06d1004fe24698cb9bec",
+  "model": "openai/gpt-4o",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T11:04:37.385837Z",
+  "temperature": 0.7,
+  "response_text": "HTTP status codes are standardized codes returned by a web server in response to a client's request. They are divided into five categories, each indicating a different type of response. Here are some of the most common HTTP status codes and their meanings:\n\n1. **1xx: Informational**\n   - **100 Continue**: The server has received the request headers, and the client should proceed to send the request body.\n   - **101 Switching Protocols**: The requester has asked the server to switch protocols, and the server is acknowledging that it will do so.\n\n2. **2xx: Success**\n   - **200 OK**: The request was successful, and the server has returned the requested resource.\n   - **201 Created**: The request was successful, and a new resource was created as a result.\n   - **204 No Content**: The request was successful, but there is no content to send in the response.\n\n3. **3xx: Redirection**\n   - **301 Moved Permanently**: The requested resource has been permanently moved to a new URL.\n   - **302 Found**: The requested resource is temporarily located at a different URL.\n   - **304 Not Modified**: The resource has not been modified since the last request, so the client can use the cached version.\n\n4. **4xx: Client Error**\n   - **400 Bad Request**: The server could not understand the request due to invalid syntax.\n   - **401 Unauthorized**: The client must authenticate itself to receive the requested response.\n   - **403 Forbidden**: The client does not have permission to access the requested resource.\n   - **404 Not Found**: The server could not find the requested resource.\n   - **405 Method Not Allowed**: The request method is not supported for the requested resource.\n\n5. **5xx: Server Error**\n   - **500 Internal Server Error**: The server encountered an unexpected condition that prevented it from fulfilling the request.\n   - **501 Not Implemented**: The server does not support the functionality required to fulfill the request.\n   - **502 Bad Gateway**: The server, while acting as a gateway or proxy, received an invalid response from the upstream server.\n   - **503 Service Unavailable**: The server is currently unable to handle the request due to temporary overload or maintenance.\n   - **504 Gateway Timeout**: The server, while acting as a gateway or proxy, did not receive a timely response from the upstream server.\n\nThese codes help in diagnosing and troubleshooting web",
+  "tokens": {
+    "prompt": 19,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028668-0bGXgxMBQIsLfRO27PKS"
+}

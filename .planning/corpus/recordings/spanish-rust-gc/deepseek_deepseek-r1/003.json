@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:6d56c84c410a5ac9fbe6f5ddc4937b4d9c3cc3e8cf5a85402e05005435f8bcb0",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T13:26:36.732841Z",
+  "temperature": 0.7,
+  "response_text": "Rust y Java tienen enfoques radicalmente diferentes para la gestión de memoria. Aquí te explico ambos sistemas:\n\n## 🔵 **Rust: Sin Recolector de Basura Tradicional**\n\nRust **NO tiene un recolector de basura** en tiempo de ejecución. En su lugar, utiliza:\n\n### 1. **Sistema de Ownership (Propiedad)**\n- Cada valor tiene un único \"dueño\"\n- Cuando el dueño sale del ámbito, el valor se destruye automáticamente\n```rust\n{\n    let s = String::from(\"hola\"); // s es el dueño\n    // uso de s\n} // s sale del ámbito, la memoria se libera automáticamente\n```\n\n### 2. **Borrowing (Préstamo)**\n- Permite referencias temporales (&) a valores sin tomar ownership\n- Reglas estrictas en tiempo de compilación:\n  - Una referencia mutable XOR múltiples referencias inmutables\n  - Las referencias no pueden sobrevivir al valor original\n\n### 3. **Lifetimes (Tiempos de vida)**\n- El compilador verifica que todas las referencias sean válidas\n- Garantiza seguridad de memoria sin runtime overhead\n\n### 4. **Smart Pointers**\n- `Box<T>`: Para asignación en heap\n- `Rc<T>`: Conteo de referencias (solo para situaciones específicas)\n- `Arc<T>`: Conteo de referencias atómico para concurrencia\n",
+  "tokens": {
+    "prompt": 32,
+    "completion": 734
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037170-aXGlHgVVwdW3TtlUsHae"
+}

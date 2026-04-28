@@ -91,4 +91,36 @@ mod tests {
         let t = SeverityThresholds::default();
         assert_eq!(t.determine(1.0), Severity::Block);
     }
+
+    // --- Custom threshold + midpoint tests (gap 7) ---
+
+    #[test]
+    fn test_custom_thresholds() {
+        // Non-default thresholds: block at 0.9, warn at 0.5.
+        let t = SeverityThresholds {
+            block_threshold: 0.9,
+            warn_threshold: 0.5,
+        };
+        assert_eq!(t.determine(0.9), Severity::Block, "exactly at custom block");
+        assert_eq!(t.determine(0.89), Severity::Warn, "just below custom block");
+        assert_eq!(t.determine(0.5), Severity::Warn, "exactly at custom warn");
+        assert_eq!(t.determine(0.49), Severity::Allow, "just below custom warn");
+    }
+
+    #[test]
+    fn test_threshold_midpoint() {
+        let t = SeverityThresholds::default();
+        // 0.55 is the midpoint between warn (0.4) and block (0.7) -> Warn
+        assert_eq!(
+            t.determine(0.55),
+            Severity::Warn,
+            "midpoint between warn and block thresholds"
+        );
+        // 0.85 is the midpoint between block (0.7) and 1.0 -> Block
+        assert_eq!(
+            t.determine(0.85),
+            Severity::Block,
+            "midpoint between block threshold and 1.0"
+        );
+    }
 }

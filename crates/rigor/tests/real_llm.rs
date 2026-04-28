@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! E1 — Real-LLM proof-of-life (PR-2.6 Tier 1).
 //!
 //! Auto-skips when `OPENROUTER_API_KEY` is unset. When the key is present,
@@ -68,11 +74,26 @@ async fn e1_openrouter_proof_of_life() {
 
     // OpenAI-compatible response shape: { choices: [{ message: { content } }] }.
     // rigor's judge parser walks the same path, so this doubles as a shape check.
+    // Reasoning models (e.g. DeepSeek R1) return content: null with text in
+    // reasoning_details — fall back to that path so the proof-of-life test works
+    // across both standard and reasoning models.
     let content = body
         .pointer("/choices/0/message/content")
         .and_then(|v| v.as_str())
-        .unwrap_or_else(|| panic!("response missing choices[0].message.content: {}", body));
+        .or_else(|| {
+            body.pointer("/choices/0/message/reasoning")
+                .and_then(|v| v.as_str())
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "response missing choices[0].message.content or .reasoning: {}",
+                body
+            )
+        });
 
-    assert!(!content.trim().is_empty(), "model returned empty content");
+    assert!(
+        !content.trim().is_empty(),
+        "model returned empty content or reasoning"
+    );
     eprintln!("e1: model='{}' got content='{}'", model, content.trim());
 }

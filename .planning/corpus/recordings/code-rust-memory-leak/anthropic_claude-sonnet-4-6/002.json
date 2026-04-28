@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:b9d9540081ed37d2b6f376621147dac8a3b6afd368b79aa0eaee32585879b592",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:24:21.584245Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Leaking in Rust with `Box::leak`\n\n## The Function and Explanation\n\n```rust\nuse std::collections::HashMap;\nuse std::sync::OnceLock;\n\n// ============================================================\n// Example 1: Static configuration loaded once at startup\n// ============================================================\n\n#[derive(Debug)]\npub struct AppConfig {\n    pub database_url: String,\n    pub max_connections: u32,\n    pub feature_flags: HashMap<String, bool>,\n}\n\nimpl AppConfig {\n    pub fn new(database_url: &str, max_connections: u32) -> Self {\n        let mut feature_flags = HashMap::new();\n        feature_flags.insert(\"dark_mode\".to_string(), true);\n        feature_flags.insert(\"beta_features\".to_string(), false);\n\n        AppConfig {\n            database_url: database_url.to_string(),\n            max_connections,\n            feature_flags,\n        }\n    }\n}\n\n/// Leaks a config struct to get a `&'static` reference.\n/// \n/// # When this is appropriate:\n/// - The value must live for the entire program duration\n/// - You need a `&'static` reference (e.g., for thread spawning without Arc)\n/// - The allocation happens ONCE at startup (not in a loop)\n/// - The data is genuinely global and immutable after initialization\npub fn leak_config(config: AppConfig) -> &'static AppConfig {\n    Box::leak(Box::new(config))\n}\n\n// ============================================================\n// Example 2: Static string slices from dynamic data\n// ============================================================\n\n/// Convert a runtime String into a &'static str.\n/// \n/// Useful when an API requires &'static str but you're building\n/// the string at runtime (e.g., from env vars or config files).\npub fn leak_string(s: String) -> &'static str {\n    Box::leak(s.into_boxed_str())\n}\n\n/// Convert a runtime Vec<u8> into a &'static [u8].\npub fn leak_bytes(bytes: Vec<u8>) -> &'static [u8] {\n    Box::leak(bytes.",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026252-AcBf3onTWEUdGiWvAQEJ"
+}

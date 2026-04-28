@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:0e6d2b4b0896e33752b261708f78f3584d703a57d9ed28c93a7cae6a5ff00881",
+  "model": "openai/gpt-4o",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:36:06.619013Z",
+  "temperature": 0.7,
+  "response_text": "Comparing floating point numbers using `==` in IEEE 754 is generally not safe due to the way floating point arithmetic is handled. Floating point numbers can have precision errors due to the way they are represented in binary, and small rounding errors can accumulate in calculations. As a result, two floating point numbers that you might expect to be equal could end up being slightly different, causing a direct equality check with `==` to fail.\n\nInstead of using `==`, it is recommended to check if the numbers are \"close enough\" by using a tolerance value. This is often done with a relative or absolute error check. For example, you can consider two numbers equal if the absolute difference between them is smaller than a small threshold (epsilon):\n\n```python\ndef are_floats_equal(a, b, epsilon=1e-9):\n    return abs(a - b) < epsilon\n\n# Example usage\na = 0.1 + 0.2\nb = 0.3\nprint(are_floats_equal(a, b))  # This will return True\n```\n\nThis approach helps account for minor discrepancies due to floating-point precision limits and is a common practice for comparing floating-point numbers in programming.",
+  "tokens": {
+    "prompt": 22,
+    "completion": 247
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026962-R2jmsTWKlsTWJXCuYRB3"
+}

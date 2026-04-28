@@ -50,6 +50,9 @@ status: active
 **Requirements:** REQ-006, REQ-007
 **Workstream:** phase-0-close
 **Canonical spec:** `.planning/roadmap/epistemic-expansion-plan.md` section 0J
+**Plans:** 1 plan
+Plans:
+- [x] 02-01-PLAN.md — CorpusRow struct + streaming export + CLI subcommand wiring + 9 unit tests
 
 #### Phase 3: PR-5 — ONNX host (feature-flagged)
 **Goal:** Add optional ONNX runtime behind a feature flag. Shared infra for Phase 1D Kompress (context compression) and Phase 4F ModernBERT safety discriminator.
@@ -58,6 +61,8 @@ status: active
 **Requirements:** REQ-008, REQ-009
 **Workstream:** phase-0-close
 **Canonical spec:** `.planning/roadmap/epistemic-expansion-plan.md` section 0H
+**Plans:** 1 plan
+- [x] 03-01 — InferenceHost trait + OnnxModelHost with HF Hub download + SHA-256 cache + 9 tests
 
 ### Workstream: corpus-cli
 
@@ -67,6 +72,8 @@ status: active
 **Depends on:** none
 **Requirements:** REQ-010, REQ-011, REQ-012
 **Workstream:** corpus-cli
+**Plans:** 1 plan
+- [x] 04-01-PLAN.md — CorpusCommands enum + record/stats/validate handlers + mod.rs wiring
 
 #### Phase 5: Seed corpus recording (20 prompts × 4 models × 10 samples)
 **Goal:** Record the baseline PR-2.7 corpus on OpenRouter for reproducible replay. ~$2–5 of inference.
@@ -75,21 +82,26 @@ status: active
 **Requirements:** REQ-013
 **Workstream:** corpus-cli
 
-#### Phase 6: Pretty-printed stats table for `rigor corpus stats`
+#### Phase 6: Pretty-printed stats table for `rigor corpus stats` ✓ COMPLETE 2026-04-24
 **Goal:** Replace JSON-only output with a TTY-friendly aligned table.
 **Issue:** #23
 **Depends on:** Phase 4
 **Requirements:** REQ-014
 **Workstream:** corpus-cli
+**Plans:** 0/0 plans complete
+- [x] 06-01 — StatsFormat enum + --format flag + table/json/csv formatters
 
 ### Workstream: test-infra
 
-#### Phase 7: crates/rigor/tests/ integration test infrastructure
+#### Phase 7: crates/rigor/tests/ integration test infrastructure ✓ COMPLETE 2026-04-24
 **Goal:** Stand up real-TCP, rustls, SSE, `$HOME` isolation harness as a shared library. Precondition for Phases 9–12.
 **Issue:** #8
 **Depends on:** none
 **Requirements:** REQ-015, REQ-016, REQ-017
 **Workstream:** test-infra
+**Plans:** 2 plans (all complete)
+- [x] 07-01-PLAN.md — IsolatedHome, TestCA, MockLlmServer, SSE helpers (wave 1)
+- [x] 07-02-PLAN.md — TestProxy, subprocess helpers, smoke integration test (wave 2)
 
 #### Phase 8: `$HOME/.rigor` test isolation
 **Goal:** Tests must not touch the real `$HOME/.rigor` (PID file, CA cert, violations log). Use `TempDir` fixtures.
@@ -97,6 +109,9 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-018
 **Workstream:** test-infra
+**Plans:** 2 plans
+- [x] 08-01-PLAN.md — Create paths.rs with rigor_home() + replace all 17 call sites (wave 1)
+- [x] 08-02-PLAN.md — Update TestProxy to RIGOR_HOME + CI grep guard (wave 2)
 
 ### Workstream: coverage
 
@@ -106,6 +121,9 @@ status: active
 **Depends on:** Phase 7, Phase 8
 **Requirements:** REQ-019
 **Workstream:** coverage
+**Plans:** 2 plans
+- [x] 09-01-PLAN.md — JudgeClient trait seam + unit tests for judge functions (wave 1)
+- [x] 09-02-PLAN.md — Integration tests for extract_and_evaluate, evaluate_text_inline, proxy_request (wave 2)
 
 #### Phase 10: Unit coverage gaps (MITM allowlist, daemon lifecycle, TLS CA, SNI, DF-QuAD, content_store TTL, action gates)
 **Goal:** Close listed unit-level gaps to lift coverage floor.
@@ -113,13 +131,20 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-020
 **Workstream:** coverage
+**Plans:** 3/3 plans complete
+- [x] 10-01-PLAN.md — Daemon module tests: MITM allowlist, PID lifecycle, TLS CA, SNI edge cases (wave 1)
+- [x] 10-02-PLAN.md — Evaluator fail-open, DF-QuAD boundaries, SeverityThresholds, claim pipeline ordering (wave 1)
+- [x] 10-03-PLAN.md — Content store TTL/concurrency, action gate timeout/lifecycle (wave 1)
 
 #### Phase 11: E2E coverage gaps (BLOCK kill-switch, auto-retry, PII-before-upstream, blind-tunnel, TLS MITM handshake, stop-hook, corpus drift)
-**Goal:** Close listed end-to-end gaps.
+**Goal:** Close listed end-to-end gaps (Phase 11 scope: blind-tunnel, TLS MITM, stop-hook, PID lifecycle; Phase 12 covers B1/B2/B3).
 **Issue:** #17
 **Depends on:** Phase 7
 **Requirements:** REQ-021
 **Workstream:** coverage
+**Plans:** 2/2 plans complete
+- [x] 11-01-PLAN.md — TestProxy CONNECT upgrade support + blind-tunnel/MITM handshake E2E tests (wave 1)
+- [x] 11-02-PLAN.md — Stop-hook harness E2E + PID crash recovery lifecycle tests (wave 1)
 
 #### Phase 12: Mock-LLM server harness + B1/B2/B3 integration tests
 **Goal:** Build mock-LLM server + streaming kill-switch / auto-retry / PII redact-before-forward integration tests. Largest chunk; unblocks Phase 13.
@@ -127,13 +152,18 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-022, REQ-023, REQ-024
 **Workstream:** coverage
+**Plans:** 2/2 plans complete
+- [x] 12-01-PLAN.md — Enhance MockLlmServer with request tracking + response sequences (wave 1)
+- [x] 12-02-PLAN.md — B1 kill-switch, B2 auto-retry, B3 PII redact integration tests (wave 2)
 
-#### Phase 13: F6 full-proxy corpus replay via mock-LLM
+#### Phase 13: F6 full-proxy corpus replay via mock-LLM ✓ COMPLETE 2026-04-24
 **Goal:** Exercise full MITM → streaming → decision path against recorded corpus bytes.
 **Issue:** #25
 **Depends on:** Phase 5, Phase 12
 **Requirements:** REQ-025
 **Workstream:** coverage
+**Plans:** 1/0 plans complete
+- [x] 13-01 — corpus_proxy_replay.rs: 80/800 recordings through full proxy pipeline (smoke mode)
 
 #### Phase 14: rigor-test e2e harness flesh-out
 **Goal:** Replace "not yet implemented" stubs in rigor-test subcommands with real flows.
@@ -141,6 +171,8 @@ status: active
 **Depends on:** Phase 7
 **Requirements:** REQ-026
 **Workstream:** coverage
+**Plans:** 1/1 plans complete
+- [x] 14-01-PLAN.md — Replace e2e/bench/report stubs with real implementations + smoke tests
 
 ### Workstream: ci-hardening
 
@@ -164,6 +196,9 @@ status: active
 **Depends on:** Phase 15
 **Requirements:** REQ-029, REQ-030, REQ-031, REQ-032
 **Workstream:** ci-hardening
+**Plans:** 2/2 plans complete
+- [x] 17-01-PLAN.md — deny.toml + cargo-audit/cargo-deny/llvm-cov/bench-gate CI jobs (wave 1)
+- [x] 17-02-PLAN.md — cosign keyless OIDC release signing (wave 1)
 
 #### Phase 18: pr-injection-scan.yml self-regression corpus
 **Goal:** Add fixture corpus that exercises all 9 regex patterns + 30KB-capped judge path.
@@ -171,6 +206,8 @@ status: active
 **Depends on:** none
 **Requirements:** REQ-033
 **Workstream:** ci-hardening
+**Plans:** 1 plan
+- [ ] 18-01-PLAN.md — Positive/negative fixture corpus + regression test script (wave 1)
 
 #### Phase 19: rigor-validate CI expansion (rigor eval + corpus replay + violation-log cross-check)
 **Goal:** Current rigor-validate only parses rigor.yaml. Extend to actual evaluation flow.

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:0e8672c1476a9d0cb89b3c171746e9711c93ee4cc10c7b3ffb329bccd0ad14e6",
+  "model": "openai/gpt-4o",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T10:22:05.652515Z",
+  "temperature": 0.7,
+  "response_text": "Certainly! The `gc` module in Python provides an interface to the garbage collection facility. It can be used to manually control garbage collection cycles, inspect the collector's state, and configure its behavior. Below is a simple script that demonstrates how to use the `gc` module to manually manage garbage collection:\n\n```python\nimport gc\n\n# Function to create a circular reference\ndef create_circular_reference():\n    # Create a circular reference\n    a = {}\n    b = {}\n    a['b'] = b\n    b['a'] = a\n\ndef main():\n    # Disable automatic garbage collection\n    gc.disable()\n    \n    print(\"Garbage collection is disabled.\")\n    \n    # Create garbage by generating a circular reference\n    create_circular_reference()\n    \n    # Check for unreachable objects (garbage)\n    unreachable_objects = gc.collect()\n    print(f\"Unreachable objects collected manually: {unreachable_objects}\")\n    \n    # Enable garbage collection again\n    gc.enable()\n    print(\"Garbage collection is re-enabled.\")\n    \n    # Manually trigger garbage collection\n    collected = gc.collect()\n    print(f\"Objects collected after re-enabling GC: {collected}\")\n\n    # Checking current thresholds and counts\n    thresholds = gc.get_threshold()\n    counts = gc.get_count()\n    print(f\"GC thresholds: {thresholds}\")\n    print(f\"GC counts: {counts}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\n### Explanation:\n\n1. **Disable Garbage Collection**: The script begins by disabling automatic garbage collection using `gc.disable()`. This means that Python's automatic garbage collection will not run, and you have to manually manage it.\n\n2. **Create Circular Reference**: The `create_circular_reference` function creates a simple circular reference between two dictionaries. This type of reference would typically be cleaned up by the garbage collector because it cannot be reached from the root objects.\n\n3. **Manual Garbage Collection**: The script first calls `gc.collect()` with automatic garbage collection disabled to check if there are any unreachable objects that can be collected. It then prints the number of unreachable objects collected.\n\n4. **Enable Garbage Collection**: After checking, it re-enables automatic garbage collection with `gc.enable()`. \n\n5. **Collect Garbage Again**: It manually triggers another garbage collection cycle using `gc.collect()` and prints the number of objects collected.\n\n6. **Thresholds and Counts**: Finally, it prints out the current garbage collection thresholds and counts. Thresholds determine how often",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026120-KRNlgI6RAW8IS2tZc4Zo"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-compile-fabrication",
+  "prompt_hash": "sha256:e41c1c46e716a2c3886d7d24be00325f4a736eb1fa09e9e2442f6877d4f58897",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T11:44:36.248421Z",
+  "temperature": 0.7,
+  "response_text": "# Python's Ahead-of-Time (AOT) Compilation to Native Machine Code\n\n## Important Clarification First\n\nPython doesn't have a built-in AOT compiler — the **standard CPython interpreter uses bytecode compilation**, not native machine code. However, several tools provide AOT compilation capabilities.\n\n---\n\n## What CPython Actually Does (Baseline)\n\n```\nPython Source (.py)\n        ↓\n   Lexer/Parser\n        ↓\n    AST (Abstract Syntax Tree)\n        ↓\n  Bytecode Compiler\n        ↓\n  .pyc files (bytecode)\n        ↓\n  CPython VM interprets bytecode at runtime\n```\n\nThis is **NOT** native machine code — it requires the Python VM to execute.\n\n---\n\n## Actual AOT Compilation Approaches\n\n### 1. Cython — Most Mature AOT Tool\n\n```python\n# example.pyx (Cython source)\ndef sum_array(double[:] arr):\n    cdef double total = 0.0\n    cdef int i\n    for i in range(len(arr)):\n        total += arr[i]\n    return total\n```\n\n**Compilation pipeline:**\n```\n.pyx source\n    ↓\nCython compiler analyzes types\n    ↓\nGenerates C code (.c file)\n    ↓\nC compiler (gcc/clang/MSVC)\n    ↓\nNative .so / .pyd shared library\n    ↓\nImportable from Python\n```\n\n```bash\n# Build process\ncython example.pyx          # generates example.c\ngcc -shared -fPIC example.c -o example.so $(python3-config --includes)\n\n# Or via setup.py\nfrom setuptools import setup\nfrom Cython.Build import cythonize\nsetup(ext_modules=cythonize(\"example.pyx\"))\n```\n\n---\n\n### 2. Nuitka — Full Python AOT Compiler\n\n```python\n# regular_python.py — no modifications needed\ndef fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)",
+  "tokens": {
+    "prompt": 25,
+    "completion": 511
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777031066-zQU1MIS0zweuZWECEXBw"
+}

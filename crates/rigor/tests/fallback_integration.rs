@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! Integration tests for fallback policy system.
 //!
 //! These tests verify that the full config → resolve → execute pipeline works

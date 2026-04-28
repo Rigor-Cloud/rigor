@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:6d56c84c410a5ac9fbe6f5ddc4937b4d9c3cc3e8cf5a85402e05005435f8bcb0",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T13:29:32.372421Z",
+  "temperature": 0.7,
+  "response_text": "## Recolector de Basura en Rust vs Java\n\n### **Rust: Sin GC tradicional**\nRust **no tiene un recolector de basura convencional**. En su lugar, utiliza:\n\n#### **Sistema de Ownership (Propiedad)**\n- Cada valor tiene un único \"dueño\"\n- Cuando el dueño sale del ámbito, el valor se libera automáticamente\n```rust\nfn ejemplo() {\n    let s = String::from(\"hola\"); // s es dueño\n} // s sale del ámbito, memoria liberada\n```\n\n#### **Borrowing (Préstamos)**\n- Permite referencias temporales sin tomar posesión\n- Verificado en **tiempo de compilación**\n```rust\nfn calcular_longitud(s: &String) -> usize {\n    s.len()\n} // No libera memoria, solo referencia prestada\n```\n\n#### **Tipos de Conteo de Referencias**\nPara casos especiales, Rust ofrece:\n- **`Rc<T>`**: Para múltiples dueños en un solo hilo\n- **`Arc<T>`**: Para múltiples dueños en múltiples hilos\n- **`Weak<T>`**: Referencias débiles para evitar ciclos\n\n### **Java: GC Tradicional**\nJava utiliza un recolector de basura **en tiempo de ejecución**:\n\n#### **Características principales**\n1. **Automático**: Libera objetos no accesibles\n2. **No determinista**: No se sabe cuándo se ejecutará\n3. **Stop-the-world**: Pued",
+  "tokens": {
+    "prompt": 32,
+    "completion": 1250
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037333-TeZUXXy8U7dku7NWj5yR"
+}

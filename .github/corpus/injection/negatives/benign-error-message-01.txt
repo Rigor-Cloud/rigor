@@ -1,0 +1,10 @@
+# Fixture: benign-error-message-01.txt | Pattern: none | Expected: CLEAN
+HTTP 500 Internal Server Error
+Content-Type: application/json
+
+{
+  "error": "evaluation_failed",
+  "message": "Upstream LLM service returned status 503",
+  "trace_id": "abc123def456",
+  "timestamp": "2026-04-20T14:30:00Z"
+}

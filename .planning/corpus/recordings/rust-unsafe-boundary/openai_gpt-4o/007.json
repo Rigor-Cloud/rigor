@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:321c3a00b8f76950fc666090e5578b646f8ddbea6706d6d08c1e88e8a170dea4",
+  "model": "openai/gpt-4o",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T13:21:26.015508Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, the `unsafe` keyword is used to perform operations that the compiler cannot guarantee to be safe. This includes:\n\n1. **Dereferencing raw pointers:** Raw pointers (`*const T` and `*mut T`) do not have the safety guarantees of Rust's references (`&T` and `&mut T`). You must ensure manually that these pointers are valid and not dangling.\n\n2. **Calling unsafe functions or methods:** Some functions are marked as `unsafe` because they can violate Rust's safety guarantees if used incorrectly. These functions require an `unsafe` block to call, indicating that the programmer has verified the preconditions and invariants required for safe execution.\n\n3. **Accessing or modifying mutable static variables:** Global variables in Rust are considered potentially unsafe due to concurrency issues. Accessing or modifying them requires an `unsafe` context.\n\n4. **Implementing unsafe traits:** Certain traits can be marked as `unsafe`, indicating that implementing them requires satisfying certain invariants that the compiler cannot check.\n\n5. **Inline assembly:** Using inline assembly is inherently unsafe because the compiler cannot reason about the correctness of the assembly code.\n\n### Guarantees Inside `unsafe` Blocks\n\nEven inside `unsafe` blocks, the Rust compiler still provides several important guarantees:\n\n- **Memory Safety Beyond Unsafe Operations:** The operations outside the `unsafe` block remain subject to Rust's safety checks. This means that memory safety issues like use-after-free, double-free, and data races are still prevented unless they arise from the specific unsafe operations themselves.\n\n- **Type System and Borrow Checker:** The Rust type system and borrow checker continue to enforce constraints outside the scope of the `unsafe` block. This means that type correctness and borrow rules are still checked, except for the specific unsafe operations.\n\n- **No Automatic Undefined Behavior:** The compiler does not automatically introduce undefined behavior inside `unsafe` blocks. It's the programmer's responsibility to ensure that operations within the `unsafe` block adhere to the invariants and preconditions necessary to avoid undefined behavior.\n\n- **Compilation and Optimization:** The compiler continues to perform optimizations and ensures that code outside `unsafe` blocks adheres to Rust's usual safety and correctness guarantees.\n\nUsing `unsafe` should be minimized and carefully reviewed. It's generally a good practice to encapsulate unsafe code in safe abstractions, ensuring that the rest of your codebase can rely on Rust's safety guarantees without requiring further `unsafe` blocks.",
+  "tokens": {
+    "prompt": 27,
+    "completion": 488
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036878-u243gEPHEXrok0PIEBhL"
+}

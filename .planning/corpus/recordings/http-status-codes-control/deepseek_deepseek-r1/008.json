@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:f4176078d1585e5b98b62e695bf420b1181ed036d1a9b849526efce0024e965c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T11:03:13.503322Z",
+  "temperature": 0.7,
+  "response_text": "Of course! HTTP status codes are three-digit numbers returned by a server in response to a client's request. They are grouped into five classes, indicated by the first digit.\n\nHere are the **most common and important HTTP status codes**, categorized by their class:\n\n### 1xx: Informational\nThese are provisional responses. You typically don't see these in browsers, as they are handled by the HTTP protocol itself.\n*   **100 Continue:** The server has received the request headers, and the client should proceed to send the request body.\n\n### 2xx: Success\nThe request was successfully received, understood, and accepted.\n*   **200 OK:** **The standard success response.** The request succeeded. The meaning depends on the HTTP method (e.g., GET returns a resource, POST returns the result of the action).\n*   **201 Created:** The request succeeded, and a new resource was created as a result (common response to a POST request).\n*   **204 No Content:** The server successfully processed the request but is not returning any content (common after a DELETE request or successful PUT update).\n\n### 3xx: Redirection\nFurther action needs to be taken by the client to complete the request.\n*   **301 Moved Permanently:** The requested resource has been permanently moved to a new URL. Browsers and search engines will update their links to the new URL.\n*   **302 Found (or 307 Temporary Redirect):** The requested resource is temporarily located at a different URL. The client should use the original URL for future requests.\n*   **304 Not Modified:** Used for caching purposes. Tells the ",
+  "tokens": {
+    "prompt": 22,
+    "completion": 520
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028575-NP6JsmqXnmqNZf8SFJHn"
+}

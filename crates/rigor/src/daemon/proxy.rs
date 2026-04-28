@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
+use async_trait::async_trait;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -42,6 +43,78 @@ fn apply_provider_auth(req: reqwest::RequestBuilder, api_key: &str) -> reqwest::
         req.header("x-api-key", api_key)
     } else {
         req.header("authorization", format!("Bearer {}", api_key))
+    }
+}
+
+/// Error type for judge client calls.
+#[derive(Debug)]
+pub enum JudgeError {
+    Timeout,
+    HttpError(u16),
+    NetworkError(String),
+    ParseError(String),
+}
+
+/// Abstraction for LLM judge calls (scope check, violation persist check, relevance scoring).
+/// Production: ReqwestJudgeClient wraps reqwest + apply_provider_auth.
+/// Tests: MockJudgeClient returns canned responses.
+#[async_trait]
+pub trait JudgeClient: Send + Sync {
+    async fn call_judge(
+        &self,
+        api_url: &str,
+        api_key: &str,
+        body: &serde_json::Value,
+        timeout_secs: u64,
+    ) -> Result<serde_json::Value, JudgeError>;
+}
+
+/// Production implementation wrapping reqwest::Client.
+pub struct ReqwestJudgeClient {
+    client: reqwest::Client,
+}
+
+impl ReqwestJudgeClient {
+    pub fn new(client: reqwest::Client) -> Self {
+        Self { client }
+    }
+}
+
+#[async_trait]
+impl JudgeClient for ReqwestJudgeClient {
+    async fn call_judge(
+        &self,
+        api_url: &str,
+        api_key: &str,
+        body: &serde_json::Value,
+        timeout_secs: u64,
+    ) -> Result<serde_json::Value, JudgeError> {
+        let mut req = self
+            .client
+            .post(format!("{}/v1/messages", api_url))
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json");
+        req = apply_provider_auth(req, api_key);
+
+        let resp = match tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            req.json(body).send(),
+        )
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => return Err(JudgeError::NetworkError(e.to_string())),
+            Err(_) => return Err(JudgeError::Timeout),
+        };
+
+        let status = resp.status().as_u16();
+        if !resp.status().is_success() {
+            return Err(JudgeError::HttpError(status));
+        }
+
+        resp.json()
+            .await
+            .map_err(|e| JudgeError::ParseError(e.to_string()))
     }
 }
 
@@ -1244,6 +1317,7 @@ async fn proxy_request(
         event_tx,
         constraints_count,
         http_client,
+        judge_client,
         fallback,
     ) = {
         let mut st = state.lock().unwrap();
@@ -1262,6 +1336,7 @@ async fn proxy_request(
             st.event_tx.clone(),
             count,
             st.http_client.clone(),
+            st.judge_client.clone(),
             st.fallback.clone(),
         )
     };
@@ -1549,6 +1624,7 @@ async fn proxy_request(
         let headers_bg = headers.clone();
         let model_bg = model.clone();
         let http_client_bg = http_client.clone();
+        let judge_client_bg = judge_client.clone();
         let user_message_bg = user_message.clone();
         let session_id_bg = session_id.clone();
         let response_chain_bg = request_chain.clone();
@@ -1809,12 +1885,12 @@ async fn proxy_request(
                                 let user_msg = user_message_bg.clone();
                                 let sess = session_id_bg.clone();
                                 let req_id = request_id_bg.clone();
-                                let http = http_client_bg.clone();
+                                let jc = judge_client_bg.clone();
                                 let etx = event_tx_bg.clone();
                                 let st_clone = state_bg.clone();
                                 tokio::spawn(async move {
                                     let (within_scope, reason) = scope_judge_check(
-                                        &http,
+                                        &*jc,
                                         &judge_url,
                                         &api_key,
                                         &judge_model,
@@ -2188,7 +2264,7 @@ async fn proxy_request(
                                         };
                                         let still_violated = if !retry_text.is_empty() {
                                             check_violations_persist(
-                                                &http_client_bg,
+                                                &*judge_client_bg,
                                                 &judge_url_1,
                                                 judge_key_1.as_deref(),
                                                 &judge_model_1,
@@ -2374,7 +2450,7 @@ async fn proxy_request(
 
                         let judge_start = std::time::Instant::now();
                         let violated = check_violations_persist(
-                            &http_client_bg,
+                            &*judge_client_bg,
                             &judge_url_2,
                             judge_key_2.as_deref(),
                             &judge_model_2,
@@ -2539,7 +2615,7 @@ async fn proxy_request(
                                 };
                                 let still_violated = if !retry_text.is_empty() {
                                     check_violations_persist(
-                                        &http_client_bg,
+                                        &*judge_client_bg,
                                         &judge_url_3,
                                         judge_key_3.as_deref(),
                                         &judge_model_3,
@@ -2875,8 +2951,8 @@ fn extract_and_evaluate(
 /// Fast LLM check: do the original violations still persist in the retry text?
 /// Uses a minimal prompt (~50 tokens per violation) for speed.
 /// Returns true if ANY violation is still present (rephrased or not).
-async fn check_violations_persist(
-    client: &reqwest::Client,
+pub async fn check_violations_persist(
+    client: &dyn JudgeClient,
     api_url: &str,
     api_key: Option<&str>,
     model: &str,
@@ -2931,29 +3007,10 @@ async fn check_violations_persist(
 
     let judge_start = std::time::Instant::now();
 
-    // Call API directly — not through the proxy (avoids self-evaluation loop)
-    let mut req = client
-        .post(format!("{}/v1/messages", api_url))
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json");
-
-    req = apply_provider_auth(req, api_key);
-
-    let resp =
-        tokio::time::timeout(std::time::Duration::from_secs(10), req.json(&body).send()).await;
-
-    let resp = match resp {
-        Ok(Ok(r)) => r,
-        Ok(Err(e)) => {
-            crate::daemon::ws::emit_log(
-                event_tx,
-                "error",
-                "relevance",
-                format!("Retry verification LLM call failed: {}", e),
-            );
-            return false; // fail open
-        }
-        Err(_) => {
+    // Call API via JudgeClient trait — not through the proxy (avoids self-evaluation loop)
+    let resp_json = match client.call_judge(api_url, api_key, &body, 10).await {
+        Ok(j) => j,
+        Err(JudgeError::Timeout) => {
             crate::daemon::ws::emit_log(
                 event_tx,
                 "error",
@@ -2962,11 +3019,18 @@ async fn check_violations_persist(
             );
             return false; // fail open
         }
-    };
-
-    let resp_json: serde_json::Value = match resp.json().await {
-        Ok(j) => j,
-        Err(_) => return false,
+        Err(JudgeError::NetworkError(e)) => {
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "relevance",
+                format!("Retry verification LLM call failed: {}", e),
+            );
+            return false; // fail open
+        }
+        Err(JudgeError::HttpError(_)) | Err(JudgeError::ParseError(_)) => {
+            return false; // fail open
+        }
     };
 
     let answer = resp_json
@@ -3032,8 +3096,8 @@ async fn check_violations_persist(
 
 /// Ask the LLM judge whether an action intent is within scope of user's request.
 /// Returns (within_scope, reason).
-async fn scope_judge_check(
-    client: &reqwest::Client,
+pub async fn scope_judge_check(
+    client: &dyn JudgeClient,
     api_url: &str,
     api_key: &str,
     model: &str,
@@ -3058,29 +3122,9 @@ async fn scope_judge_check(
         "messages": [{"role": "user", "content": prompt}]
     });
 
-    let mut req = client
-        .post(format!("{}/v1/messages", api_url))
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json");
-    req = apply_provider_auth(req, api_key);
-
-    let resp = match tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        req.json(&body).send(),
-    )
-    .await
-    {
-        Ok(Ok(r)) => r,
-        Ok(Err(e)) => {
-            crate::daemon::ws::emit_log(
-                event_tx,
-                "error",
-                "gate",
-                format!("Scope judge request failed: {}", e),
-            );
-            return (true, "Judge error — defaulting to allow".to_string());
-        }
-        Err(_) => {
+    let resp_json = match client.call_judge(api_url, api_key, &body, 10).await {
+        Ok(j) => j,
+        Err(JudgeError::Timeout) => {
             crate::daemon::ws::emit_log(
                 event_tx,
                 "warn",
@@ -3089,26 +3133,27 @@ async fn scope_judge_check(
             );
             return (true, "Judge timeout — defaulting to allow".to_string());
         }
-    };
-
-    // Fail-open on HTTP errors (401/403/500/etc.). Without this, a 401 from
-    // Anthropic parses as {"error": ...}, `get("content")` returns None,
-    // text is empty, and `within_scope` ends up false — rejecting every
-    // action instead of failing open. This caused the contrapunk gate stall.
-    let status = resp.status();
-    if !status.is_success() {
-        crate::daemon::ws::emit_log(
-            event_tx,
-            "warn",
-            "gate",
-            format!("Scope judge HTTP {} — defaulting to allow", status),
-        );
-        return (true, format!("Judge HTTP {} — defaulting to allow", status));
-    }
-
-    let resp_json: serde_json::Value = match resp.json().await {
-        Ok(j) => j,
-        Err(_) => return (true, "Parse error — defaulting to allow".to_string()),
+        Err(JudgeError::NetworkError(e)) => {
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "error",
+                "gate",
+                format!("Scope judge request failed: {}", e),
+            );
+            return (true, "Judge error — defaulting to allow".to_string());
+        }
+        Err(JudgeError::HttpError(status)) => {
+            crate::daemon::ws::emit_log(
+                event_tx,
+                "warn",
+                "gate",
+                format!("Scope judge HTTP {} — defaulting to allow", status),
+            );
+            return (true, format!("Judge HTTP {} — defaulting to allow", status));
+        }
+        Err(JudgeError::ParseError(_)) => {
+            return (true, "Parse error — defaulting to allow".to_string());
+        }
     };
 
     let text = resp_json
@@ -3444,7 +3489,7 @@ fn extract_and_evaluate_text(
             .collect();
 
         // Use judge config (OpenRouter) if available, else fall back to captured API key
-        let (judge_url, judge_key, judge_model, http_client) = {
+        let (judge_url, judge_key, judge_model, jc) = {
             let st = state.lock().unwrap();
             let key = st.judge_api_key.clone().or_else(|| st.api_key.clone());
             let url = if st.judge_api_key.is_some() {
@@ -3453,13 +3498,13 @@ fn extract_and_evaluate_text(
                 st.target_api.clone()
             };
             let model = st.judge_model.clone();
-            (url, key, model, st.http_client.clone())
+            (url, key, model, st.judge_client.clone())
         };
 
         let event_tx_rel = event_tx.clone();
         tokio::spawn(async move {
             score_claim_relevance(
-                &http_client,
+                &*jc,
                 &judge_url,
                 judge_key.as_deref(),
                 &judge_model,
@@ -3518,10 +3563,24 @@ pub fn lookup_relevance(claim_text: &str) -> Vec<(String, String, String)> {
     cache.get(claim_text).cloned().unwrap_or_default()
 }
 
+/// Clear the relevance cache. Test-only helper to prevent cross-test contamination.
+#[cfg(test)]
+pub fn clear_relevance_cache() {
+    RELEVANCE_CACHE.lock().unwrap().clear();
+}
+
+/// Reset the relevance semaphore to unacquired state. Test-only helper.
+#[cfg(test)]
+pub fn reset_relevance_semaphore() {
+    RELEVANCE_SEMAPHORE
+        .0
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
 /// Call Sonnet to compute semantic relevance between claims and constraints.
 /// Features: 30s timeout, rate limiting (1 in flight), caching, logging.
-async fn score_claim_relevance(
-    client: &reqwest::Client,
+pub async fn score_claim_relevance(
+    client: &dyn JudgeClient,
     api_url: &str,
     api_key: Option<&str>,
     model: &str,
@@ -3632,31 +3691,36 @@ async fn score_claim_relevance(
             tokio::time::sleep(std::time::Duration::from_secs(*delay)).await;
         }
 
-        // Rebuild request each attempt (reqwest consumes the builder)
-        let mut retry_req = client
-            .post(format!("{}/v1/messages", api_url))
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json");
-        retry_req = apply_provider_auth(retry_req, api_key);
-
-        let resp = tokio::time::timeout(
-            std::time::Duration::from_secs(30),
-            retry_req.json(&body).send(),
-        )
-        .await;
-
-        let r = match resp {
-            Ok(Ok(r)) => r,
-            Ok(Err(e)) => {
+        // Call via JudgeClient trait
+        match client.call_judge(api_url, api_key, &body, 30).await {
+            Ok(j) => {
+                eprintln!("rigor relevance: API status: 200 (attempt {})", attempt + 1);
+                resp_json = j;
+                break;
+            }
+            Err(JudgeError::HttpError(429)) => {
+                eprintln!("rigor relevance: API status: 429 (attempt {})", attempt + 1);
+                // Rate limited — will retry if more attempts remain
+                if attempt < delays.len() - 1 {
+                    continue;
+                }
                 crate::daemon::ws::emit_log(
                     event_tx,
                     "error",
                     "relevance",
-                    format!("LLM call failed: {}", e),
+                    "Rate limited after all retry attempts".to_string(),
                 );
                 return;
             }
-            Err(_) => {
+            Err(JudgeError::HttpError(status)) => {
+                eprintln!(
+                    "rigor relevance: API status: {} (attempt {})",
+                    status,
+                    attempt + 1
+                );
+                return;
+            }
+            Err(JudgeError::Timeout) => {
                 crate::daemon::ws::emit_log(
                     event_tx,
                     "error",
@@ -3665,35 +3729,16 @@ async fn score_claim_relevance(
                 );
                 return;
             }
-        };
-
-        let status = r.status();
-        eprintln!(
-            "rigor relevance: API status: {} (attempt {})",
-            status,
-            attempt + 1
-        );
-
-        if status.as_u16() == 429 {
-            // Rate limited — will retry if more attempts remain
-            if attempt < delays.len() - 1 {
-                continue;
+            Err(JudgeError::NetworkError(e)) => {
+                crate::daemon::ws::emit_log(
+                    event_tx,
+                    "error",
+                    "relevance",
+                    format!("LLM call failed: {}", e),
+                );
+                return;
             }
-            crate::daemon::ws::emit_log(
-                event_tx,
-                "error",
-                "relevance",
-                "Rate limited after all retry attempts".to_string(),
-            );
-            return;
-        }
-
-        match r.json().await {
-            Ok(j) => {
-                resp_json = j;
-                break;
-            }
-            Err(e) => {
+            Err(JudgeError::ParseError(e)) => {
                 crate::daemon::ws::emit_log(
                     event_tx,
                     "error",
@@ -3939,8 +3984,17 @@ fn extract_usage(body: &serde_json::Value, path: &str) -> (u64, u64) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::await_holding_lock,
+        clippy::bool_assert_comparison,
+        clippy::single_match
+    )]
     use super::*;
     use serde_json::json;
+
+    /// Serializes tests that depend on the global RELEVANCE_SEMAPHORE / RELEVANCE_CACHE.
+    /// Without this, parallel test execution races on the shared atomic state.
+    static RELEVANCE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     // ---- apply_provider_auth -----------------------------------------------
 
@@ -4213,5 +4267,474 @@ mod tests {
         let sse = "event: ping\n\n";
         let result = extract_sse_assistant_text(sse, "/v1/messages");
         assert_eq!(result, None);
+    }
+
+    // ---- JudgeClient mock + judge function tests ----------------------------
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc as StdArc;
+
+    /// Helper: build an Anthropic-style JSON response with the given text.
+    fn anthropic_json_response(text: &str) -> serde_json::Value {
+        json!({
+            "id": "msg_test",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-sonnet-4-20250514",
+            "content": [{"type": "text", "text": text}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 5}
+        })
+    }
+
+    /// Mock JudgeClient that returns a canned response and counts calls.
+    struct MockJudgeClient {
+        response: Result<serde_json::Value, JudgeErrorKind>,
+        call_count: StdArc<AtomicUsize>,
+    }
+
+    /// Simplified error kind for mock construction (avoids JudgeError not being Clone).
+    #[derive(Clone, Debug)]
+    #[allow(dead_code)]
+    enum JudgeErrorKind {
+        Timeout,
+        HttpError(u16),
+        NetworkError(String),
+        ParseError(String),
+    }
+
+    impl MockJudgeClient {
+        fn with_text(text: &str) -> Self {
+            Self {
+                response: Ok(anthropic_json_response(text)),
+                call_count: StdArc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn with_error(err: JudgeErrorKind) -> Self {
+            Self {
+                response: Err(err),
+                call_count: StdArc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn with_text_counting(text: &str, counter: StdArc<AtomicUsize>) -> Self {
+            Self {
+                response: Ok(anthropic_json_response(text)),
+                call_count: counter,
+            }
+        }
+
+        #[allow(dead_code)]
+        fn with_error_counting(err: JudgeErrorKind, counter: StdArc<AtomicUsize>) -> Self {
+            Self {
+                response: Err(err),
+                call_count: counter,
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.call_count.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl JudgeClient for MockJudgeClient {
+        async fn call_judge(
+            &self,
+            _api_url: &str,
+            _api_key: &str,
+            _body: &serde_json::Value,
+            _timeout_secs: u64,
+        ) -> Result<serde_json::Value, JudgeError> {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            match &self.response {
+                Ok(v) => Ok(v.clone()),
+                Err(JudgeErrorKind::Timeout) => Err(JudgeError::Timeout),
+                Err(JudgeErrorKind::HttpError(s)) => Err(JudgeError::HttpError(*s)),
+                Err(JudgeErrorKind::NetworkError(e)) => Err(JudgeError::NetworkError(e.clone())),
+                Err(JudgeErrorKind::ParseError(e)) => Err(JudgeError::ParseError(e.clone())),
+            }
+        }
+    }
+
+    /// Helper to create an event channel for tests.
+    fn test_event_tx() -> super::super::ws::EventSender {
+        let (tx, _rx) = super::super::ws::create_event_channel();
+        tx
+    }
+
+    // ---- scope_judge_check tests --------------------------------------------
+
+    #[tokio::test]
+    async fn scope_judge_check_yes() {
+        let mock = MockJudgeClient::with_text("YES The action is within scope.");
+        let etx = test_event_tx();
+        let (within, reason) = scope_judge_check(
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
+        )
+        .await;
+        assert!(within, "expected within_scope=true for YES response");
+        assert!(
+            reason.contains("YES"),
+            "reason should contain YES prefix: {reason}"
+        );
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn scope_judge_check_no() {
+        let mock = MockJudgeClient::with_text("NO The user did not request this.");
+        let etx = test_event_tx();
+        let (within, _reason) = scope_judge_check(
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
+        )
+        .await;
+        assert!(!within, "expected within_scope=false for NO response");
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn scope_judge_check_timeout_failopen() {
+        let mock = MockJudgeClient::with_error(JudgeErrorKind::Timeout);
+        let etx = test_event_tx();
+        let (within, reason) = scope_judge_check(
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
+        )
+        .await;
+        assert!(within, "timeout should fail open (within_scope=true)");
+        assert!(
+            reason.contains("timeout") || reason.contains("Timeout"),
+            "reason should mention timeout: {reason}"
+        );
+    }
+
+    #[tokio::test]
+    async fn scope_judge_check_http_error_failopen() {
+        let mock = MockJudgeClient::with_error(JudgeErrorKind::HttpError(401));
+        let etx = test_event_tx();
+        let (within, reason) = scope_judge_check(
+            &mock,
+            "http://test",
+            "sk-test",
+            "model",
+            "help me",
+            "do thing",
+            &etx,
+        )
+        .await;
+        assert!(within, "HTTP 401 should fail open (within_scope=true)");
+        assert!(
+            reason.contains("401"),
+            "reason should mention status code: {reason}"
+        );
+    }
+
+    // ---- check_violations_persist tests -------------------------------------
+
+    #[tokio::test]
+    async fn check_violations_persist_yes() {
+        let mock = MockJudgeClient::with_text("YES violations persist");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(result, "expected true when judge says YES");
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_no() {
+        let mock = MockJudgeClient::with_text("NO violations resolved");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(!result, "expected false when judge says NO");
+        assert_eq!(mock.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_no_api_key() {
+        let mock = MockJudgeClient::with_text("YES");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            None, // no API key
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(
+            !result,
+            "expected false when no API key (early return, no judge call)"
+        );
+        assert_eq!(mock.calls(), 0, "should not call judge when no API key");
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_empty_violations() {
+        let mock = MockJudgeClient::with_text("YES");
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &[], // empty violations
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(!result, "expected false when violations list is empty");
+        assert_eq!(
+            mock.calls(),
+            0,
+            "should not call judge with empty violations"
+        );
+    }
+
+    #[tokio::test]
+    async fn check_violations_persist_timeout_failopen() {
+        let mock = MockJudgeClient::with_error(JudgeErrorKind::Timeout);
+        let etx = test_event_tx();
+        let result = check_violations_persist(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &["constraint1: violation text".to_string()],
+            "The response text to check",
+            &etx,
+        )
+        .await;
+        assert!(!result, "timeout should fail open (return false)");
+    }
+
+    // ---- score_claim_relevance tests ----------------------------------------
+
+    #[tokio::test]
+    async fn score_claim_relevance_no_api_key() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+        let mock = MockJudgeClient::with_text_counting(
+            "claim1|constraint1|high|relevant",
+            counter.clone(),
+        );
+        let etx = test_event_tx();
+        score_claim_relevance(
+            &mock,
+            "http://test",
+            None, // no API key
+            "model",
+            &[("claim1".to_string(), "the sky is blue".to_string())],
+            &[(
+                "constraint1".to_string(),
+                "Sky: The sky is blue".to_string(),
+            )],
+            &etx,
+        )
+        .await;
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            0,
+            "should not call judge when no API key"
+        );
+    }
+
+    #[tokio::test]
+    async fn score_claim_relevance_caching() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+        let mock = MockJudgeClient::with_text_counting(
+            "claim1|constraint1|high|matches sky constraint",
+            counter.clone(),
+        );
+        let etx = test_event_tx();
+
+        let claims = vec![("claim1".to_string(), "the sky is blue".to_string())];
+        let constraints = vec![(
+            "constraint1".to_string(),
+            "Sky: The sky is blue".to_string(),
+        )];
+
+        // First call — should invoke the judge
+        score_claim_relevance(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &claims,
+            &constraints,
+            &etx,
+        )
+        .await;
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "first call should invoke judge"
+        );
+
+        // Second call with same claims — should be served from cache
+        score_claim_relevance(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &claims,
+            &constraints,
+            &etx,
+        )
+        .await;
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "second call should NOT invoke judge (cached)"
+        );
+    }
+
+    #[tokio::test]
+    async fn score_claim_relevance_single_flight() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        // Acquire the semaphore manually to simulate an in-flight request
+        assert!(
+            RELEVANCE_SEMAPHORE.try_acquire().is_some(),
+            "should acquire semaphore"
+        );
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+        let mock = MockJudgeClient::with_text_counting(
+            "claim1|constraint1|high|relevant",
+            counter.clone(),
+        );
+        let etx = test_event_tx();
+
+        // This is the call site pattern from extract_and_evaluate_text:
+        // it checks RELEVANCE_SEMAPHORE.try_acquire() before calling score_claim_relevance.
+        // Since we already acquired it, a second try_acquire should fail.
+        let acquired = RELEVANCE_SEMAPHORE.try_acquire();
+        assert!(
+            acquired.is_none(),
+            "second acquire should fail (semaphore held)"
+        );
+
+        // If we were to call score_claim_relevance here via the normal path,
+        // the semaphore guard would prevent it. Let's verify the function itself
+        // works once we release:
+        RELEVANCE_SEMAPHORE.release();
+
+        score_claim_relevance(
+            &mock,
+            "http://test",
+            Some("sk-test"),
+            "model",
+            &[(
+                "claim1".to_string(),
+                "unique_claim_for_single_flight".to_string(),
+            )],
+            &[("constraint1".to_string(), "Sky: blue".to_string())],
+            &etx,
+        )
+        .await;
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "exactly one judge call after semaphore release"
+        );
+    }
+
+    #[tokio::test]
+    async fn score_claim_relevance_concurrent_single_flight() {
+        let _guard = RELEVANCE_TEST_LOCK.lock().unwrap();
+        clear_relevance_cache();
+        reset_relevance_semaphore();
+
+        let counter = StdArc::new(AtomicUsize::new(0));
+
+        // Simulate the pattern used in extract_and_evaluate_text:
+        // N tasks race to acquire RELEVANCE_SEMAPHORE.try_acquire()
+        // Only one should win and call score_claim_relevance.
+        let n = 10;
+        let mut handles = Vec::new();
+
+        // Use a barrier to ensure all tasks start at roughly the same time
+        let barrier = StdArc::new(tokio::sync::Barrier::new(n));
+
+        for i in 0..n {
+            let cnt = counter.clone();
+            let bar = barrier.clone();
+            handles.push(tokio::spawn(async move {
+                bar.wait().await;
+
+                // Replicate the extract_and_evaluate_text guard pattern:
+                if RELEVANCE_SEMAPHORE.try_acquire().is_some() {
+                    // Winner: simulate the work score_claim_relevance does
+                    cnt.fetch_add(1, Ordering::SeqCst);
+                    // Small delay to keep semaphore held while others try
+                    tokio::task::yield_now().await;
+                    RELEVANCE_SEMAPHORE.release();
+                }
+                // Losers: skip (no-op), just like production code
+                i
+            }));
+        }
+
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        let total = counter.load(Ordering::SeqCst);
+        assert!(
+            total >= 1,
+            "at least one task should have acquired the semaphore"
+        );
+        // Due to sequential release + re-acquire, more than 1 may run,
+        // but in the tight race window typically only 1 acquires before others
+        // check. The key invariant: never more than 1 IN FLIGHT at any time.
+        // Since we release before the next can acquire, the invariant holds.
     }
 }

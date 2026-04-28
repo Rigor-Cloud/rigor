@@ -1,0 +1,15 @@
+{
+  "prompt_id": "hedged-python-compile",
+  "prompt_hash": "sha256:3c1226b2eb6a104bc8c89704b03ac80ec1a57bcf093b7a65de9ad5fb563eba0b",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:59:24.104121Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question. The statement \"Python compiles to native code\" is a common point of confusion because",
+  "tokens": {
+    "prompt": 18,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028356-74evkISPvTDv2YCnYeBk"
+}

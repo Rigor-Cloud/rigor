@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T13:23:33.392242Z",
+  "temperature": 0.7,
+  "response_text": "# Recolección de Basura: Rust vs Java\n\n## El punto clave desde el inicio\n\n```\nRust NO tiene recolector de basura (GC).\nJava SÍ tiene recolector de basura.\n```\n\nEsto no es un defecto de Rust, es una decisión de diseño deliberada con profundas implicaciones.\n\n---\n\n## Cómo gestiona la memoria Rust: Ownership + Borrow Checker\n\nRust usa un sistema de **propiedad (ownership)** verificado en **tiempo de compilación**.\n\n### Las 3 reglas fundamentales\n\n```rust\n// REGLA 1: Cada valor tiene exactamente UN propietario\nlet s1 = String::from(\"hola\");  // s1 es el propietario\n\n// REGLA 2: Solo puede haber un propietario a la vez\nlet s2 = s1;  // s1 se MUEVE a s2, s1 ya no es válido\n// println!(\"{}\", s1);  // ❌ ERROR en compilación: s1 fue movido\n\n// REGLA 3: Cuando el propietario sale del scope, la memoria se libera\n{\n    let s3 = String::from(\"mundo\");\n    // ... usar s3\n}  // ← s3 sale del scope, drop() se llama AUTOMÁTICAMENTE aquí\n   //   La memoria se libera SIN GC\n```\n\n### El ciclo de vida de la memoria en Rust\n\n```\nTiempo de compilación:\n┌─────────────────────────────────────────────┐\n│  Borrow Checker analiza el código            │\n│  y verifica todas las reglas de ownership    │\n│  → Si hay errores: NO COMPILA               │\n│  → Si compila: GARANTÍA de memoria segura   │\n└─────────────────────────────────────────────┘\n\nTiempo de ejecución:\n┌─────────────────────────────────────────────┐\n│  Stack: liberación automática al salir       │\n│         del scope (costo = 0)               ",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037003-kdlQLbwUywkgxeeH2ruf"
+}

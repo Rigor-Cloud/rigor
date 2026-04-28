@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:13901fe88a8ee56078ea80b44bbda998f3853a1dc3f3d3728948938995ca3919",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T11:14:16.888160Z",
+  "temperature": 0.7,
+  "response_text": "# JavaScript's Concurrency Model\n\n## The Direct Answer\n\n**JavaScript has no built-in multi-threading.** It is fundamentally single-threaded. This is a core design decision, not a limitation to work around.\n\n---\n\n## The Single-Threaded Event Loop\n\nJavaScript runs on a single thread with an event loop architecture:\n\n```\n┌─────────────────────────────────────────┐\n│           Call Stack                    │\n│  ┌─────────────────────────────────┐    │\n│  │  Currently executing code       │    │\n│  │  (one thing at a time)          │    │\n│  └─────────────────────────────────┘    │\n│                                         │\n│           Event Loop                    │\n│  ┌─────────────────────────────────┐    │\n│  │  Checks: is call stack empty?   │    │\n│  │  If yes → pull from queue       │    │\n│  └─────────────────────────────────┘    │\n│                                         │\n│     Microtask Queue  (Promises)         │\n│  [ task1, task2, task3 ]                │\n│                                         │\n│     Macrotask Queue  (setTimeout, I/O)  │\n│  [ task1, task2, task3 ]                │\n└─────────────────────────────────────────┘\n```\n\n```javascript\nconsole.log(\"1\");                          // Runs immediately\n\nsetTimeout(() => console.log(\"2\"), 0);    // Queued as macrotask\n\nPromise.resolve().then(() => console.log(\"3\")); // Queued as microtask\n\nconsole.log(\"4\");                          // Runs immediately\n\n// Output: 1, 4, 3, 2\n// Microtasks drain completely before next macrotask\n```\n\n---\n\n## What \"Concurrent\" Actually Means in JS\n\nJavaScript achieves **concurrency without parallelism** — tasks are interleaved, not simultaneous:\n\n```javascript\n// This BLOCKS everything — no other code runs during this loop\nfunction blockingOperation() {\n    const start = Date.now",
+  "tokens": {
+    "prompt": 23,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029245-eBpeWGZffyPpAOg2NRv5"
+}

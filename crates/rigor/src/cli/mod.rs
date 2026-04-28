@@ -1,5 +1,6 @@
 pub mod alert;
 pub mod config;
+pub mod corpus;
 pub mod diff;
 pub mod eval;
 pub mod gate;
@@ -213,6 +214,11 @@ pub enum Commands {
         /// Config value
         value: Option<String>,
     },
+    /// Recorded-LLM corpus management: record, stats, validate
+    Corpus {
+        #[command(subcommand)]
+        command: corpus::CorpusCommands,
+    },
     /// Verify source anchors and track code-grounded constraints.
     /// Uses LSP for deep semantic analysis (--deep) or grep for fast checks.
     Map {
@@ -330,15 +336,10 @@ pub enum Commands {
         #[arg(long)]
         compare: bool,
     },
-    /// Analyze violation patterns and suggest constraint refinements.
-    /// Targets constraints with false-positive rate above 30%.
+    /// Analyze violation patterns and suggest constraint refinements, or export training corpus.
     Refine {
-        /// Apply suggested refinements directly to rigor.yaml
-        #[arg(long)]
-        apply: bool,
-        /// Print the diff that would be applied, without modifying rigor.yaml
-        #[arg(long = "dry-run")]
-        dry_run: bool,
+        #[command(subcommand)]
+        command: refine::RefineCommands,
     },
     /// Interactive setup wizard for non-engineers.
     /// Walks through: daemon start, rigor.yaml init, OpenCode plugin install,
@@ -417,6 +418,7 @@ pub fn run_cli() -> Result<()> {
         Some(Commands::Config { action, key, value }) => {
             config::run_config(&action, key.as_deref(), value.as_deref())
         }
+        Some(Commands::Corpus { command }) => corpus::run_corpus_command(command),
         Some(Commands::Map {
             path,
             codebase,
@@ -453,7 +455,7 @@ pub fn run_cli() -> Result<()> {
             baseline,
             compare,
         }) => eval::run_eval(report, baseline, compare),
-        Some(Commands::Refine { apply, dry_run }) => refine::run_refine(apply, dry_run),
+        Some(Commands::Refine { command }) => refine::run_refine_command(command),
         Some(Commands::Setup) => setup::run_setup(),
     }
 }

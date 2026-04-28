@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T13:15:26.682084Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or turn Rust into C. It unlocks **five specific capabilities** while keeping everything else enforced.\n\n```rust\nunsafe {\n    // You can now:\n    // 1. Dereference raw pointers\n    // 2. Call unsafe functions/methods\n    // 3. Access/modify mutable static variables\n    // 4. Implement unsafe traits\n    // 5. Access fields of unions\n}\n```\n\n## What the Compiler Still Enforces Inside `unsafe`\n\n```rust\nunsafe {\n    let x = 5;\n    let y = x;          // Move/copy rules: still enforced\n    // x used here      // Borrow checker: still active\n    \n    let s = String::from(\"hello\");\n    let r1 = &s;\n    let r2 = &s;        // Multiple immutable refs: still fine\n    // let r3 = &mut s; // Would still be rejected\n    \n    // Type system: still fully enforced\n    let n: i32 = \"hello\"; // Still a compile error\n    \n    // Integer overflow: still checked in debug mode\n    // Lifetimes: still tracked\n    // Pattern matching exhaustiveness: still required\n}\n```\n\n**The compiler stops guaranteeing**: memory safety, data race freedom, and validity invariants for the five unsafe operations.\n\n---\n\n## The Five Unsafe Superpowers\n\n### 1. Dereferencing Raw Pointers\n\n```rust\nfn main() {\n    let mut x = 42;\n    \n    let r1 = &x as *const i32;      // Creating raw pointers is safe\n    let r2 = &mut x as *mut i32;    // Just creating them is fine\n    \n    unsafe {\n        println!(\"{}\", *r1);         // Dereferencing requires unsafe\n        *r2 = 100;\n        \n        // You're responsible for ensuring:\n        // - Pointer is non-null\n        // - Pointer is properly aligned\n        // - Points to valid memory of the right type\n        // - No aliasing violations (r1",
+  "tokens": {
+    "prompt": 29,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036516-FSPITvNg3PvENXWgvdMS"
+}

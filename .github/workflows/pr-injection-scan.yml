@@ -46,7 +46,8 @@ jobs:
           # injection fixtures, rigor.yaml itself (which contains rego regex
           # describing injection patterns), and planning docs that may quote
           # examples for analysis.
-          EXCLUDE='^(crates/rigor/tests/fixtures/|rigor\.yaml$|\.planning/|README\.md$|CHANGELOG\.md$)'
+          # Anchored to start of line (path comes first in awk output: <path><TAB><content>)
+          EXCLUDE='(crates/rigor/tests/fixtures/|\.github/corpus/injection/|rigor\.yaml\t|\.planning/|README\.md\t|CHANGELOG\.md\t)'
 
           # Patterns drawn from common prompt-injection indicators. Each one
           # must be a full-line regex anchored to `+` (an added line in the
@@ -66,7 +67,7 @@ jobs:
           REPORT=$(mktemp)
           git diff --unified=0 "${{ steps.diff.outputs.base }}..${{ steps.diff.outputs.head }}" \
             | awk '/^diff --git/ {file=$0; next} /^\+\+\+ / {path=substr($0,7); next} /^\+[^+]/ {print path "\t" $0}' \
-            | grep -vE "	$EXCLUDE" \
+            | grep -vE "^$EXCLUDE" \
             | while IFS=$'\t' read -r path line; do
                 body="${line:1}"  # strip leading `+`
                 for pat in "${PATTERNS[@]}"; do

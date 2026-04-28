@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:b9d9540081ed37d2b6f376621147dac8a3b6afd368b79aa0eaee32585879b592",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:24:12.673479Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Leaking in Rust with `Box::leak`\n\n## What `Box::leak` Does\n\n`Box::leak` converts a `Box<T>` into a `&'static mut T`, intentionally preventing the destructor from running and giving the value a `'static` lifetime.\n\n```rust\nuse std::collections::HashMap;\nuse std::sync::OnceLock;\n\n// ============================================================\n// Example 1: Static configuration loaded once at startup\n// ============================================================\n\n#[derive(Debug)]\nstruct AppConfig {\n    database_url: String,\n    max_connections: u32,\n    feature_flags: HashMap<String, bool>,\n}\n\nimpl AppConfig {\n    fn load() -> Self {\n        AppConfig {\n            database_url: String::from(\"postgres://localhost/mydb\"),\n            max_connections: 10,\n            feature_flags: HashMap::from([\n                (String::from(\"dark_mode\"), true),\n                (String::from(\"beta_features\"), false),\n            ]),\n        }\n    }\n}\n\nimpl Drop for AppConfig {\n    fn drop(&mut self) {\n        // This will NEVER be called when we use Box::leak\n        println!(\"AppConfig dropped (you won't see this with Box::leak)\");\n    }\n}\n\n/// Leak config once, get a &'static reference usable everywhere.\n/// Appropriate because: lives for program duration, needed in many places,\n/// and the OS reclaims memory on process exit anyway.\nfn get_static_config() -> &'static AppConfig {\n    static CONFIG: OnceLock<&'static AppConfig> = OnceLock::new();\n\n    CONFIG.get_or_init(|| {\n        let config = Box::new(AppConfig::load());\n        Box::leak(config) // &'static AppConfig\n    })\n}\n\n// ============================================================\n// Example 2: Intentionally leaked thread-local storage\n// ============================================================\n\nuse std::thread;\n\nfn spawn_worker_with_static_data(worker_id: u32) -> thread::JoinHandle<()> {\n    // The worker name needs 'static lifetime for the thread\n    let name = format!(\"",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026242-cNYqc2gQgSJmom0tkgNK"
+}

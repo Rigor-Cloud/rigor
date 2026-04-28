@@ -29,8 +29,11 @@ on:
 
 jobs:
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
     environment: ci-approval
     steps:
       - name: Checkout code
@@ -61,8 +64,11 @@ jobs:
         run: cargo test --release --test egress_integration
 
   clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
+    name: Clippy (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,6 +83,23 @@ jobs:
 
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Guard against raw HOME for .rigor paths
+        run: |
+          # All .rigor/ path resolution must go through crate::paths::rigor_home().
+          # Category B sites (non-.rigor HOME usage) are allowlisted with '// rigor-home-ok'.
+          VIOLATIONS=$(grep -rn 'dirs::home_dir\|env::var("HOME")\|env::var_os("HOME")' \
+            crates/rigor/src/ \
+            --include='*.rs' \
+            | grep -v 'paths\.rs' \
+            | grep -v 'rigor-home-ok' \
+            || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::Raw HOME access found outside paths.rs. Use crate::paths::rigor_home() instead, or add '// rigor-home-ok' for non-.rigor/ paths."
+            echo ""
+            echo "$VIOLATIONS"
+            exit 1
+          fi
 
   rustfmt:
     name: Format Check
@@ -111,3 +134,120 @@ jobs:
 
       - name: Run Rigor on itself
         run: ./target/release/rigor validate --path rigor.yaml
+
+      - name: Corpus replay consistency check
+        run: cargo test -p rigor --test corpus_replay --release -- --nocapture
+
+      - name: Corpus proxy replay smoke
+        run: cargo test -p rigor --test corpus_proxy_replay --release -- --nocapture
+
+      - name: Corpus drift check
+        run: ./target/release/rigor corpus replay --fail-on-drift
+
+  cargo-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        # Pre-existing transitive dep advisories tracked separately;
+        # report but do not fail the build. See issue tracker for follow-up.
+        continue-on-error: true
+        run: cargo audit
+
+  cargo-deny:
+    name: License & Supply Chain Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Run cargo deny
+        run: cargo deny check
+
+  coverage:
+    name: Coverage Floor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run coverage
+        run: cargo llvm-cov --workspace --fail-under-lines 60
+
+  bench-gate:
+    name: Bench Regression Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Restore bench baseline
+        uses: actions/cache@v4
+        with:
+          path: target/criterion
+          key: criterion-baseline-${{ runner.os }}-${{ hashFiles('crates/rigor/benches/**') }}
+          restore-keys: |
+            criterion-baseline-${{ runner.os }}-
+
+      - name: Run benchmarks
+        run: cargo bench --bench hook_latency --bench evaluation_only --bench dfquad_scaling --bench filter_chain_overhead -- --output-format bencher 2>&1 | tee bench-output.txt
+
+      - name: Check for regressions
+        run: |
+          # Parse criterion output for regressions.
+          # Criterion reports "regressed" in its comparison output when
+          # performance degrades beyond the noise threshold.
+          if grep -q "regressed" bench-output.txt; then
+            echo "::warning::Benchmark regressions detected -- review bench-output.txt"
+            # Extract regression percentages and fail if any exceed 20%
+            # Criterion outputs lines like: "change: +25.123% (p = 0.00 < 0.05)"
+            REGRESSIONS=$(grep -A2 "regressed" bench-output.txt \
+              | grep -oP '[+-]\d+\.\d+%' \
+              | sed 's/[+%]//g' \
+              | awk '$1 > 20 { found=1 } END { if (found) print "FAIL"; else print "OK" }')
+            if [ "$REGRESSIONS" = "FAIL" ]; then
+              echo "::error::Benchmark regression exceeds 20% threshold"
+              cat bench-output.txt
+              exit 1
+            fi
+            echo "Regressions detected but within 20% tolerance"
+          fi
+
+      - name: Save baseline (main branch only)
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: target/criterion
+          key: criterion-baseline-${{ runner.os }}-${{ hashFiles('crates/rigor/benches/**') }}

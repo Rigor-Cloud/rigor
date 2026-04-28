@@ -1,0 +1,15 @@
+{
+  "prompt_id": "hedged-python-compile",
+  "prompt_hash": "sha256:9f150881c56d2dcf2814d4f31e4306ffd7662d807c20fad80a36dfc9785c6d72",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:54:00.097095Z",
+  "temperature": 0.7,
+  "response_text": "## Python Compilation: The Reality\n\nThe claim that Python \"compiles to native code\" is **mostly false**, with some nuance depending on what you mean.\n\n---\n\n## What Actually Happens (Standard CPython)\n\n```\nyour_code.py → bytecode (.pyc) → interpreted by CPython VM\n```\n\n1. **Python source is compiled to bytecode** - a lower-level, platform-independent instruction set\n2. **Bytecode is interpreted** by the CPython virtual machine at runtime\n3. This is **not native machine code** - it still requires the Python runtime\n\n```python\nimport dis\n\ndef add(a, b):\n    return a + b\n\ndis.dis(add)\n# LOAD_FAST    0 (a)\n# LOAD_FAST    1 (b)\n# BINARY_OP   0 (+)\n# RETURN_VALUE\n```\n\n---\n\n## Where the Confusion Comes From\n\n| Tool | What it Does | Actually Native? |\n|------|-------------|-----------------|\n| **CPython** | Compiles to bytecode, then interprets | ❌ No |\n| **PyPy** | JIT compiles hot paths to machine code | ✅ Partially |\n| **Cython** | Transpiles to C, then compiles | ✅ Yes |\n| **Nuitka** | Compiles Python to C/machine code | ✅ Yes |\n| **mypyc** | Compiles typed Python to C extensions | ✅ Yes |\n| **Numba** | JIT compiles specific functions | ✅ Partially |\n\n---\n\n## The `.pyc` Files People Mistake for Native Code\n\n```\n__pycache__/\n    mymodule.cpython-311.pyc   ← bytecode, NOT native code\n```\n\nThese are **bytecode cache files** - they speed up startup by skipping re-parsing, but still need the interpreter.\n\n---\n\n## Key Implications\n\n- **Performance**: Python is typically **10-100x slower** than C/C++ for CPU-bound tasks because of interpretation overhead\n- **Distribution**: You still need Python installed to run `.pyc` files\n- **Tools like Py",
+  "tokens": {
+    "prompt": 24,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028027-FylXf7CGnJfY01viIojM"
+}

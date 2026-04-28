@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:0289edff6b6dfe3c6aaffd93e79ffc9974d73dd7acae32aeb824709613ffb809",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:35:57.269715Z",
+  "temperature": 0.7,
+  "response_text": "Directly comparing floating point numbers with `==` in IEEE 754 is **generally unsafe** for most real-world calculations, though there are specific cases where it's acceptable.\n\nHere's why:\n\n## The Problem\nFloating point numbers have limited precision (23 bits for single precision, 52 bits for double precision). Many decimal values cannot be represented exactly in binary, leading to rounding errors.\n\n### Common failure cases:\n1. **Arithmetic operations**: `0.1 + 0.2 == 0.3` returns `false` in most languages\n2. **Accumulated errors**: Repeated calculations magnify tiny errors\n3. **Transcendental functions**: Results of `sin()`, `log()`, etc., have approximation errors\n4. **Conversions**: Decimal-to-binary conversion introduces errors\n\n## When `==` Might Be Safe\n- Comparing against exact binary-representable values (0, 0.5, 2.0)\n- Comparing variables that haven't undergone calculations\n- Checking for special values like ±0 or ±∞ (but use dedicated functions if available)\n- Comparing results from the same calculation path\n\n## Better Alternatives\n\n### 1. **Epsilon Comparison**\n```python\ndef nearly_equal(a, b, epsilon=1e-12):\n    return abs(a - b) < epsilon\n```\n\n### 2. **Relative Error Comparison** (more robust)\n```python\ndef nearly_equal_rel(a, b, rel_tol=1e-9, abs_tol=0.0):\n    return abs(a - b) <= ",
+  "tokens": {
+    "prompt": 25,
+    "completion": 522
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026937-WArVlsIC1yn8ukQjqnlX"
+}

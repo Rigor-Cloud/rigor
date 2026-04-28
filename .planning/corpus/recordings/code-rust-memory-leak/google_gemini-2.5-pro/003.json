@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:389ad4179aea50bed2f4f49a4fff666be66c8c6b23398f91830e1a3bc5816957",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T10:29:58.181142Z",
+  "temperature": 0.7,
+  "response_text": "Of course. Here is a Rust function that deliberately leaks memory using `Box::leak`, followed by a",
+  "tokens": {
+    "prompt": 18,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026591-85FUaEa88n7ZXRZn2mc4"
+}

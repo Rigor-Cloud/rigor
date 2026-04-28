@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:e7d280eddf99433b6286fbe697c4928b39cea5c3428e06d1004fe24698cb9bec",
+  "model": "openai/gpt-4o",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T11:05:17.075575Z",
+  "temperature": 0.7,
+  "response_text": "HTTP status codes are issued by a server in response to a client's request made to the server. They are three-digit numbers, and each group of numbers has a specific meaning. Here are some of the most common HTTP status codes and what they mean:\n\n1. **100 Series (Informational):**\n   - **100 Continue**: This interim response indicates that the initial part of a request has been received and has not yet been rejected by the server. The client should continue with the request.\n\n2. **200 Series (Success):**\n   - **200 OK**: The request has succeeded. The meaning of success depends on the HTTP method: GET typically means the requested resource is being transferred in the response body; POST means the result of the action is being returned.\n   - **201 Created**: The request has been fulfilled, resulting in the creation of a new resource.\n   - **204 No Content**: The server successfully processed the request, and is not returning any content.\n\n3. **300 Series (Redirection):**\n   - **301 Moved Permanently**: This indicates that the resource requested has been permanently moved to the URL given by the `Location` headers.\n   - **302 Found (Temporary Redirect)**: The requested resource resides temporarily under a different URL, and the client should use the URL from the `Location` header for this request.\n   - **304 Not Modified**: Indicates that the resource has not been modified since the version specified by the request headers If-Modified-Since or If-None-Match.\n\n4. **400 Series (Client Error):**\n   - **400 Bad Request**: The server cannot or will not process the request due to a client error (e.g., malformed request syntax).\n   - **401 Unauthorized**: The request has not been applied because it lacks valid authentication credentials for the target resource.\n   - **403 Forbidden**: The server understood the request but refuses to authorize it.\n   - **404 Not Found**: The server cannot find the requested resource. This code is often used when the server does not wish to make this information available.\n   - **405 Method Not Allowed**: The request method is known by the server but is not supported by the target resource.\n\n5. **500 Series (Server Error):**\n   - **500 Internal Server Error**: An unexpected condition was encountered, and no more specific message is suitable.\n   - **501 Not Implemented**: The server does not support the functionality required to fulfill the request.\n   - **",
+  "tokens": {
+    "prompt": 19,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028708-qVarJtdWHGi1TdIUHWfR"
+}

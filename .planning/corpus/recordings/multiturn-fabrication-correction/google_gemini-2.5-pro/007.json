@@ -1,0 +1,15 @@
+{
+  "prompt_id": "multiturn-fabrication-correction",
+  "prompt_hash": "sha256:25e35600f3a77874a8007fded9b55d62b331c344dec18778576f26d71ecb1b61",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T11:35:50.972905Z",
+  "temperature": 0.7,
+  "response_text": "That's an excellent and very important question. I must first correct a misunderstanding, which is",
+  "tokens": {
+    "prompt": 20,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777030542-3Bi69hKfnwHeUg8iYWtW"
+}

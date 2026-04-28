@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:9dd25bb1994545ba1ad4905c448bf649e33fa14eb49c5548dc1340783159ae55",
+  "model": "openai/gpt-4o",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:28:40.610017Z",
+  "temperature": 0.7,
+  "response_text": "To deliberately leak memory in Rust using `Box::leak`, you can use the following function. This function allocates memory for a string and leaks it:\n\n```rust\nfn leak_memory() {\n    // Create a String and allocate it on the heap.\n    let my_string = String::from(\"This is a leaked string\");\n\n    // Leak the memory by converting the Box into a raw pointer, which prevents it from being deallocated.\n    let _leaked = Box::leak(Box::new(my_string));\n    \n    // At this point, the memory is leaked and will not be automatically freed.\n}\n\nfn main() {\n    leak_memory();\n    // The program can continue executing, but the leaked memory won't be freed until the program terminates.\n}\n```\n\n### Explanation\n\nThe `Box::leak` function in Rust allows you to intentionally leak memory by converting a `Box<T>` into a mutable reference to `T`. Once you do this, the Rust ownership system no longer tracks the memory, and it won't be deallocated automatically. This means that the memory will remain allocated for the lifetime of the program, or until you manually manage it (if you choose to do so).\n\n### When is it appropriate to use `Box::leak`?\n\n1. **Global Static Data**: If you want to create global static data that is initialized at runtime, you can use `Box::leak` to safely leak the data so it lives for the entire duration of the program. This is useful when you need a static reference to data that cannot be initialized at compile time.\n\n2. **Interfacing with C Code**: When interfacing with C libraries, you might need to provide them with raw pointers to data that must not be deallocated by Rust’s ownership system. Leaking the memory ensures that Rust doesn't automatically free it, and you can manage it manually if needed.\n\n3. **Long-Lived Memory**: In certain scenarios, you might have data that must outlive the typical scope constraints and lifetimes managed by Rust. Leaking memory allows this data to persist beyond those constraints.\n\nHowever, leaking memory is generally discouraged unless necessary because it circumvents Rust's memory safety guarantees and can lead to memory bloat if not managed carefully. Always ensure that you have a good reason and that the benefits outweigh the downsides when you choose to leak memory intentionally.",
+  "tokens": {
+    "prompt": 26,
+    "completion": 482
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026514-b2sg0Z2sunnefQA7vU5T"
+}

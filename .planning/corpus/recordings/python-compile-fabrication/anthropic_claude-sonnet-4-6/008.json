@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-compile-fabrication",
+  "prompt_hash": "sha256:e41c1c46e716a2c3886d7d24be00325f4a736eb1fa09e9e2442f6877d4f58897",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T11:45:07.582601Z",
+  "temperature": 0.7,
+  "response_text": "## Python's Ahead-of-Time Compilation to Native Machine Code\n\nThis is an important clarification: **Python doesn't have a built-in AOT compiler**. The standard CPython implementation uses a bytecode interpreter. However, several tools provide AOT compilation capabilities.\n\n---\n\n## What CPython Actually Does\n\n```\nPython Source (.py)\n       ↓\n   Tokenizer/Lexer\n       ↓\n   Parser (AST)\n       ↓\n   Bytecode Compiler\n       ↓\n   .pyc files (bytecode)\n       ↓\n   CPython VM interprets bytecode at runtime\n```\n\nThis is **NOT** native machine code — it's bytecode for a virtual machine.\n\n---\n\n## Tools That Provide True AOT Compilation\n\n### 1. Cython\n```python\n# example.pyx - Cython source\ndef add_numbers(int x, int y):\n    cdef int result\n    result = x + y\n    return result\n\n# Type annotations enable true C code generation\ncpdef double compute(double[:] arr, int n):\n    cdef int i\n    cdef double total = 0.0\n    for i in range(n):\n        total += arr[i]\n    return total\n```\n\n```bash\n# Compilation pipeline\ncython example.pyx          # → generates example.c\ngcc -shared example.c       # → generates example.so (native code)\n```\n\n**Pipeline:**\n```\n.pyx source\n    ↓\nCython compiler (Python AST → C AST)\n    ↓\nGenerated C code\n    ↓\nC compiler (gcc/clang/MSVC)\n    ↓\nNative machine code (.so/.dll)\n```\n\n---\n\n### 2. Nuitka\n```python\n# regular_python.py - standard Python, no modifications needed\nimport numpy as np\n\ndef matrix_multiply(a, b):\n    return np.dot(a, b)\n\nclass DataProcessor:\n    def __init__(self, data):\n        self.data = data\n    \n    def process(self):\n        return [x * 2 for x in self.data]\n```\n\n```",
+  "tokens": {
+    "prompt": 25,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777031097-YmWnHZpLPyfkkjJV2124"
+}

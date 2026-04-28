@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! A3 — False-positive precision tests.
 //!
 //! Claims that look like violations but are correct speech — negated,

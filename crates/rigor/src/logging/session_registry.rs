@@ -52,12 +52,12 @@ impl SessionEntry {
 
 /// Path to the session registry file.
 pub fn registry_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".rigor/sessions.jsonl"))
+    Some(crate::paths::rigor_home().join("sessions.jsonl"))
 }
 
 /// Path to per-session log directory.
 pub fn session_log_dir(session_id: &str) -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(format!(".rigor/sessions/{}", session_id)))
+    Some(crate::paths::rigor_home().join(format!("sessions/{}", session_id)))
 }
 
 /// Path to per-session log file.

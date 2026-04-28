@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:1e215f3e679455341b9954f1984dfea1bd5c8328149959599aac793e1616a09c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T11:15:19.041589Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question. Let's clarify a fundamental point first and then dive into the details.\n\n### Core Clarification: JavaScript is Single-Threaded\n\nThe primary JavaScript runtime (like the one in browsers or Node.js) is intrinsically **single-threaded**. It uses an **event loop** to manage asynchronous operations (callbacks, promises, async/await), but this concurrency model does not involve true parallel execution of JavaScript code on multiple threads.\n\nHowever, to perform computationally intensive tasks without blocking the main thread, JavaScript provides a multi-threading capability through **Web Workers** (in browsers) and **Worker Threads** (in Node.js).\n\n---\n\n### The Multi-Threading Model: Web Workers / Worker Threads\n\nThis model is based on the **actor model**, not the traditional shared-memory threading model found in languages like Java or C++.\n\n**Key Characteristics:**\n1.  **Isolated Threads:** Each worker runs in its own completely isolated execution environment. It has its own:\n    *   JavaScript engine instance (call stack, heap).\n    *   Event loop.\n    *   Global object (`self` or `global`). It does **not** have access to the DOM, `window` object, or most browser APIs (for web workers).\n\n2.  **Communication via Messaging:** The **only** way for the main thread and a worker (or between workers) to communicate is through an asynchronous **message-passing** system using `postMessage()` and the `onmessage` event handler.\n    *   Data is **copied** (not shared) when sent",
+  "tokens": {
+    "prompt": 24,
+    "completion": 474
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029301-wMgRppVf4g8JMYp5JsGf"
+}

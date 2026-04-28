@@ -1,0 +1,17 @@
+# Fixture: benign-api-docs-02.txt | Pattern: none | Expected: CLEAN
+type Query {
+  evaluate(text: String!): EvaluationResult!
+  constraints: [Constraint!]!
+  health: HealthStatus!
+}
+
+type EvaluationResult {
+  verdict: Verdict!
+  score: Float!
+  violations: [Violation!]
+}
+
+enum Verdict {
+  PASS
+  BLOCK
+}

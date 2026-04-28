@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:ac11a189c661e9d7858b4d385dd1fdccee240074c93e6dcb055b739cc3372fd3",
+  "model": "openai/gpt-4o",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T11:10:54.825039Z",
+  "temperature": 0.7,
+  "response_text": "As of my last update, HTTP/3 is not yet mandatory for all web servers, and future developments may change the specifics. However, if you want to configure your Nginx instance to support HTTP/3, here is a general guide based on current practices:\n\n1. **Ensure You Have the Right Version**: HTTP/3 support is available in newer versions of Nginx, specifically those compiled with the `quiche` library. Verify that your version of Nginx supports HTTP/3. You might need to compile it manually or use a pre-built version that includes HTTP/3 support.\n\n2. **Install Dependencies**: If compiling Nginx yourself, ensure you have the necessary dependencies like `quiche` and `BoringSSL`. These are required for HTTP/3 and QUIC support.\n\n3. **Configure Nginx with HTTP/3**:\n   \n   - Open your Nginx configuration file, usually located at `/etc/nginx/nginx.conf` or `/etc/nginx/sites-available/your-site`.\n   \n   - Update your server block to include HTTP/3 settings. Example configuration might look like this:\n\n     ```nginx\n     server {\n         listen 443 ssl http2;\n         listen [::]:443 ssl http2;\n         listen 443 quic reuseport;\n         listen [::]:443 quic reuseport;\n         \n         ssl_certificate /path/to/your/certificate.crt;\n         ssl_certificate_key /path/to/your/private.key;\n         \n         # Add HTTP/3 (QUIC) specific header\n         add_header Alt-Svc 'h3-29=\":443\"; ma=86400';\n         \n         # Additional configuration...\n     }\n     ```\n\n4. **Configure SSL**: HTTP/3 requires TLS. Ensure your SSL certificates are correctly configured. You can use Let's Encrypt for free SSL certificates if needed.\n\n5. **Enable QUIC and HTTP/3**: Quiche is a library used by Nginx to support QUIC. Make sure it is properly integrated and configured.\n\n6. **Adjust Firewall and Network Settings**: Ensure your firewall allows UDP traffic on port 443, as HTTP/3 uses QUIC over UDP.\n\n7. **Test Your Configuration**: After setting up, test your configuration to ensure everything is working. You can use online tools like [QUIC and HTTP/3 Test](https://gf.dev/http3-test) to verify that your server is delivering content over HTTP/3.\n\n8. **Monitor",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029044-kqbNPfmMX6xKKKxKCEYE"
+}

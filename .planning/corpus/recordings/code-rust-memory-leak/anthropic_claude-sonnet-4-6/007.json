@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:b9d9540081ed37d2b6f376621147dac8a3b6afd368b79aa0eaee32585879b592",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:25:05.783798Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Leaking in Rust with `Box::leak`\n\n## What `Box::leak` Does\n\n`Box::leak` converts a `Box<T>` into a `&'static mut T`, intentionally preventing the destructor from running and giving the value a `'static` lifetime.\n\n```rust\nuse std::collections::HashMap;\nuse std::sync::OnceLock;\n\n// ============================================================\n// Example 1: Static configuration loaded at startup\n// ============================================================\n\n#[derive(Debug)]\nstruct AppConfig {\n    database_url: String,\n    max_connections: u32,\n    feature_flags: HashMap<String, bool>,\n}\n\nimpl AppConfig {\n    fn new(database_url: &str, max_connections: u32) -> Self {\n        let mut feature_flags = HashMap::new();\n        feature_flags.insert(\"dark_mode\".to_string(), true);\n        feature_flags.insert(\"beta_features\".to_string(), false);\n\n        AppConfig {\n            database_url: database_url.to_string(),\n            max_connections,\n            feature_flags,\n        }\n    }\n}\n\nimpl Drop for AppConfig {\n    fn drop(&mut self) {\n        // This will NEVER run when Box::leak is used\n        println!(\"AppConfig dropped (you won't see this with Box::leak)\");\n    }\n}\n\n/// Leaks config intentionally to get a 'static reference.\n/// Appropriate here because:\n/// - Config lives for the entire program lifetime anyway\n/// - We need 'static references for use in threads\n/// - The OS reclaims all memory on process exit\nfn leak_config(database_url: &str) -> &'static AppConfig {\n    let config = Box::new(AppConfig::new(database_url, 10));\n    Box::leak(config)\n    // The Box is consumed, its heap allocation is intentionally \"forgotten\"\n}\n\n// ============================================================\n// Example 2: Thread-safe global initialization\n// ============================================================\n\nstatic GLOBAL_CONFIG: OnceLock<&'static AppConfig> = OnceLock::new();\n\nfn initialize_global_config(database_url: &str) -> &",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026296-402a9pxC8bCRL1zboMev"
+}

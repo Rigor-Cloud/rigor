@@ -1,3 +1,9 @@
+#![allow(
+    clippy::await_holding_lock,
+    clippy::single_match,
+    clippy::bool_assert_comparison,
+    clippy::doc_overindented_list_items
+)]
 //! A1 — Constraint firing matrix.
 //!
 //! For every constraint in `rigor.yaml` that ships a fixture, verify it fires

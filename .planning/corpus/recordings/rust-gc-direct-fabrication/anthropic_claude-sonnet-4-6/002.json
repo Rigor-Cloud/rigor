@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:9b85865e694d960764446892ac45ea8f225259474011fda43739928918f308f6",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T13:00:31.887466Z",
+  "temperature": 0.7,
+  "response_text": "# Rust Doesn't Have a Garbage Collector\n\nThis is a common misconception worth addressing directly. **Rust has no garbage collector** — this is actually one of its defining features and primary selling points.\n\n---\n\n## How Rust Manages Memory\n\nRust uses a compile-time ownership system instead of runtime garbage collection.\n\n### Core Concepts\n\n**Ownership Rules:**\n- Every value has exactly one owner\n- When the owner goes out of scope, the value is dropped (freed) immediately\n- No runtime overhead, no pauses\n\n```rust\nfn main() {\n    let s = String::from(\"hello\"); // s owns this heap allocation\n    \n    do_something(s);               // ownership MOVES to the function\n    \n    // println!(\"{}\", s);          // COMPILE ERROR: s no longer valid here\n}                                  // if s still owned here, it would drop automatically\n\nfn do_something(s: String) {\n    println!(\"{}\", s);\n}   // s drops here, memory freed immediately\n```\n\n**Borrowing — Use Without Taking Ownership:**\n```rust\nfn main() {\n    let s = String::from(\"hello\");\n    \n    print_length(&s);  // lend a reference, don't give ownership\n    \n    println!(\"{}\", s); // s still valid here\n}\n\nfn print_length(s: &String) {  // borrows s, doesn't own it\n    println!(\"Length: {}\", s.len());\n}   // reference dropped, but s is NOT freed (we don't own it)\n```\n\n**Borrow Rules (enforced at compile time):**\n```rust\nlet mut s = String::from(\"hello\");\n\nlet r1 = &s;      // immutable borrow - OK\nlet r2 = &s;      // second immutable borrow - OK\n// let r3 = &mut s; // COMPILE ERROR: can't mutate while immutably borrowed\n\nprintln!(\"{} {}\", r1, r2);\n// r1 and r2 no longer used after this point\n\nlet r3 = &mut s;  // mutable borrow - OK now\nr3.push_str(\" world\");\n```\n\n**Lifetimes — Preventing",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035622-Rb8Xl2tjpxO16kz00Erg"
+}

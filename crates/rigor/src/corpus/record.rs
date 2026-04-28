@@ -53,12 +53,20 @@ pub async fn record_prompt<C: ChatClient + ?Sized>(
                 max_tokens: cfg.max_tokens,
             };
 
-            let resp = client.chat(&req).await.with_context(|| {
-                format!(
-                    "record {} / {} / sample {}",
-                    manifest.id, model, sample_index
-                )
-            })?;
+            let resp = match client.chat(&req).await {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::warn!(
+                        prompt_id = %manifest.id,
+                        model = %model,
+                        sample_index,
+                        error = %e,
+                        "skipping sample due to API error"
+                    );
+                    stats.errors += 1;
+                    continue;
+                }
+            };
 
             let sample = RecordedSample {
                 prompt_id: manifest.id.clone(),
@@ -89,6 +97,7 @@ pub async fn record_prompt<C: ChatClient + ?Sized>(
 pub struct RecordStats {
     pub recorded: u32,
     pub skipped: u32,
+    pub errors: u32,
 }
 
 /// Convert an OpenRouter slug like `anthropic/claude-sonnet-4-6` into a
@@ -226,6 +235,47 @@ mod tests {
             .unwrap();
         assert_eq!(s2.recorded, 0);
         assert_eq!(s2.skipped, 2);
+    }
+
+    #[tokio::test]
+    async fn record_prompt_continues_on_api_error() {
+        let tmp = TempDir::new().unwrap();
+        let manifest = test_manifest();
+        let models = vec!["anthropic/claude-sonnet-4-6".to_string()];
+
+        // Provide only 1 canned response but request 3 samples.
+        // Samples 2 and 3 will hit "MockChatClient exhausted" errors.
+        let client = MockChatClient::new(vec![canned("only-one")]);
+        let cfg = RecordConfig {
+            models: &models,
+            samples: 3,
+            temperature: 0.7,
+            max_tokens: 128,
+            resume: false,
+        };
+
+        let stats = record_prompt(&client, &manifest, tmp.path(), &cfg)
+            .await
+            .unwrap();
+        assert_eq!(stats.recorded, 1, "should record the one successful sample");
+        assert_eq!(stats.errors, 2, "should count the two failed samples");
+        assert_eq!(stats.skipped, 0);
+
+        // Verify the successful sample was written
+        let sample_path = tmp
+            .path()
+            .join("unit-probe/anthropic_claude-sonnet-4-6/001.json");
+        assert!(sample_path.exists(), "first sample should exist on disk");
+
+        // Verify the failed samples were NOT written
+        let missing_2 = tmp
+            .path()
+            .join("unit-probe/anthropic_claude-sonnet-4-6/002.json");
+        let missing_3 = tmp
+            .path()
+            .join("unit-probe/anthropic_claude-sonnet-4-6/003.json");
+        assert!(!missing_2.exists(), "second sample should not exist");
+        assert!(!missing_3.exists(), "third sample should not exist");
     }
 
     #[test]

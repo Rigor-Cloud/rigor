@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T10:38:39.425496Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## Core Philosophy Difference\n\n```\nGitFlow:  Multiple long-lived branches → merge complexity → structured releases\nTrunk:    One main branch → continuous integration → continuous deployment\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain          ─────●─────────────────────●──────────\n                   │                     │\ndevelop       ─────●───●───●───●───●───●─●──────────\n                       │           │\nfeature/login  ────────●───●───●───┘\n                                   │\nrelease/1.2    ────────────────────●───●───┘\n                                           │\nhotfix/bug     ────────────────────────────●───┘\n```\n\n### Branch Types & Rules\n```\n┌─────────────┬──────────────┬─────────────────────────────────┐\n│ Branch      │ Lifespan     │ Purpose                         │\n├─────────────┼──────────────┼─────────────────────────────────┤\n│ main        │ Forever      │ Production-ready code only       │\n│ develop     │ Forever      │ Integration branch               │\n│ feature/*   │ Days-weeks   │ New features                     │\n│ release/*   │ Days         │ Release preparation & bugfixes   │\n│ hotfix/*    │ Hours-days   │ Emergency production fixes       │\n└─────────────┴──────────────┴─────────────────────────────────┘\n```\n\n### GitFlow Workflow\n```bash\n# 1. Start a feature\ngit checkout develop\ngit checkout -b feature/user-auth\n\n# 2. Work on feature\ngit commit -m \"Add login endpoint\"\ngit commit -m \"Add JWT validation\"\n\n# 3. Merge back to develop\ngit checkout develop\ngit merge --no-ff feature/user-auth\ngit branch -d feature/user-auth\n\n# 4. Create release branch\ngit checkout -b release/1.2.0\n# bump version, final fixes only\ngit commit -m \"Bump",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027110-bAkqcIVulXvjTdrUfm3G"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:e7c77fff5e17f6e6e96df375b5cff86eb93b05970af2ec1e489f66d3aebacd3c",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T10:31:25.147653Z",
+  "temperature": 0.7,
+  "response_text": "## Comparing Floating Point Numbers with `==` in IEEE 754\n\nThe short answer is: **it depends on the situation**.\n\n---\n\n## When `==` is UNSAFE\n\n### Computed/calculated values\n```python\n# Rounding errors make this fail\n0.1 + 0.2 == 0.3        # False! (0.1 + 0.2 = 0.30000000000000004)\nsqrt(2.0) ** 2 == 2.0   # False!\nsin(pi) == 0.0          # False! (result is ~1.2e-16)\n```\n\n### Accumulated operations\n```python\nx = 0.0\nfor _ in range(10):\n    x += 0.1\nx == 1.0    # False! Errors accumulate\n```\n\n---\n\n## When `==` IS Safe\n\n### Exact integer values (within precision limits)\n```python\n1.0 == 1.0      # True  - same exact bit pattern\n0.0 == 0.0      # True\n2.0 == 2.0      # True\n```\n\n### Assigned constants (same source)\n```python\nx = 3.14\nx == 3.14       # True  - identical literal, same bits\n```\n\n### Special values\n```python\nfloat('inf') == float('inf')   # True  - IEEE 754 guarantees this\nfloat('-inf') == float('-inf') # True\nfloat('nan') == float('nan')   # FALSE! NaN != NaN by spec\n```\n\n### Powers of 2 and exact fractions\n```python\n0.5 == 0.5      # True  - exactly representable\n0.25 + 0.25 == 0.5  # True  - no rounding error here\n```\n\n---\n\n## The NaN Special Case\n```python\nx = float('nan')\nx == x          # FALSE - NaN is never equal to anything, including itself\n# Use this to detect NaN:\nimport math\nmath.isnan(x)   # True\n```\n\n---\n\n## Safe Alternatives\n\n### Epsilon comparison\n```python\nabs(a - b)",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026676-uQTlwcpaFNSIK60jepWt"
+}

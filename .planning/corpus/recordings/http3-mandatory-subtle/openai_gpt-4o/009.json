@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:ac11a189c661e9d7858b4d385dd1fdccee240074c93e6dcb055b739cc3372fd3",
+  "model": "openai/gpt-4o",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T11:11:23.752449Z",
+  "temperature": 0.7,
+  "response_text": "As of my last update, HTTP/3 is not mandatory for all web servers, but many organizations and administrators are adopting it for its benefits, such as reduced latency and improved performance. If you want to configure your Nginx instance to support HTTP/3, you need to ensure you have the necessary environment and configuration. Here’s a general guide to help you configure HTTP/3 on Nginx:\n\n### Prerequisites\n\n1. **Nginx Version**: Make sure you are using a version of Nginx that supports HTTP/3. This typically means using the latest stable release or a specific build, such as Nginx with the `quiche` library.\n\n2. **OpenSSL Version**: Ensure you have a version of OpenSSL that supports QUIC and HTTP/3, often requiring at least OpenSSL 1.1.1 or a custom build with QUIC support.\n\n3. **Quiche Library**: You need to compile Nginx with the `quiche` library, which is a library that provides support for HTTP/3 and QUIC.\n\n4. **Browser Support**: Ensure that the clients accessing your server use browsers that support HTTP/3.\n\n### Steps to Configure Nginx for HTTP/3\n\n1. **Install Necessary Packages**:\n   - Update your package list and install necessary build dependencies.\n\n2. **Compile Nginx with HTTP/3 Support**:\n   - Download the Nginx source code and the `quiche` library.\n   - Compile Nginx with the `quiche` library. This involves configuring the Nginx build with the `--with-http_v3_module` and specifying the path to the `quiche` library.\n\n3. **Edit Nginx Configuration**:\n   - Modify your `nginx.conf` or site-specific configuration files to enable HTTP/3:\n     ```nginx\n     http {\n         server {\n             listen 443 ssl http2; # Listen for HTTP/2\n             listen [::]:443 ssl http2;\n             \n             # Enable QUIC and HTTP/3\n             listen 443 quic reuseport;\n             listen [::]:443 quic reuseport;\n             \n             ssl_protocols       TLSv1.3;\n             ssl_certificate     /path/to/cert.pem;\n             ssl_certificate_key /path/to/cert.key;\n\n             # Add Alt-Svc header to negotiate HTTP/3\n             add_header Alt-Svc 'h3=\":443\"; ma=864",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029076-uFn1v7PRC7mTmzEKwHfA"
+}

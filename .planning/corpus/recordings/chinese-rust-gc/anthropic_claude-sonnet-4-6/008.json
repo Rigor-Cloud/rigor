@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:6c57896a264891627e02aff6cc1e1bd516778db1a1d9d8d887b5b02f528a8e5e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T10:10:16.502226Z",
+  "temperature": 0.7,
+  "response_text": "# Rust 没有垃圾回收器\n\n这是一个常见的误解，需要先纠正：**Rust 根本没有垃圾回收器（GC）**。\n\n---\n\n## Rust 的内存管理机制\n\nRust 使用**所有权系统（Ownership System）**在编译期解决内存管理问题。\n\n### 核心三原则\n\n```\n1. 每个值有且只有一个所有者（Owner）\n2. 所有者离开作用域时，值被自动释放\n3. 同一时刻，要么有多个不可变引用，要么只有一个可变引用\n```\n\n### 所有权示例\n\n```rust\nfn main() {\n    // s1 拥有这个 String 的所有权\n    let s1 = String::from(\"hello\");\n    \n    // 所有权移动（Move）到 s2，s1 不再有效\n    let s2 = s1;\n    \n    // println!(\"{}\", s1); // ❌ 编译错误！s1 已被移走\n    println!(\"{}\", s2);    // ✅ 正常\n    \n} // s2 离开作用域，内存自动释放（调用 drop）\n```\n\n### 借用（Borrowing）\n\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");\n    \n    // 借用引用，不转移所有权\n    let len = calculate_length(&s1);\n    \n    println!(\"{} 的长度是 {}\", s1, len); // ✅ s1 仍然有效\n}\n\nfn calculate_length(s: &String) -> usize {\n    s.len()\n} // s 是引用，离开作用域不会释放数据\n```\n\n### 生命周期（Lifetimes）\n\n```rust\n// 编译器需要知道引用的有效期\nfn longest",
+  "tokens": {
+    "prompt": 45,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025407-KjFmY3UV2kQfiMcxGs7G"
+}

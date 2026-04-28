@@ -9,3 +9,4 @@ graphify-out/
 # GSD runtime state (local, changes per session)
 .planning/active-workstream
 .claude/scheduled_tasks.lock
+.harness/logs/

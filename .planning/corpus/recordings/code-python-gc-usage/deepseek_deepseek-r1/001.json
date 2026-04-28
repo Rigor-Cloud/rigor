@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:3ab63f50b1bd87ff4430b1f25f9e4b73f27ccceeb533fb89a8f5f89cf8ea9f5a",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:19:01.237002Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Python script demonstrating manual control of garbage collection using the `gc` module:\n\n```python\nimport gc\nimport sys\n\nclass CircularReference:\n    \"\"\"Class to create circular references for demonstration\"\"\"\n    def __init__(self, name):\n        self.name = name\n        self.reference = None\n    \n    def __del__(self):\n        print(f\"{self.name} is being garbage collected\")\n    \n    def create_circular_ref(self, other):\n        self.reference = other\n        other.reference = self\n\ndef demonstrate_gc_control():\n    \"\"\"Demonstrate manual garbage collection control\"\"\"\n    \n    print(\"=== Initial GC State ===\")\n    print(f\"GC Enabled: {gc.isenabled()}\")\n    print(f\"GC Thresholds: {gc.get_threshold()}\")\n    print(f\"GC Count (generations 0,1,2): {gc.get_count()}\")\n    \n    # 1. Disable automatic garbage collection\n    print(\"\\n=== Disabling Automatic GC ===\")\n    gc.disable()\n    print(f\"GC Enabled: {gc.isenabled()}\")\n    \n    # 2. Create objects with circular references\n    print(\"\\n=== Creating Circular References ===\")\n    obj1 = CircularReference(\"Object1\")\n    obj2 = CircularReference(\"Object2\")\n    obj1.create_circular_ref(obj2)\n    \n    # Track reference counts\n    print(f\"\\nReference count for obj1: {sys.getrefcount(obj1) - 1}\")\n    print(f\"Reference count for obj2: {sys.getrefcount(obj2) - 1}\")\n    \n   ",
+  "tokens": {
+    "prompt": 25,
+    "completion": 557
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025920-63PCcKJ1uRbErSLDZZJn"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:e7d280eddf99433b6286fbe697c4928b39cea5c3428e06d1004fe24698cb9bec",
+  "model": "openai/gpt-4o",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T11:04:45.646016Z",
+  "temperature": 0.7,
+  "response_text": "HTTP status codes are issued by a server in response to a client's request made to the server. They are divided into five classes, each representing a different category of response:\n\n1. **1xx: Informational**\n   - **100 Continue**: Indicates that the initial part of the request has been received and the client can continue with its request or ignore if it is already finished.\n   - **101 Switching Protocols**: Informs the client that the server is changing to a different protocol as requested by the client.\n\n2. **2xx: Success**\n   - **200 OK**: The request has succeeded. The meaning of the success depends on the HTTP method (GET, POST, etc.).\n   - **201 Created**: The request has been fulfilled and has resulted in the creation of a new resource.\n   - **204 No Content**: The server successfully processed the request and is not returning any content.\n\n3. **3xx: Redirection**\n   - **301 Moved Permanently**: This and all future requests should be directed to the given URI.\n   - **302 Found**: The requested resource resides temporarily under a different URI.\n   - **304 Not Modified**: Indicates that the resource has not been modified since the last request, so the client can use the cached version.\n\n4. **4xx: Client Error**\n   - **400 Bad Request**: The server could not understand the request due to invalid syntax.\n   - **401 Unauthorized**: Authentication is required and has failed or has not yet been provided.\n   - **403 Forbidden**: The server understood the request but refuses to authorize it.\n   - **404 Not Found**: The server can not find the requested resource.\n   - **405 Method Not Allowed**: The request method is known by the server but is not supported by the target resource.\n\n5. **5xx: Server Error**\n   - **500 Internal Server Error**: A generic error message indicating that the server encountered an unexpected condition.\n   - **501 Not Implemented**: The server does not support the functionality required to fulfill the request.\n   - **503 Service Unavailable**: The server is not ready to handle the request, often used for temporary overloading or maintenance.\n\nThese codes are standardized and provide a way for the server to communicate the status of a request to the client, helping both developers and users understand what is happening during HTTP transactions.",
+  "tokens": {
+    "prompt": 19,
+    "completion": 491
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028677-0ckC73foBWMy1A6BntPD"
+}

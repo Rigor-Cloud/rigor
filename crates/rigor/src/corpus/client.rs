@@ -84,7 +84,9 @@ struct OpenAiRequest<'a> {
 
 #[derive(Deserialize)]
 struct OpenAiResponseMessage {
-    content: String,
+    // Option<String> because reasoning models (e.g. DeepSeek R1) return content: null
+    #[serde(default)]
+    content: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -160,7 +162,7 @@ impl ChatClient for OpenRouterClient {
             .unwrap_or((0, 0));
 
         Ok(ChatResponse {
-            text: choice.message.content,
+            text: choice.message.content.unwrap_or_default(),
             prompt_tokens,
             completion_tokens,
             cost_usd: None, // OpenRouter reports in headers — not wired yet

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "python-typing-control",
+  "prompt_hash": "sha256:65b2cf55cabe9936dd2aef48e26567e956543392cf116826bb3d0a75fabe2b3e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T12:53:52.242012Z",
+  "temperature": 0.7,
+  "response_text": "# Benefits of Type Hints in Python\n\n## 1. Improved Code Readability\n```python\n# Without type hints - unclear what types are expected\ndef process_user(user, age, active):\n    pass\n\n# With type hints - immediately clear\ndef process_user(user: str, age: int, active: bool) -> dict:\n    pass\n```\n\n## 2. Better IDE Support\n```python\ndef calculate_total(prices: list[float], tax_rate: float) -> float:\n    return sum(prices) * (1 + tax_rate)\n\n# IDE can now:\n# - Autocomplete methods on 'prices' (e.g., .append(), .sort())\n# - Warn if you pass wrong types\n# - Provide accurate parameter hints\n```\n\n## 3. Early Bug Detection (Static Analysis)\n```python\nfrom mypy import ...  # Run: mypy your_file.py\n\ndef greet(name: str) -> str:\n    return f\"Hello, {name}\"\n\ngreet(123)  # mypy catches this: Argument 1 has incompatible type \"int\"; expected \"str\"\n```\n\n## 4. Self-Documenting Code\n```python\nfrom typing import Optional\n\n# No need for docstring to explain return type\ndef find_user(user_id: int) -> Optional[dict]:\n    # Returns user dict or None if not found\n    ...\n```\n\n## 5. Easier Refactoring\n```python\n# Type checkers flag ALL places affected by a type change\n# across your entire codebase\n```\n\n## 6. Common Type Hint Patterns\n```python\nfrom typing import Union, Optional, Callable, TypeVar\n\n# Union types (Python 3.10+: int | str)\ndef parse(value: Union[int, str]) -> str: ...\n\n# Optional (equivalent to Union[X, None])\ndef find(id: int) -> Optional[str]: ...\n\n# Collections\ndef process(items: list[int], mapping: dict[str, int]) -> tuple[int, ...]: ...\n\n# Callable\ndef apply(func: Callable[[int, int], int], x: int) -> int: ...\n\n# TypeVar for gener",
+  "tokens": {
+    "prompt": 17,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035223-BAF8H2lBYZsCrY4Uj0GP"
+}

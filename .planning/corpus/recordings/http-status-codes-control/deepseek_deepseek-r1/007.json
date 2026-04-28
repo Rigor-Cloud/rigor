@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:f4176078d1585e5b98b62e695bf420b1181ed036d1a9b849526efce0024e965c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T11:02:55.428850Z",
+  "temperature": 0.7,
+  "response_text": "Here are the most common HTTP status codes categorized by their first digit, along with their typical meanings:\n\n---\n\n### **1xx: Informational**\n- **100 Continue** – The server acknowledges the initial part of the request; the client should proceed.\n- **101 Switching Protocols** – The server agrees to switch protocols (e.g., to WebSocket).\n\n---\n\n### **2xx: Success**\n- **200 OK** – The request succeeded. The response body contains the requested resource.\n- **201 Created** – The request succeeded and a new resource was created (common after POST).\n- **204 No Content** – The request succeeded, but there’s no response body (common after DELETE).\n\n---\n\n### **3xx: Redirection**\n- **301 Moved Permanently** – The requested resource has permanently moved to a new URL.\n- **302 Found** – Temporary redirect; the client should use a different URL for now.\n- **304 Not Modified** – Used for caching; the resource hasn’t changed since the last request.\n\n---\n\n### **4xx: Client Errors**\n- **400 Bad Request** – The server cannot process the request due to client-side error (e.g., malformed syntax).\n- **401 Unauthorized** – Authentication is required and has failed or not been provided.\n- **403 Forbidden** – The server understood the request but refuses to authorize it.\n- **404 Not Found** – The requested resource could not be found on the server.\n- **405 Method Not Allowed** – The HTTP method used is not supported for the requested resource.\n- **429 Too Many Requests** – The user has sent too ",
+  "tokens": {
+    "prompt": 22,
+    "completion": 504
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028557-aoDNX5pBGwwOOZL4uYMD"
+}

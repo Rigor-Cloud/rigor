@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:3ab63f50b1bd87ff4430b1f25f9e4b73f27ccceeb533fb89a8f5f89cf8ea9f5a",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T10:20:34.269938Z",
+  "temperature": 0.7,
+  "response_text": "Here's a Python script demonstrating manual control of garbage collection using the `gc` module:\n\n```python\nimport gc\nimport sys\n\nclass Node:\n    \"\"\"Example class that creates circular references\"\"\"\n    def __init__(self, name):\n        self.name = name\n        self.next = None\n        self.prev = None\n    \n    def __repr__(self):\n        return f\"Node({self.name})\"\n\ndef create_circular_references():\n    \"\"\"Create objects with circular references\"\"\"\n    a = Node(\"A\")\n    b = Node(\"B\")\n    c = Node(\"C\")\n    \n    # Create circular references\n    a.next = b\n    b.prev = a\n    b.next = c\n    c.prev = b\n    c.next = a  # Complete the circle\n    a.prev = c\n    \n    return a, b, c\n\ndef manual_gc_control():\n    \"\"\"Demonstrate manual garbage collection control\"\"\"\n    \n    print(\"=\" * 50)\n    print(\"GARBAGE COLLECTION CONTROL DEMO\")\n    print(\"=\" * 50)\n    \n    # 1. Check current GC status\n    print(\"\\n1. Current GC Status:\")\n    print(f\"   GC Enabled: {gc.isenabled()}\")\n    print(f\"   GC Thresholds: {gc.get_threshold()}\")\n    print(f\"   GC Count: {gc.get_count()}\")\n    \n    # 2. Disable automatic GC temporarily\n    print(\"\\n2. Disabling automatic GC...\")\n    gc.disable()\n    print(f\"   GC Enabled: {gc.isenabled()}\")\n    \n    # 3. ",
+  "tokens": {
+    "prompt": 25,
+    "completion": 454
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026016-7PJNP1k2XOGUzRI6bVNS"
+}

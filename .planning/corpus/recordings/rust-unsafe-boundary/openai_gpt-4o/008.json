@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:321c3a00b8f76950fc666090e5578b646f8ddbea6706d6d08c1e88e8a170dea4",
+  "model": "openai/gpt-4o",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T13:21:31.803341Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, the `unsafe` keyword is used to perform operations that are not checked by the Rust compiler's safety guarantees. You should use `unsafe` when you need to perform low-level operations that the Rust compiler cannot guarantee to be safe, such as:\n\n1. **Dereferencing raw pointers**: Raw pointers (`*const T` and `*mut T`) are not subject to Rust's borrowing rules, so you need `unsafe` to dereference them.\n\n2. **Calling unsafe functions or methods**: Some functions are marked as `unsafe` because they can lead to undefined behavior if used incorrectly. You need `unsafe` to call these functions.\n\n3. **Accessing or modifying mutable static variables**: Static variables are shared across threads and are not protected by Rust's borrowing rules, so accessing or modifying them requires `unsafe`.\n\n4. **Implementing unsafe traits**: Some traits are marked `unsafe` to ensure that their implementors uphold certain invariants. Implementing these traits requires an `unsafe` block.\n\n5. **Using inline assembly**: Inline assembly is inherently unsafe and requires an `unsafe` block to use.\n\nWhile `unsafe` allows you to perform these operations, it does not mean that all safety checks are disabled. The Rust compiler still provides several guarantees even inside `unsafe` blocks:\n\n1. **Type Checking**: The Rust compiler continues to enforce type safety within `unsafe` blocks. Incorrect types will still cause compilation errors.\n\n2. **Memory Layout**: The compiler maintains guarantees about the memory layout of types, such as struct field order and alignment.\n\n3. **Data Races**: Rust guarantees that data races cannot occur in safe Rust, and `unsafe` itself does not introduce data races. However, you must ensure manually that your `unsafe` code does not cause data races.\n\n4. **Control Flow**: The Rust compiler still checks for valid control flow, such as ensuring all code paths return a value in functions that return non-`()` types.\n\n5. **Lifetimes**: Even within `unsafe` blocks, Rust's lifetime system is still in place, though you can bypass some checks by using raw pointers.\n\nIt's crucial to limit the use of `unsafe` to the smallest scope possible and to thoroughly review and test `unsafe` code to ensure it upholds Rust's safety guarantees. Only use `unsafe` when absolutely necessary, and prefer safe abstractions whenever possible.",
+  "tokens": {
+    "prompt": 27,
+    "completion": 493
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036886-2KTDPrXDbJqfzFk4T0ZV"
+}

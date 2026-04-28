@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:87c82e4678ca4ee7a41a05d3a22d3faa689c845e20d858244efadb469ef6c4b5",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:39:31.302705Z",
+  "temperature": 0.7,
+  "response_text": "# Git Branching Strategies: GitFlow vs Trunk-Based Development\n\n## The Core Philosophy Difference\n\n```\nGitFlow: Multiple long-lived branches, structured releases\nTrunk-Based: Single main branch, continuous integration\n```\n\n---\n\n## GitFlow\n\n### Branch Structure\n```\nmain          ──●──────────────────────────●──────────────●──\n                │                          │              │\ndevelop    ──●──●──●──●──●──●──●──●──●──●──●──●──●──●──●──\n                   │           │              │\nfeature/A    ──●──●──●         │              │\n                         │    │              │\nfeature/B           ──●──●──●─┘              │\n                                       │    │\nrelease/1.0                       ──●──●──●─┘\n                                             │\nhotfix/bug                              ──●──●\n```\n\n### The 5 Branch Types\n\n```\n┌─────────────────┬──────────────────────────────────────────┐\n│ Branch          │ Purpose                                  │\n├─────────────────┼──────────────────────────────────────────┤\n│ main            │ Production-ready code only               │\n│ develop         │ Integration branch for features          │\n│ feature/*       │ Individual features (from develop)       │\n│ release/*       │ Release preparation (from develop)       │\n│ hotfix/*        │ Emergency production fixes (from main)   │\n└─────────────────┴──────────────────────────────────────────┘\n```\n\n### GitFlow Workflow in Practice\n\n```bash\n# 1. Start a new feature\ngit checkout develop\ngit checkout -b feature/user-authentication\n\n# Work on feature...\ngit add .\ngit commit -m \"Add login endpoint\"\ngit commit -m \"Add JWT validation\"\n\n# 2. Finish feature - merge back to develop\ngit checkout develop\ngit merge --no-ff feature/user-authentication\ngit branch -d feature/user-authentication\n\n# 3. Create release branch\ngit checkout -b release/1.2.0\n\n#",
+  "tokens": {
+    "prompt": 21,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027162-WMJnxtSpnnaACQ4m2To1"
+}

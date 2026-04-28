@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:1e215f3e679455341b9954f1984dfea1bd5c8328149959599aac793e1616a09c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T11:15:01.635738Z",
+  "temperature": 0.7,
+  "response_text": "JavaScript does **not** have traditional multi-threading like languages such as Java or C++. Instead, it uses a **single-threaded event loop** for its main execution model. However, it does support parallelism through **Web Workers**, which run scripts in background threads.\n\nHere’s a breakdown of JavaScript’s concurrency model and memory sharing:\n\n---\n\n### **1. Single-Threaded Event Loop (Main Thread)**\n- JavaScript code runs on a single main thread (except workers).\n- Asynchronous operations (like `setTimeout`, promises, I/O) are handled via the event loop, enabling non-blocking behavior without parallelism.\n- This avoids complexities like deadlocks but limits CPU-intensive tasks.\n\n---\n\n### **2. Web Workers – The Multi-Threading Model**\nWeb Workers allow parallel execution in background threads:\n\n- **Dedicated Workers**: Run a separate script in parallel to the main thread.\n- **Shared Workers**: Can be accessed by multiple scripts (even across tabs).\n- **Service Workers**: For proxy/offline capabilities (not general-purpose threading).\n\n**Key Constraints**:\n- Workers **do not share memory** by default.\n- They run in isolated environments with their own global scope and memory.\n\n---\n\n### **3. How Threads (Workers) Communicate**\nSince memory isn’t shared, communication happens via **message passing**:\n\n#### **postMessage() API**\n- Data is serialized (using the **structured clone algorithm**) and copied between threads.\n- Example:\n  ```javascript\n  // Main thread\n  const worker = new Worker('worker.js'",
+  "tokens": {
+    "prompt": 24,
+    "completion": 486
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029284-Jk83QvNppUVThrOhVNVk"
+}

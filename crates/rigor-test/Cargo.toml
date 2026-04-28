@@ -12,3 +12,11 @@ path = "src/main.rs"
 [dependencies]
 clap = { workspace = true }
 anyhow = { workspace = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json"], default-features = false }
+rigor-harness = { path = "../rigor-harness" }
+
+[dev-dependencies]
+tempfile = "3"

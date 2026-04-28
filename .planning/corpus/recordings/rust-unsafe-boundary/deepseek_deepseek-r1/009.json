@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T13:19:45.814831Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, `unsafe` is used when you need to perform operations that the compiler can't verify as safe. Here are the primary use cases and what the compiler still enforces:\n\n## **When to Use `unsafe`**\n\n### 1. **Dereferencing Raw Pointers**\n```rust\nlet x = 5;\nlet raw = &x as *const i32;\nunsafe {\n    println!(\"{}\", *raw); // Dereferencing raw pointer\n}\n```\n\n### 2. **Calling Unsafe Functions**\n```rust\nunsafe fn dangerous() {}\nunsafe {\n    dangerous(); // Calling unsafe function\n}\n```\n\n### 3. **Accessing or Modifying Mutable Static Variables**\n```rust\nstatic mut COUNTER: i32 = 0;\nunsafe {\n    COUNTER += 1; // Mutable static access\n}\n```\n\n### 4. **Implementing Unsafe Traits**\n```rust\nunsafe trait UnsafeTrait {}\nunsafe impl UnsafeTrait for MyType {}\n```\n\n### 5. **Accessing Union Fields**\n```rust\nunion MyUnion {\n    i: i32,\n    f: f32,\n}\nunsafe {\n    let u = MyUnion { i: 42 };\n    println!(\"{}\", u.i); // Union field access\n}\n```\n\n### 6. **FFI (Foreign Function Interface)**\n```rust\nextern \"C\" {\n    fn abs(input: i32) -> i32;\n}\nunsafe {\n    abs(-3); // Calling C function\n}\n```\n\n## **What the Compiler Still Guarantees in `unsa",
+  "tokens": {
+    "prompt": 30,
+    "completion": 805
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036759-p90b0Yes98TA1LG4LSdh"
+}

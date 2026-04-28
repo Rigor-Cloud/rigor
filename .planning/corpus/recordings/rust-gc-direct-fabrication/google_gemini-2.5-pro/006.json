@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:c1c3a6c3011eda5881bb84b273cf4acd5e1d8b4b1e7ca1d011f03dbcfb545b21",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T13:06:48.857554Z",
+  "temperature": 0.7,
+  "response_text": "Of course! This is an excellent and very common question, as it gets to the very heart",
+  "tokens": {
+    "prompt": 17,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036001-PD4UawmIge7aVA46gkQ3"
+}

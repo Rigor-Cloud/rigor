@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T13:14:19.174048Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or type system — it unlocks **5 specific superpowers** that Rust can't automatically verify:\n\n```rust\nunsafe {\n    // 1. Dereference raw pointers\n    let ptr: *const i32 = &42;\n    println!(\"{}\", *ptr);\n\n    // 2. Call unsafe functions\n    some_unsafe_fn();\n\n    // 3. Access/modify mutable static variables\n    COUNTER += 1;\n\n    // 4. Implement unsafe traits\n    // (done at item level, not block level)\n\n    // 5. Access fields of unions\n    my_union.field\n}\n```\n\n## What the Compiler STILL Guarantees Inside `unsafe`\n\n```rust\nunsafe {\n    // ✅ Type checking still works\n    let x: i32 = \"hello\"; // still a compile error\n    \n    // ✅ Borrow checker still runs\n    let s = String::new();\n    let r1 = &s;\n    let r2 = &mut s; // still a compile error\n    \n    // ✅ Lifetimes still checked\n    // ✅ Pattern matching exhaustiveness\n    // ✅ Trait bounds still enforced\n    // ✅ Move semantics still apply\n}\n```\n\n**`unsafe` only suspends verification of the 5 things above — nothing else.**\n\n---\n\n## When You SHOULD Use `unsafe`\n\n### 1. FFI (Foreign Function Interface)\n```rust\nextern \"C\" {\n    fn abs(input: i32) -> i32;\n}\n\nfn safe_abs(x: i32) -> i32 {\n    // Unsafe because: compiler can't verify C function behavior\n    unsafe { abs(x) }\n}\n```\n\n### 2. Raw Pointer Operations\n```rust\nfn split_at_mut_impl<T>(slice: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {\n    let len = slice.len();\n    let ptr = slice.as_mut_ptr();",
+  "tokens": {
+    "prompt": 29,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036449-2etSNcHrj0nzmjqlqCq4"
+}

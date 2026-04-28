@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 7,
+  "recorded_at": "2026-04-24T13:19:19.203609Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## When to Use `unsafe`\n\nYou should use `unsafe` in Rust only when:\n\n1. **Interfacing with C/C++ code** via FFI (Foreign Function Interface)\n2. **Implementing low-level data structures** where you need to:\n   - Manually manage memory (alloc/dealloc)\n   - Implement custom smart pointers\n   - Create intrusive data structures\n3. **Performing certain operations the compiler can't verify**:\n   - Dereferencing raw pointers (`*const T`, `*mut T`)\n   - Accessing mutable static variables\n   - Calling unsafe functions\n   - Implementing unsafe traits\n4. **Performance-critical code** where you need:\n   - Inline assembly\n   - SIMD intrinsics\n   - Bounds-check elision (when you've already verified bounds)\n\n**General principle**: Use `unsafe` only when necessary, keep it minimal, and encapsulate it behind safe APIs.\n\n## Guarantees Maintained in `unsafe` Blocks\n\nEven inside `unsafe` blocks, Rust still provides these guarantees:\n\n### 1. **Type Safety**\n   - Type checking still occurs\n   - You can't arbitrarily reinterpret bytes as different types without explicit casts\n   - Generics and trait bounds are still enforced\n\n### 2. **Ownership System**\n   - The borrow checker still operates normally\n   - You cannot create multiple mutable references to the same data\n   - Lifetime annotations are still respected\n\n### 3. **All Safety Not Related to Specific `unsafe` Operations*",
+  "tokens": {
+    "prompt": 30,
+    "completion": 1377
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036714-8VrLD3g5rJTRWREKXl03"
+}

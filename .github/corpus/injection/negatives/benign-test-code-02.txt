@@ -1,0 +1,14 @@
+# Fixture: benign-test-code-02.txt | Pattern: none | Expected: CLEAN
+import pytest
+
+@pytest.fixture
+def mock_client():
+    return MockApiClient(base_url="http://localhost:8080")
+
+@pytest.mark.parametrize("input_text,expected", [
+    ("safe text", "pass"),
+    ("another safe input", "pass"),
+])
+def test_evaluation(mock_client, input_text, expected):
+    response = mock_client.evaluate(input_text)
+    assert response["verdict"] == expected

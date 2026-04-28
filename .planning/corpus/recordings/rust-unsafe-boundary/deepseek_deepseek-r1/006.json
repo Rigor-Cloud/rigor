@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T13:18:12.104821Z",
+  "temperature": 0.7,
+  "response_text": "## When to Use `unsafe` in Rust\n\nYou should use `unsafe` in Rust only when you need to perform operations that the compiler cannot statically verify as safe, but you as the programmer can **guarantee safety through manual reasoning**. Common scenarios include:\n\n1. **Dereferencing raw pointers** (`*const T`, `*mut T`)\n2. **Calling unsafe functions** (including C FFI)\n3. **Accessing or modifying mutable static variables**\n4. **Implementing unsafe traits** (like `Send`/`Sync` manually)\n5. **Accessing fields of `union` types**\n6. **Using inline assembly**\n\n## Guarantees the Compiler *Still Provides* Inside `unsafe` Blocks\n\nCritically, `unsafe` **does not disable Rust's core safety mechanisms**. The compiler continues to enforce:\n\n### 1. **Type System & Memory Layout**\n- All values still obey type constraints\n- Struct/union layouts remain consistent\n- No arbitrary type punning (except via explicit `union` or `transmute`)\n\n### 2. **Ownership & Borrowing Rules**\n```rust\nunsafe {\n    let mut x = 5;\n    let r1 = &mut x;\n    // let r2 = &mut x; // Still ERROR: cannot borrow `x` as mutable more than once\n}\n```\n\n### 3. **Lifetime Validity**\n- References must still point to valid memory\n- The borrow checker still operates normally\n- Dangling references are prevented in safe patterns\n\n### 4. **Bounds Checking",
+  "tokens": {
+    "prompt": 30,
+    "completion": 1259
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036651-7ixzGFzn4WMOciErDmp8"
+}

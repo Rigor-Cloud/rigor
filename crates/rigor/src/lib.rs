@@ -21,6 +21,7 @@ pub mod logging;
 pub mod lsp;
 pub mod memory;
 pub mod observability;
+pub mod paths;
 pub mod policy;
 pub mod violation;
 

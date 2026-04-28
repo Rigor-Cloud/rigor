@@ -46,7 +46,7 @@ Requirements are grouped by workstream. Every REQ-ID is referenced by at least o
 
 ### Phase 6 — issue #23
 
-- **REQ-014** — `rigor corpus stats` produces aligned TTY output with columns: model, prompt, samples, drift_score, last_recorded.
+- **REQ-014** ✅ — `rigor corpus stats` produces aligned TTY output with columns: model, prompt, samples, drift_score, last_recorded.
 
 ---
 
@@ -87,7 +87,7 @@ Requirements are grouped by workstream. Every REQ-ID is referenced by at least o
 
 ### Phase 13 — issue #25
 
-- **REQ-025** — F6 full-proxy replay drives recorded corpus bytes through the complete MITM→streaming→decision pipeline with no network calls. Asserts identical verdicts between live and replay.
+- **REQ-025** ✅ — F6 full-proxy replay drives recorded corpus bytes through the complete MITM→streaming→decision pipeline with no network calls. Asserts identical verdicts between live and replay.
 
 ### Phase 14 — issue #6
 

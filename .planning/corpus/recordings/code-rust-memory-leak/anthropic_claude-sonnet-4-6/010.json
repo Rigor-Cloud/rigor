@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:b9d9540081ed37d2b6f376621147dac8a3b6afd368b79aa0eaee32585879b592",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:25:31.210068Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Leaking with `Box::leak` in Rust\n\n## Basic Implementation\n\n```rust\nuse std::collections::HashMap;\nuse std::sync::OnceLock;\n\n// ============================================================\n// Core examples of Box::leak usage\n// ============================================================\n\n/// Leaks a value and returns a static reference.\n/// The memory lives for the entire program duration.\nfn leak_string(s: String) -> &'static str {\n    Box::leak(s.into_boxed_str())\n}\n\nfn leak_vec<T>(v: Vec<T>) -> &'static [T] {\n    Box::leak(v.into_boxed_slice())\n}\n\nfn leak_value<T>(value: T) -> &'static T {\n    Box::leak(Box::new(value))\n}\n\nfn leak_value_mut<T>(value: T) -> &'static mut T {\n    Box::leak(Box::new(value))\n}\n\n// ============================================================\n// Real-world use case 1: Static configuration\n// ============================================================\n\n#[derive(Debug)]\nstruct AppConfig {\n    database_url: String,\n    max_connections: u32,\n    timeout_ms: u64,\n    feature_flags: HashMap<String, bool>,\n}\n\nimpl AppConfig {\n    fn new(database_url: impl Into<String>) -> Self {\n        let mut feature_flags = HashMap::new();\n        feature_flags.insert(\"dark_mode\".to_string(), true);\n        feature_flags.insert(\"beta_features\".to_string(), false);\n\n        Self {\n            database_url: database_url.into(),\n            max_connections: 10,\n            timeout_ms: 5000,\n            feature_flags,\n        }\n    }\n}\n\n/// Initialize config once, leak it for program-lifetime static access.\n/// This avoids Arc<> overhead on every read in a read-heavy scenario.\nstatic CONFIG: OnceLock<&'static AppConfig> = OnceLock::new();\n\nfn init_config(database_url: &str) -> &'static AppConfig {\n    CONFIG.get_or_init(|| {\n        let config = AppConfig::",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026323-OZoO7n7ZyN45tgLTEkfV"
+}

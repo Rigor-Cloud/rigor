@@ -187,7 +187,7 @@ const HOOK_COMMAND: &str = "rigor scan --hook --smart";
 const HOOK_EVENT: &str = "UserPromptSubmit";
 
 fn claude_settings_path() -> Result<PathBuf> {
-    let home = std::env::var("HOME").context("HOME env var not set")?;
+    let home = std::env::var("HOME").context("HOME env var not set")?; // rigor-home-ok
     Ok(PathBuf::from(home).join(".claude").join("settings.json"))
 }
 

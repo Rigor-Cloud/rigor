@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T13:20:26.694327Z",
+  "temperature": 0.7,
+  "response_text": "## When to Use `unsafe` in Rust\n\nYou should use `unsafe` **sparingly and only when necessary**, typically in these situations:\n\n### 1. **FFI (Foreign Function Interface)**\n   - Calling C/C++ functions from Rust\n   ```rust\n   extern \"C\" {\n       fn c_library_function(arg: i32) -> i32;\n   }\n   \n   pub fn safe_wrapper(arg: i32) -> i32 {\n       unsafe { c_library_function(arg) }\n   }\n   ```\n\n### 2. **Raw Pointer Manipulation**\n   - Working with `*const T` and `*mut T` pointers\n   - When you need to bypass Rust's borrowing rules for low-level operations\n\n### 3. **Memory Management**\n   - Implementing custom smart pointers or data structures\n   - Manual memory allocation/deallocation\n\n### 4. **Inline Assembly**\n   - Platform-specific operations requiring assembly instructions\n\n### 5. **Accessing Mutable Static Variables**\n   ```rust\n   static mut COUNTER: u32 = 0;\n   \n   fn increment() {\n       unsafe { COUNTER += 1; }\n   }\n   ```\n\n### 6. **Implementing Unsafe Traits**\n   - `Send` and `Sync` traits when Rust can't verify thread safety\n\n## What the Compiler **Still Guarantees** in `unsafe` Blocks\n\nDespite the name, `unsafe` doesn't turn off Rust's safety features—it merely relaxes **certain** checks:\n\n### ✅ **Still Enforced:**\n1. **T",
+  "tokens": {
+    "prompt": 30,
+    "completion": 1301
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036785-AXVjxMWOlTWqv2yPx4o2"
+}

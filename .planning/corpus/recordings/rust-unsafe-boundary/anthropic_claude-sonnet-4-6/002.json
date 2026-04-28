@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c748e0c70dbc9643089ad9b94b9b260d3116962868f1fd8bfa9455f5ecd0d91b",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T13:14:09.570456Z",
+  "temperature": 0.7,
+  "response_text": "# Using `unsafe` in Rust\n\n## What `unsafe` Actually Means\n\n`unsafe` doesn't disable the borrow checker or type system — it unlocks **five specific capabilities** the compiler can't verify automatically.\n\n```rust\nunsafe {\n    // You can now:\n    // 1. Dereference raw pointers\n    // 2. Call unsafe functions/methods\n    // 3. Access/modify mutable static variables\n    // 4. Implement unsafe traits\n    // 5. Access fields of unions\n}\n```\n\n## What the Compiler STILL Guarantees Inside `unsafe`\n\nThis is commonly misunderstood — most safety checks remain active:\n\n```rust\nunsafe {\n    let x = 5u32;\n    // Still enforced:\n    // ✅ Type checking (can't assign string to u32)\n    // ✅ Borrow checker (still prevents double-free, use-after-free for references)\n    // ✅ Lifetime checking on references\n    // ✅ Bounds checking on slice indexing (use get_unchecked to skip)\n    // ✅ Integer overflow checks (in debug mode)\n    // ✅ Pattern match exhaustiveness\n    // ✅ Dead code / unused variable warnings\n}\n```\n\nWhat you're actually doing is **promising the compiler** that YOU will uphold invariants it can't check.\n\n---\n\n## The Five Unsafe Superpowers\n\n### 1. Dereferencing Raw Pointers\n```rust\nlet mut value = 42i32;\nlet ptr: *mut i32 = &mut value;\n\n// Creating raw pointers is safe\n// Dereferencing is unsafe — pointer might be null, dangling, misaligned\nunsafe {\n    *ptr = 100;\n    println!(\"{}\", *ptr);\n}\n```\n\n### 2. Calling Unsafe Functions\n```rust\n// Unsafe function — caller must uphold documented invariants\nunsafe fn dangerous(ptr: *const u8, len: usize) -> &'static str {\n    let slice = std::slice::from_raw_parts(ptr, len);\n    std::str::from_utf8_unchecked(slice)\n}",
+  "tokens": {
+    "prompt": 29,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036437-FRF12voqL5VyMGwruO0T"
+}

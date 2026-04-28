@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:6c57896a264891627e02aff6cc1e1bd516778db1a1d9d8d887b5b02f528a8e5e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T10:10:34.484538Z",
+  "temperature": 0.7,
+  "response_text": "# Rust 没有垃圾回收器\n\n这是一个很重要的澄清：**Rust 根本没有垃圾回收器（GC）**。这正是 Rust 最核心的设计特点之一。\n\n---\n\n## Rust 的内存管理：所有权系统\n\nRust 通过**编译时**的所有权系统来管理内存，零运行时开销。\n\n### 核心规则\n\n```\n1. 每个值有且只有一个所有者\n2. 所有者离开作用域时，值被自动释放\n3. 同一时间，要么有多个不可变引用，要么只有一个可变引用\n```\n\n### 基本示例\n\n```rust\nfn main() {\n    {\n        let s = String::from(\"hello\");  // s 获得所有权，堆内存被分配\n        println!(\"{}\", s);\n    }  // ← 编译器在这里自动插入释放代码（调用 drop）\n       //   无需 GC，无需手动 free\n    \n    // println!(\"{}\", s);  // 编译错误！s 已经不存在\n}\n```\n\n### 所有权转移（Move）\n\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");\n    let s2 = s1;  // 所有权从 s1 转移到 s2\n    \n    // println!(\"{}\", s1);  // 编译错误！s1 不再有效\n    println!(\"{}\", s2);     // OK\n}  // 只有 s2 被释放，不会双重释放\n```\n\n### 借用（Borrowing）—— 不转移所有权\n\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");\n    \n    let len = calculate_length(&s1);  // 借用，不转移所有权\n    \n    println!(\"",
+  "tokens": {
+    "prompt": 45,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025425-OdVZNAH4zlbFA0Y492wg"
+}

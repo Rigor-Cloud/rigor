@@ -1,0 +1,15 @@
+{
+  "prompt_id": "git-branching-control",
+  "prompt_hash": "sha256:463323a123a4a0f63997aef3baa4d784f971db995d00824260af8dc6779c99d8",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T10:42:43.032077Z",
+  "temperature": 0.7,
+  "response_text": "Here's a comparison of **GitFlow** and **trunk-based development**, two popular Git branching strategies, including their workflows, pros/cons, and use cases.\n\n---\n\n## **GitFlow**\n### **Overview**\nA structured, multi-branch model designed for projects with scheduled release cycles (e.g., versioned software). It uses long-lived branches and clear separation of concerns.\n\n### **Key Branches**\n1. **`main`/`master`**  \n   - Stores official release history.  \n   - Only updated via merges from `release` or hotfix branches.\n\n2. **`develop`**  \n   - Integration branch for features.  \n   - Always contains the latest delivered development changes.\n\n3. **Supporting Branches**  \n   - **Feature branches** (`feature/xxx`) → Merged into `develop`.  \n   - **Release branches** (`release/xxx`) → Prepare releases; merged into `main` and `develop`.  \n   - **Hotfix branches** (`hotfix/xxx`) → Emergency fixes on `main`; merged into `main` and `develop`.\n\n### **Workflow Example**\n```\n1. Create feature branch from `develop`:  \n   git checkout -b feature/login develop\n\n2. Finish feature → merge into `develop`:  \n   git checkout develop  \n   git merge --no-ff feature/login\n\n3. Create release branch from `develop`:  \n   git checkout -b release/1.2.0 develop\n\n4. After testing, merge release into `main` (tag) and `develop`:  \n   git checkout main  \n   ",
+  "tokens": {
+    "prompt": 21,
+    "completion": 524
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777027343-P96KA27Be2L90lOTDWqN"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:ac11a189c661e9d7858b4d385dd1fdccee240074c93e6dcb055b739cc3372fd3",
+  "model": "openai/gpt-4o",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T11:10:18.051921Z",
+  "temperature": 0.7,
+  "response_text": "To configure your Nginx server to support HTTP/3, you need to make sure that you have a version of Nginx that supports HTTP/3 and QUIC. As of my last update, Nginx had been working on adding HTTP/3 support, but it was not available in the mainline version. You might need to use a version of Nginx with HTTP/3 support from the Nginx QUIC branch or use the third-party module like `quiche` or `BoringSSL`. Here’s a general guide on how you can configure your Nginx instance for HTTP/3:\n\n### Step 1: Ensure Prerequisites\n\n1. **Nginx Version**: Ensure you have a version of Nginx that supports HTTP/3. This might involve downloading and compiling a specific branch from source.\n   \n2. **OpenSSL/ BoringSSL**: Ensure you have a version of OpenSSL or BoringSSL that supports QUIC and HTTP/3. BoringSSL is often recommended for HTTP/3.\n\n3. **UDP Support**: Make sure your server and firewall are configured to allow UDP traffic on your server's address.\n\n### Step 2: Compile Nginx with HTTP/3\n\n1. **Download Nginx Source**: Get the Nginx source code from the official repository or the specific branch that supports HTTP/3.\n   \n2. **Install Dependencies**: Install necessary build tools and libraries, including OpenSSL or BoringSSL and quiche if required.\n\n3. **Compile Nginx**: Use the following commands to compile Nginx:\n\n    ```bash\n    ./configure --with-http_v3_module --with-cc-opt='-I/path/to/openssl/include' --with-ld-opt='-L/path/to/openssl/lib'\n    make\n    make install\n    ```\n\n   Replace `/path/to/openssl` with the actual path where OpenSSL or BoringSSL is installed.\n\n### Step 3: Configure Nginx for HTTP/3\n\n1. **Edit Nginx Configuration**: Open your Nginx configuration file (usually located at `/etc/nginx/nginx.conf` or `/etc/nginx/conf.d/default.conf`).\n\n2. **Configure HTTP/3 settings**: Add the necessary HTTP/3 settings. Here is an example server block configuration:\n\n    ```nginx\n    server {\n        listen 443 ssl http2; # Enable HTTP/2 for compatibility\n       ",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029010-3GsBPFW492P6F6OBzcTw"
+}

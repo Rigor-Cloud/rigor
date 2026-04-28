@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http-status-codes-control",
+  "prompt_hash": "sha256:f4176078d1585e5b98b62e695bf420b1181ed036d1a9b849526efce0024e965c",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T11:01:43.745172Z",
+  "temperature": 0.7,
+  "response_text": "Here are the most common HTTP status codes, grouped by their response class, along with their standard meanings:\n\n### **1xx: Informational**\n*   **100 Continue:** The server has received the request headers, and the client should proceed to send the request body.\n\n### **2xx: Success**\n*   **200 OK:** The standard, successful response. The request was successful, and the response body contains the requested data (e.g., a webpage or API data).\n*   **201 Created:** The request was successful, and a new resource was created (common after a `POST` request).\n*   **204 No Content:** The request was successful, but there is no content to send back in the response body (common after a `DELETE` request).\n\n### **3xx: Redirection**\n*   **301 Moved Permanently:** The requested resource has been permanently moved to a new URL. Browsers and search engines will update their links.\n*   **302 Found (or 307 Temporary Redirect):** The resource is temporarily located at a different URL. The client should use the original URL for future requests.\n*   **304 Not Modified:** Used for caching. The client's cached version is still valid, so the server doesn't need to resend the resource.\n\n### **4xx: Client Error**\n*   **400 Bad Request:** The server cannot process the request due to malformed syntax or invalid request (e.g., bad JSON in an API call).\n*   **401 Unauthorized:** Authentication is required and has failed or has not been provided. The client must authenticate itself.\n*   **403 Forbidden",
+  "tokens": {
+    "prompt": 22,
+    "completion": 495
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028487-5uWO8ATtpFEtKdiKK0iP"
+}

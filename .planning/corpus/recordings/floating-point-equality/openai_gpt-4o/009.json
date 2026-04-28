@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:0e6d2b4b0896e33752b261708f78f3584d703a57d9ed28c93a7cae6a5ff00881",
+  "model": "openai/gpt-4o",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T10:36:39.126390Z",
+  "temperature": 0.7,
+  "response_text": "Comparing floating point numbers using `==` in IEEE 754 can be problematic due to the way floating point arithmetic works. Floating point numbers are an approximation of real numbers, and operations on them can introduce small rounding errors. Because of this, two floating point numbers that you expect to be equal may not be exactly the same due to these small inaccuracies. \n\nFor example, consider the result of arithmetic operations like addition, subtraction, multiplication, or division. Due to precision limitations, the results may not be exact, leading to unexpected results if compared directly using `==`.\n\nInstead of using `==`, a common approach is to check if the numbers are \"close enough\" to each other within some small tolerance, often referred to as \"epsilon.\" This can be done by checking if the absolute difference between the two numbers is smaller than this tolerance:\n\n```python\nimport math\n\ndef are_floats_equal(a, b, tol=1e-9):\n    return math.isclose(a, b, abs_tol=tol)\n\n# Example usage:\na = 0.1 + 0.2\nb = 0.3\nprint(are_floats_equal(a, b))  # True\n```\n\nHere, `math.isclose` is used, which is a built-in function in Python that provides a robust way to compare floating-point numbers with a specified relative or absolute tolerance.\n\nUsing this method helps avoid common pitfalls associated with floating-point comparisons, ensuring that your comparisons are more reliable and aligned with practical expectations of numerical computations.",
+  "tokens": {
+    "prompt": 22,
+    "completion": 311
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026995-urETStKHMZUtZdA2Hfou"
+}

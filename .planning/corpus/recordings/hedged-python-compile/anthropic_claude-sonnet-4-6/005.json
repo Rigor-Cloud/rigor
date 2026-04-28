@@ -1,0 +1,15 @@
+{
+  "prompt_id": "hedged-python-compile",
+  "prompt_hash": "sha256:9f150881c56d2dcf2814d4f31e4306ffd7662d807c20fad80a36dfc9785c6d72",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T10:53:37.523216Z",
+  "temperature": 0.7,
+  "response_text": "## Python Compilation: The Reality\n\nThe claim is **misleading** - here's what actually happens:\n\n---\n\n### What Python Actually Does\n\n**Standard CPython (the reference implementation):**\n1. Source code (`.py`) → **Bytecode** (`.pyc` files)\n2. Bytecode runs on the **Python Virtual Machine (PVM)**\n3. The PVM interprets bytecode at runtime\n\nThis is **not** native machine code - it's an intermediate representation, similar to Java's JVM bytecode.\n\n---\n\n### Why People Get Confused\n\n- The `.pyc` compilation step is **real**, but bytecode ≠ native code\n- Python does \"compile\" in a technical sense, just not to machine code\n- Some tools **do** produce native code, leading to overgeneralization\n\n---\n\n### When Python Code Actually Becomes Native\n\n| Tool | Approach |\n|------|----------|\n| **Cython** | Transpiles to C, then compiles to native |\n| **Numba** | JIT compiles numeric code via LLVM |\n| **PyPy** | JIT compiles hot paths to native code |\n| **Nuitka** | Compiles Python to C, then native binary |\n| **mypyc** | Compiles type-annotated Python to C extensions |\n\n---\n\n### Practical Implications\n\n- Standard CPython is **slower** than compiled languages because of interpretation overhead\n- The **GIL** (Global Interpreter Lock) adds further constraints\n- For performance-critical code, the tools above or **C extensions** are the real solutions\n\n---\n\n### Summary\n\n> CPython compiles to **bytecode**, not native code. Saying \"Python compiles to native code\" is either wrong or refers to specific non-standard toolchains.",
+  "tokens": {
+    "prompt": 24,
+    "completion": 412
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028008-qG7zsnZ4Z179XaL91idu"
+}

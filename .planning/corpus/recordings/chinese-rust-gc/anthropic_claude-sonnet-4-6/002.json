@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:6c57896a264891627e02aff6cc1e1bd516778db1a1d9d8d887b5b02f528a8e5e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:09:21.385537Z",
+  "temperature": 0.7,
+  "response_text": "# Rust 没有垃圾回收器\n\n这是一个常见的误解，让我来澄清并深入解释。\n\n## Rust 的内存管理机制\n\nRust 使用**所有权系统（Ownership System）**在**编译时**管理内存，完全不需要运行时垃圾回收器。\n\n### 核心概念\n\n```rust\n// 1. 所有权（Ownership）\nfn ownership_demo() {\n    let s1 = String::from(\"hello\"); // s1 拥有这块内存\n    let s2 = s1;                    // 所有权转移给 s2，s1 失效\n    // println!(\"{}\", s1);          // 编译错误！s1 已无效\n    println!(\"{}\", s2);             // OK\n} // s2 离开作用域，内存自动释放（调用 drop）\n\n// 2. 借用（Borrowing）\nfn borrowing_demo() {\n    let s1 = String::from(\"hello\");\n    let len = calculate_length(&s1); // 借用，不转移所有权\n    println!(\"{} 的长度是 {}\", s1, len); // s1 仍然有效\n}\n\nfn calculate_length(s: &String) -> usize {\n    s.len()\n} // s 是引用，离开作用域时不释放内存\n\n// 3. 生命周期（Lifetimes）\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n    // 编译器确保返回的引用不会比输入活得更长\n}\n```\n\n### 所有权规则（编译器强制执行）\n\n```\n┌─────────────────────────────────────────┐\n│           Rust 所有权三原则              │\n├─────────────────────────────",
+  "tokens": {
+    "prompt": 45,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025352-17Kq9iwtnS4zBgxeOGMd"
+}

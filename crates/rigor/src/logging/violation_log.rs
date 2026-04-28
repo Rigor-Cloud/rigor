@@ -20,9 +20,7 @@ impl ViolationLogger {
     }
 
     pub fn new() -> Result<Self> {
-        let home_dir = dirs::home_dir().context("Failed to get home directory")?;
-
-        let rigor_dir = home_dir.join(".rigor");
+        let rigor_dir = crate::paths::rigor_home();
         fs::create_dir_all(&rigor_dir).context("Failed to create ~/.rigor directory")?;
 
         let log_path = rigor_dir.join("violations.jsonl");

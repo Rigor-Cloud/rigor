@@ -1,0 +1,21 @@
+# Fixture: benign-api-docs-01.txt | Pattern: none | Expected: CLEAN
+openapi: "3.0.3"
+info:
+  title: Rigor Evaluation API
+  version: "1.0.0"
+paths:
+  /api/v1/evaluate:
+    post:
+      summary: Evaluate text against constraints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+      responses:
+        "200":
+          description: Evaluation result

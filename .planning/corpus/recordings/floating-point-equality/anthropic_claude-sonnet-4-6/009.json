@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:e7c77fff5e17f6e6e96df375b5cff86eb93b05970af2ec1e489f66d3aebacd3c",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T10:32:12.464378Z",
+  "temperature": 0.7,
+  "response_text": "# Comparing Floating Point Numbers with `==` in IEEE 754\n\n## Short Answer\n\n**It depends on the situation** — sometimes safe, often dangerous.\n\n---\n\n## When `==` is UNSAFE\n\n### Accumulated rounding errors\n```python\na = 0.1 + 0.2\nb = 0.3\nprint(a == b)        # False ❌\nprint(a)             # 0.30000000000000004\n```\n\n### Computed values\n```c\ndouble x = sqrt(2.0);\nx * x == 2.0;        // False ❌ — rounding error in sqrt\n```\n\n---\n\n## When `==` IS Safe\n\n| Situation | Example | Safe? |\n|-----------|---------|-------|\n| Exact integer values (within precision) | `1.0 == 1.0` | ✅ |\n| Powers of 2 | `0.5 == 0.5` | ✅ |\n| Assigned from same source | `x = y; x == y` | ✅ |\n| Checking for sentinel values | `x == 0.0` | ⚠️ Usually |\n| Infinity | `x == INFINITY` | ✅ |\n| **NaN** | `NaN == NaN` | ❌ **Always false!** |\n\n---\n\n## The NaN Problem (IEEE 754 Specific)\n```c\ndouble x = 0.0 / 0.0;  // NaN\nx == x;                 // FALSE — NaN is not equal to itself!\n\n// Correct NaN check:\nisnan(x);               // ✅\n```\n> This is the **one guaranteed case** where `==` breaks reflexivity in IEEE 754.\n\n---\n\n## Better Alternatives\n\n### Absolute epsilon (for small numbers)\n```c\nbool nearly_equal(double a, double b) {\n    return fabs(a - b) < 1e-9;  // ⚠️ Poor for large numbers\n}\n```\n\n### Relative epsilon (general purpose)\n```c\nbool nearly_equal(double a, double b, double eps)",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026722-kql92aRhTAI2Pdg2YjVs"
+}

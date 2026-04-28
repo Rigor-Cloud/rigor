@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:1d708ca3c0d06ad6476a1be3e005d00d32a48dca89fdd068672069c873257231",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 5,
+  "recorded_at": "2026-04-24T11:12:16.130470Z",
+  "temperature": 0.7,
+  "response_text": "That's a great question, and it's based on a common misunderstanding that'",
+  "tokens": {
+    "prompt": 27,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029128-j587Dj0XjuAu0fNORD5z"
+}

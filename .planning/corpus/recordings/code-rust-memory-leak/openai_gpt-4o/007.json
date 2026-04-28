@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:9dd25bb1994545ba1ad4905c448bf649e33fa14eb49c5548dc1340783159ae55",
+  "model": "openai/gpt-4o",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:29:19.617430Z",
+  "temperature": 0.7,
+  "response_text": "In Rust, memory leaks can occur when memory is allocated but never deallocated. One way to deliberately leak memory is by using `Box::leak`. This function takes ownership of a `Box` and transforms it into a `'static` reference, effectively leaking the memory because the Rust ownership system no longer tracks it for deallocation. Here’s how you can implement a function that leaks memory using `Box::leak`:\n\n```rust\nfn leak_memory() -> &'static mut u32 {\n    let boxed_value = Box::new(42);\n    Box::leak(boxed_value)\n}\n\nfn main() {\n    let leaked_ref = leak_memory();\n    println!(\"Leaked value: {}\", leaked_ref);\n}\n```\n\n### Explanation\n\n1. **Box Allocation**: We start by creating a `Box` that allocates memory on the heap for the integer `42`.\n   \n2. **Leaking the Box**: By calling `Box::leak`, we convert the `Box<u32>` into a `&'static mut u32`. This operation transfers the ownership of the `Box` to a static reference. Since the Rust compiler cannot track `'static` references for deallocation, this memory is effectively leaked.\n\n3. **Use Case**: The function returns a reference to the leaked object. This reference can be used throughout the program as a static mutable reference.\n\n### When is `Box::leak` Appropriate?\n\nWhile memory leaks are generally undesirable, there are certain cases where deliberately leaking memory is appropriate:\n\n1. **Long-lived Data**: If you need data to live for the entire duration of a program without being deallocated until the program exits, such as a global cache or configuration data, leaking memory can be an acceptable strategy.\n\n2. **Embedded Systems**: In systems with no operating system or where the application runs for the device's lifetime, leaking memory for certain static data structures can be a valid approach.\n\n3. **Performance Optimization**: In performance-critical applications where the cost of deallocating memory at runtime is too high, you might choose to leak memory intentionally.\n\n4. **Avoiding Unsafe Code**: Sometimes, leaking memory using `Box::leak` can be a safer alternative to using `unsafe` code, especially if you need to work with static references without surpassing Rust's safety guarantees.\n\nIt is crucial to remember that memory leaks can lead to increased memory usage and potential exhaustion of memory resources. Therefore, this pattern should be used with caution and only when the benefits outweigh the",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026554-gEwDN9AahmiFjWq9xVVs"
+}

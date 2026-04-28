@@ -1,0 +1,15 @@
+{
+  "prompt_id": "http3-mandatory-subtle",
+  "prompt_hash": "sha256:53d61d01d1a912652850d02d10810df1b8612c79d90c732d012a95d992dd02a1",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 2,
+  "recorded_at": "2026-04-24T11:08:43.093622Z",
+  "temperature": 0.7,
+  "response_text": "It seems there's a misunderstanding—**HTTP/3 is not mandatory for all web servers as of 2025**. HTTP/3 is still an emerging standard (RFC 9114, published 2022), and adoption is growing, but it's not universally required. Many servers still use HTTP/1.1 or HTTP/2.\n\nHowever, if you want to configure **HTTP/3 in Nginx**, here’s how:\n\n---\n\n### **Prerequisites**\n1. **Nginx version 1.25.0+** (HTTP/3 support was experimental earlier; stable support improved in later releases).\n2. **OpenSSL 1.1.1+** (or BoringSSL/Quictls for QUIC support).\n3. **Domain with valid TLS certificate** (HTTP/3 uses QUIC over TLS).\n\n---\n\n### **Step-by-Step Configuration**\n\n#### 1. **Compile Nginx with HTTP/3 Support**  \nIf your package manager doesn’t include HTTP/3, compile Nginx with the `--with-http_v3_module` flag:\n```bash\n./configure --with-http_v3_module --with-openssl=/path/to/openssl-quic\nmake && sudo make install\n```\n*Note: Some distros (e.g., Nginx official repo) now include HTTP/3 as a standard module.*\n\n#### 2. **Update Nginx Configuration**  \nEdit your site’s config (e.g., `/etc/nginx/sites-available/example.com`):\n```nginx\nserver {\n    listen 443 ssl;\n    listen ",
+  "tokens": {
+    "prompt": 35,
+    "completion": 504
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777028904-z31pHCrtA5qzcj3XtUBO"
+}

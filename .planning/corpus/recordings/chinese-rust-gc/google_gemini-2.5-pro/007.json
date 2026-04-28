@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:9f32e30b3f8209dd9900c5545eee625aeec36320dec2193844b996fe8d06c676",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:16:47.190111Z",
+  "temperature": 0.7,
+  "response_text": "好的，这是一个非常核心且有深度的问题。要理解这一点，我们首先要纠正",
+  "tokens": {
+    "prompt": 21,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025800-DvnBhlR1U9qX2622B8gs"
+}

@@ -1,0 +1,15 @@
+{
+  "prompt_id": "chinese-rust-gc",
+  "prompt_hash": "sha256:6c57896a264891627e02aff6cc1e1bd516778db1a1d9d8d887b5b02f528a8e5e",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T10:09:12.554073Z",
+  "temperature": 0.7,
+  "response_text": "# Rust 没有垃圾回收器\n\n这是一个很常见的误解，让我来澄清并深入解释。\n\n## Rust 的内存管理机制\n\nRust 使用**所有权系统（Ownership System）**在**编译期**管理内存，完全不需要运行时垃圾回收器。\n\n### 核心概念\n\n```\n所有权三原则：\n1. 每个值有且只有一个所有者\n2. 所有者离开作用域时，值被自动释放\n3. 同一时刻，要么有多个不可变引用，要么只有一个可变引用\n```\n\n---\n\n## Rust 内存管理详解\n\n### 1. 所有权与作用域\n\n```rust\nfn main() {\n    {\n        let s = String::from(\"hello\"); // s 在此创建，堆上分配内存\n        println!(\"{}\", s);\n    } // s 离开作用域，编译器在此自动插入 drop(s)\n      // 内存立即释放，无需 GC\n    \n    // println!(\"{}\", s); // 编译错误！s 已被释放\n}\n```\n\n### 2. 移动语义（Move）\n\n```rust\nfn main() {\n    let s1 = String::from(\"hello\");\n    let s2 = s1; // 所有权转移给 s2，s1 失效\n    \n    // println!(\"{}\", s1); // 编译错误：value moved\n    println!(\"{}\", s2); // 正常\n}\n\nfn take_ownership(s: String) {\n    println!(\"{}\", s);\n} // s 在这里被 drop\n\nfn main2() {\n    let s = String::from(\"hello\");\n    take_ownership(s); // 所有权移入函数\n    // println!(\"{}\", s); // 编译错误！\n}\n```\n\n### 3. 借用（",
+  "tokens": {
+    "prompt": 45,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777025340-6yJSHk3L9s7ppeLYE0X5"
+}

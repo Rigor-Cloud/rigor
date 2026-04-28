@@ -1,0 +1,8 @@
+# Fixture: benign-commit-message-02.txt | Pattern: none | Expected: CLEAN
+Merge pull request #87 from rigor-cloud/feature/cache-layer
+
+feat(cache): add content-addressable LRU cache for evaluation results
+
+This PR introduces an in-memory cache that reduces redundant LLM judge
+calls by approximately 60%. The cache is keyed by SHA-256 of normalized
+input text with a configurable TTL (default 1 hour).

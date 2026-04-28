@@ -1,0 +1,15 @@
+{
+  "prompt_id": "spanish-rust-gc",
+  "prompt_hash": "sha256:2f76dff7225ab930985dfb53a2ad09c867c11347bcda0c7209fe6a76694b4117",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 9,
+  "recorded_at": "2026-04-24T13:24:54.694893Z",
+  "temperature": 0.7,
+  "response_text": "# Gestión de Memoria: Rust vs Java\n\n## La respuesta corta: Rust NO tiene recolector de basura\n\nEsta es la diferencia fundamental. Rust usa un modelo completamente diferente.\n\n---\n\n## Cómo gestiona la memoria Rust\n\n### El Sistema de Ownership\n\n```rust\nfn main() {\n    let s1 = String::from(\"hola\");  // s1 es dueño de la memoria\n    let s2 = s1;                     // ownership se MUEVE a s2\n    \n    // println!(\"{}\", s1);  // ERROR: s1 ya no es válido\n    println!(\"{}\", s2);     // OK\n}   // s2 sale de scope → memoria liberada AUTOMÁTICAMENTE aquí\n```\n\n### Las 3 reglas de Ownership\n\n```\n1. Cada valor tiene exactamente UN dueño\n2. Solo puede haber un dueño a la vez\n3. Cuando el dueño sale de scope, el valor se libera\n```\n\n### Borrowing (Préstamos)\n\n```rust\nfn calcular_longitud(s: &String) -> usize {  // & = referencia (préstamo)\n    s.len()\n}   // s NO se libera aquí, solo era prestado\n\nfn main() {\n    let s1 = String::from(\"hola\");\n    let len = calcular_longitud(&s1);  // prestamos s1\n    \n    println!(\"{} tiene {} caracteres\", s1, len);  // s1 sigue siendo válido\n}\n```\n\n### Referencias mutables\n\n```rust\nfn main() {\n    let mut s = String::from(\"hola\");\n    \n    // REGLA: Solo UNA referencia mutable a la vez\n    let r1 = &mut s;\n    // let r2 = &mut s;  // ERROR en tiempo de compilación\n    \n    r1.push_str(\", mundo\");\n}\n```\n\n### El compilador como guardián\n\n```rust\n// Rust previene dangling pointers en COMPILACIÓN\nfn crear_referencia() -> &String {  // ERROR\n    ",
+  "tokens": {
+    "prompt": 33,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777037085-jkHyYeuLrFBGWlX3ZSMB"
+}

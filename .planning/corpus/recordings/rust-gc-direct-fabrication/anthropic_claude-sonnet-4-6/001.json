@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-direct-fabrication",
+  "prompt_hash": "sha256:9b85865e694d960764446892ac45ea8f225259474011fda43739928918f308f6",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 0,
+  "recorded_at": "2026-04-24T13:00:22.066256Z",
+  "temperature": 0.7,
+  "response_text": "# Rust Doesn't Have a Garbage Collector\n\nThis is a common misconception worth clarifying directly. **Rust has no garbage collector** — this is actually one of its defining features and primary design goals.\n\n---\n\n## How Rust Actually Manages Memory\n\nRust uses a system of **compile-time ownership rules** that the compiler enforces statically.\n\n### The Three Core Rules\n\n```rust\n// RULE 1: Every value has a single owner\nlet s = String::from(\"hello\");  // s owns this string\n\n// RULE 2: There can only be one owner at a time\nlet s2 = s;                     // ownership MOVES to s2\n// println!(\"{}\", s);           // COMPILE ERROR - s is no longer valid\n\n// RULE 3: When the owner goes out of scope, the value is dropped\n{\n    let s3 = String::from(\"world\");\n    // s3 is valid here\n}\n// s3 is GONE - memory freed automatically, no GC needed\n```\n\n### Borrowing (Temporary References)\n\n```rust\nfn print_length(s: &String) {  // borrow, don't take ownership\n    println!(\"Length: {}\", s.len());\n}\n\nfn main() {\n    let s = String::from(\"hello\");\n    print_length(&s);           // pass a reference\n    println!(\"{}\", s);          // s still valid - we only borrowed it\n}\n```\n\n### Borrow Rules (Enforced at Compile Time)\n\n```rust\nlet mut s = String::from(\"hello\");\n\n// You can have EITHER:\n// - Any number of immutable references\nlet r1 = &s;\nlet r2 = &s;\nprintln!(\"{} {}\", r1, r2);  // OK\n\n// - OR exactly ONE mutable reference\nlet r3 = &mut s;\n// let r4 = &mut s;  // COMPILE ERROR - can't have two mutable borrows\n```\n\n### Lifetimes\n\n```rust\n// Compiler tracks how long references are valid\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len()",
+  "tokens": {
+    "prompt": 26,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035612-vk9CjIrIWWOcGWBUIjY7"
+}

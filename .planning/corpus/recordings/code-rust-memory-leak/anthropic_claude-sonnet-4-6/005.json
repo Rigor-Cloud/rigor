@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-rust-memory-leak",
+  "prompt_hash": "sha256:b9d9540081ed37d2b6f376621147dac8a3b6afd368b79aa0eaee32585879b592",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T10:24:47.885580Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Leaking with `Box::leak` in Rust\n\n## Basic Implementation\n\n```rust\nuse std::collections::HashMap;\nuse std::sync::OnceLock;\n\n/// Demonstrates Box::leak for creating a 'static string from runtime data\nfn create_static_str(s: String) -> &'static str {\n    Box::leak(s.into_boxed_str())\n}\n\n/// Demonstrates Box::leak for a static configuration\nfn create_static_config(config: HashMap<String, String>) -> &'static HashMap<String, String> {\n    Box::leak(Box::new(config))\n}\n\nfn main() {\n    // Example 1: Static string from runtime data\n    let dynamic_string = format!(\"Hello, {}!\", \"world\");\n    let static_str: &'static str = create_static_str(dynamic_string);\n    println!(\"Static str: {}\", static_str);\n\n    // Example 2: Global configuration loaded once\n    let mut config = HashMap::new();\n    config.insert(\"host\".to_string(), \"localhost\".to_string());\n    config.insert(\"port\".to_string(), \"8080\".to_string());\n\n    let static_config: &'static HashMap<String, String> = create_static_config(config);\n    println!(\"Config host: {}\", static_config[\"host\"]);\n}\n```\n\n## Practical Use Cases\n\n### 1. Thread-Safe Global State (Before `OnceLock` was stable)\n\n```rust\nuse std::sync::Mutex;\n\n// Old pattern: leak a Mutex for global mutable state\nfn get_global_registry() -> &'static Mutex<Vec<String>> {\n    // This is intentional: we want this to live for the entire program\n    Box::leak(Box::new(Mutex::new(Vec::new())))\n}\n\n// Modern pattern: prefer OnceLock for this use case\nstatic REGISTRY: OnceLock<Mutex<Vec<String>>> = OnceLock::new();\n\nfn register_handler(name: String) {\n    // Using OnceLock (preferred modern approach)\n    REGISTRY\n        .get_or_init(|| Mutex::",
+  "tokens": {
+    "prompt": 27,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026278-cXZFu1cQBTQ1L2sB7CPY"
+}

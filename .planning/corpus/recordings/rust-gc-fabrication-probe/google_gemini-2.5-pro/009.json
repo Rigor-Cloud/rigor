@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:457df7cbeb31ce0eda31f86cdb4ec5657d3aa6820b79dec423cfef42a048dc54",
+  "model": "google/gemini-2.5-pro",
+  "sample_index": 8,
+  "recorded_at": "2026-04-24T12:45:31.072995Z",
+  "temperature": 0.7,
+  "response_text": "Of course! Explaining Rust's memory management is key to understanding what makes the language",
+  "tokens": {
+    "prompt": 10,
+    "completion": 508
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777034724-6B56nuP9wSPh3dfyJPs0"
+}

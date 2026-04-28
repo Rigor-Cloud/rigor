@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:e7c77fff5e17f6e6e96df375b5cff86eb93b05970af2ec1e489f66d3aebacd3c",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T10:31:07.232824Z",
+  "temperature": 0.7,
+  "response_text": "## Comparing Floating Point Numbers with `==` in IEEE 754\n\nThe short answer is: **it depends on the situation**.\n\n---\n\n## When `==` is Safe\n\n### 1. Comparing with Zero (Sometimes)\n```python\nx = 0.0\nx == 0.0  # Safe if x was explicitly set to 0.0\n```\n\n### 2. Comparing Results of Identical Operations\n```python\na = some_value * 2.0\nb = some_value * 2.0\na == b  # Safe - identical operations on identical inputs\n```\n\n### 3. Integer-Valued Floats (Within Safe Range)\n```python\n# IEEE 754 doubles represent integers exactly up to 2^53\na = 2.0\na == 2.0  # Safe\n```\n\n### 4. Special Values\n```python\nimport math\nmath.isinf(x)   # Better than x == float('inf')\nmath.isnan(x)   # NaN == NaN is ALWAYS FALSE - never use ==\n```\n\n---\n\n## When `==` is Dangerous\n\n### The Classic Problem\n```python\n0.1 + 0.2 == 0.3    # FALSE - evaluates to False\n# 0.1 + 0.2 = 0.30000000000000004\n```\n\n### Accumulated Errors\n```python\nx = 0.0\nfor _ in range(10):\n    x += 0.1\nx == 1.0    # FALSE due to accumulated rounding errors\n```\n\n---\n\n## The NaN Problem (Critical)\n```python\nnan = float('nan')\nnan == nan      # FALSE  ← IEEE 754 spec: NaN is not equal to anything\nnan != nan      # TRUE   ← Use this to detect NaN\n```\n\n---\n\n## Safer Alternatives\n\n### Epsilon Comparison\n```python\ndef nearly_equal(a, b, epsilon=1e-9):\n    return abs(a - b) < epsilon\n```\n\n### Relative + Absolute Tolerance (Better)\n```python\nimport math\nmath.isclose(a, b, rel_tol=1e-9, abs",
+  "tokens": {
+    "prompt": 22,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026657-yWCBaQE2AqlbvNnN1uf9"
+}

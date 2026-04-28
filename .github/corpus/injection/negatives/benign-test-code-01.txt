@@ -1,0 +1,8 @@
+# Fixture: benign-test-code-01.txt | Pattern: none | Expected: CLEAN
+#[test]
+fn test_constraint_evaluation_returns_pass() {
+    let evaluator = Evaluator::new(default_config());
+    let result = evaluator.evaluate("Hello world").unwrap();
+    assert_eq!(result.verdict, Verdict::Pass);
+    assert!(result.score > 0.8);
+}

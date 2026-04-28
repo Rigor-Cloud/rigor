@@ -1,0 +1,15 @@
+{
+  "prompt_id": "javascript-threading-fabrication",
+  "prompt_hash": "sha256:13901fe88a8ee56078ea80b44bbda998f3853a1dc3f3d3728948938995ca3919",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 3,
+  "recorded_at": "2026-04-24T11:13:29.049604Z",
+  "temperature": 0.7,
+  "response_text": "# JavaScript's Concurrency Model\n\n## The Direct Answer\n\n**JavaScript has no built-in multi-threading.** It is fundamentally single-threaded. This is a deliberate design decision, not a limitation to work around.\n\n---\n\n## The Single-Threaded Event Loop\n\nJavaScript runs on a single thread with an event loop architecture:\n\n```\n┌─────────────────────────────────────────────┐\n│                 Call Stack                   │\n│  (one thing executes at a time)              │\n│  [ main() ]                                  │\n│  [ setTimeout callback ]                     │\n│  [ Promise handler ]                         │\n└──────────────────┬──────────────────────────┘\n                   │\n┌──────────────────▼──────────────────────────┐\n│               Event Loop                     │\n│  Checks: \"Is the call stack empty?\"          │\n│  If yes → pull next task from queue          │\n└──────────────────┬──────────────────────────┘\n                   │\n        ┌──────────▼──────────┐\n        │    Task Queues       │\n        │  [Macrotask Queue]   │  ← setTimeout, setInterval, I/O\n        │  [Microtask Queue]   │  ← Promises, queueMicrotask\n        └─────────────────────┘\n```\n\n```javascript\nconsole.log(\"1\");\n\nsetTimeout(() => console.log(\"2\"), 0); // macrotask\n\nPromise.resolve().then(() => console.log(\"3\")); // microtask\n\nconsole.log(\"4\");\n\n// Output: 1, 4, 3, 2\n// Microtasks drain completely before next macrotask\n```\n\n---\n\n## What Actually Provides Concurrency\n\n### 1. Asynchronous I/O (Not True Parallelism)\n\n```javascript\n// These don't block the thread — the OS/runtime handles waiting\nconst [users, posts] = await Promise.all([\n  fetch(\"/api/users\"),   // handed off to browser/Node.js networking\n  fetch(\"/api/posts\")    // both run \"concurr",
+  "tokens": {
+    "prompt": 23,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777029198-tjQWVEvqciLeQYvTUnKC"
+}

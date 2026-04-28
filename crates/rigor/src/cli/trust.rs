@@ -8,7 +8,7 @@
 //!   rigor trust codex      -> creates ~/.rigor/bin/codex
 //!   rigor untrust opencode -> removes ~/.rigor/bin/opencode
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -16,8 +16,7 @@ use std::path::PathBuf;
 const SUPPORTED_TOOLS: &[&str] = &["opencode", "claude", "codex"];
 
 fn rigor_bin_dir() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("Cannot determine home directory")?;
-    let dir = home.join(".rigor/bin");
+    let dir = crate::paths::rigor_home().join("bin");
     fs::create_dir_all(&dir)?;
     Ok(dir)
 }
@@ -46,8 +45,8 @@ fn find_real_binary(tool: &str) -> Result<String> {
 }
 
 fn shell_profile_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
-    // Prefer zshrc on macOS
+    let home = dirs::home_dir()?; // rigor-home-ok
+                                  // Prefer zshrc on macOS
     let zshrc = home.join(".zshrc");
     if zshrc.exists() {
         return Some(zshrc);
@@ -61,9 +60,10 @@ fn shell_profile_path() -> Option<PathBuf> {
 
 fn is_rigor_bin_in_path() -> bool {
     let path_var = std::env::var("PATH").unwrap_or_default();
-    let rigor_bin = dirs::home_dir()
-        .map(|h| h.join(".rigor/bin").to_string_lossy().to_string())
-        .unwrap_or_default();
+    let rigor_bin = crate::paths::rigor_home()
+        .join("bin")
+        .to_string_lossy()
+        .to_string();
     path_var.split(':').any(|p| p == rigor_bin)
 }
 
@@ -94,8 +94,7 @@ fn system_ca_bundle_path() -> Option<PathBuf> {
 /// upstream's real cert is no longer rooted in any trusted CA. We need both
 /// sets in one file.
 fn ensure_ca_bundle() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("Cannot determine home directory")?;
-    let rigor_dir = home.join(".rigor");
+    let rigor_dir = crate::paths::rigor_home();
     fs::create_dir_all(&rigor_dir)?;
     let rigor_ca = rigor_dir.join("ca.pem");
     let bundle = rigor_dir.join("ca-bundle.pem");

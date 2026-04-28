@@ -3,6 +3,10 @@
 //! D.1 ships with `--help` only. Subcommands (e2e, bench, report) are
 //! implemented in Plan D.3.
 
+mod bench;
+mod e2e;
+mod report;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
@@ -42,21 +46,16 @@ enum Commands {
     },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         None => {
             eprintln!("rigor-test: dev-only test orchestrator. Use --help for subcommands.");
             Ok(())
         }
-        Some(Commands::E2e { .. }) => {
-            anyhow::bail!("rigor-test e2e: not yet implemented (ships in Plan D.3)")
-        }
-        Some(Commands::Bench { .. }) => {
-            anyhow::bail!("rigor-test bench: not yet implemented (ships in Plan D.3)")
-        }
-        Some(Commands::Report { .. }) => {
-            anyhow::bail!("rigor-test report: not yet implemented (ships in Plan D.3)")
-        }
+        Some(Commands::E2e { suite }) => e2e::run_e2e(suite).await,
+        Some(Commands::Bench { suite, profile }) => bench::run_bench(suite, &profile),
+        Some(Commands::Report { input, output }) => report::run_report(input, output),
     }
 }

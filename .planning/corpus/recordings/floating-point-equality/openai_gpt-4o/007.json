@@ -1,0 +1,15 @@
+{
+  "prompt_id": "floating-point-equality",
+  "prompt_hash": "sha256:0e6d2b4b0896e33752b261708f78f3584d703a57d9ed28c93a7cae6a5ff00881",
+  "model": "openai/gpt-4o",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:36:32.400529Z",
+  "temperature": 0.7,
+  "response_text": "Comparing floating-point numbers using `==` in IEEE 754 can be problematic due to the inherent imprecision in representing real numbers in binary form. IEEE 754 is a standard for floating-point arithmetic used by most modern processors and languages, and it defines how floating-point numbers are stored and operated on at the hardware level. Here are some reasons why direct comparison using `==` may not be safe or reliable:\n\n1. **Rounding Errors**: Floating-point arithmetic can introduce rounding errors. For example, operations like addition, subtraction, multiplication, and division may not yield exact results, and small errors can accumulate.\n\n2. **Precision Limitations**: Floating-point numbers have limited precision. For instance, a `float` typically has about 7 decimal digits of precision, while a `double` has about 15 decimal digits. This means that some numbers cannot be represented exactly, leading to approximations.\n\n3. **Representation of Numbers**: Some numbers that are simple in decimal (like 0.1) cannot be represented exactly in binary floating-point, which can lead to unexpected results when comparing them.\n\n4. **Special Values**: IEEE 754 includes special values like NaN (Not a Number) and infinity, which have unique comparison rules. For instance, NaN is not equal to any number, including itself.\n\n**Best Practices**:\n- **Use a Tolerance**: Instead of checking if two floating-point numbers are exactly equal, check if they are close enough by using a small tolerance or epsilon value. For example:\n  ```python\n  def are_close(a, b, tol=1e-9):\n      return abs(a - b) < tol\n  ```\n\n- **Consider the Context**: In some cases, numbers can be compared directly if you are certain that the values being compared are results of the same operations or constants that should logically be equal.\n\n- **Use Specialized Libraries**: Some programming environments provide libraries or functions specifically designed to manage floating-point comparisons more robustly, such as `math.isclose` in Python.\n\nBy following these best practices, you can mitigate the issues associated with floating-point comparisons in IEEE 754 arithmetic.",
+  "tokens": {
+    "prompt": 22,
+    "completion": 440
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026987-XVqrtSzwF4EPDxOzgX3D"
+}

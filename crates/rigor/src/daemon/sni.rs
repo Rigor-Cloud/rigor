@@ -211,4 +211,161 @@ mod tests {
         let data = vec![0x02; 100]; // Not a ClientHello
         assert_eq!(parse_sni_from_client_hello(&data), None);
     }
+
+    // ---- Helper for building ClientHello with arbitrary extensions ----
+
+    /// Build a ClientHello record body (no TLS record header) with an optional
+    /// SNI hostname and zero or more extra extensions supplied as raw bytes.
+    fn build_client_hello_with_extensions(
+        hostname: Option<&str>,
+        extra_extensions: &[Vec<u8>],
+    ) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.push(0x01); // ClientHello type
+        data.extend_from_slice(&[0, 0, 0]); // length placeholder (unused by parser)
+        data.extend_from_slice(&[0x03, 0x03]); // TLS 1.2 version
+        data.extend_from_slice(&[0u8; 32]); // random
+        data.push(0); // session_id length = 0
+        data.extend_from_slice(&[0, 2]); // cipher suites length
+        data.extend_from_slice(&[0xc0, 0x2f]); // one cipher suite
+        data.push(1); // compression methods length
+        data.push(0); // null compression
+
+        // Collect all extensions into a single buffer
+        let mut all_exts = Vec::new();
+        for ext in extra_extensions {
+            all_exts.extend_from_slice(ext);
+        }
+        if let Some(host) = hostname {
+            let host_bytes = host.as_bytes();
+            let sni_data_len = 2 + 1 + 2 + host_bytes.len();
+            all_exts.extend_from_slice(&[0, 0]); // ext type = SNI (0x0000)
+            all_exts.extend_from_slice(&(sni_data_len as u16).to_be_bytes());
+            all_exts.extend_from_slice(&((1 + 2 + host_bytes.len()) as u16).to_be_bytes());
+            all_exts.push(0); // name_type = host_name
+            all_exts.extend_from_slice(&(host_bytes.len() as u16).to_be_bytes());
+            all_exts.extend_from_slice(host_bytes);
+        }
+
+        // Extensions total length + data
+        data.extend_from_slice(&(all_exts.len() as u16).to_be_bytes());
+        data.extend_from_slice(&all_exts);
+
+        data
+    }
+
+    /// Build an ALPN extension (type 0x0010) with a single protocol name.
+    fn build_alpn_extension(protocol: &str) -> Vec<u8> {
+        let proto = protocol.as_bytes();
+        // ALPN data: protocols_len(2) + protocol_len(1) + protocol
+        let alpn_data_len = 2 + 1 + proto.len();
+        let mut ext = Vec::new();
+        ext.extend_from_slice(&[0x00, 0x10]); // ext type = ALPN
+        ext.extend_from_slice(&(alpn_data_len as u16).to_be_bytes());
+        ext.extend_from_slice(&((1 + proto.len()) as u16).to_be_bytes()); // protocols list length
+        ext.push(proto.len() as u8); // protocol length
+        ext.extend_from_slice(proto);
+        ext
+    }
+
+    /// Wrap a ClientHello body in a TLS record header (type 0x16, version 0x0301).
+    fn wrap_in_tls_record(client_hello: &[u8]) -> Vec<u8> {
+        let mut record = Vec::new();
+        record.push(0x16); // handshake
+        record.extend_from_slice(&[0x03, 0x01]); // TLS 1.0 record version
+        record.extend_from_slice(&(client_hello.len() as u16).to_be_bytes());
+        record.extend_from_slice(client_hello);
+        record
+    }
+
+    // ---- New edge case tests (gap 4) ----
+
+    #[test]
+    fn test_parse_sni_fragmented_record_rejected() {
+        // Truncated data (too few bytes to reach extensions) -> None
+        let data = vec![0x01, 0, 0, 0, 0x03, 0x03]; // ClientHello type + partial header
+        assert_eq!(parse_sni_from_client_hello(&data), None);
+    }
+
+    #[test]
+    fn test_parse_sni_with_alpn_extension() {
+        // ALPN extension comes BEFORE SNI -- SNI should still be extracted
+        let alpn = build_alpn_extension("h2");
+        let data = build_client_hello_with_extensions(Some("example.com"), &[alpn]);
+        let sni = parse_sni_from_client_hello(&data);
+        assert_eq!(sni.as_deref(), Some("example.com"));
+    }
+
+    #[test]
+    fn test_parse_sni_missing_sni_extension() {
+        // Only ALPN present, no SNI -> None
+        let alpn = build_alpn_extension("h2");
+        let data = build_client_hello_with_extensions(None, &[alpn]);
+        let sni = parse_sni_from_client_hello(&data);
+        assert_eq!(sni, None);
+    }
+
+    #[test]
+    fn test_parse_sni_truncated_at_session_id() {
+        // Build ClientHello truncated after version+random (before session_id length)
+        let mut data = Vec::new();
+        data.push(0x01); // ClientHello type
+        data.extend_from_slice(&[0, 0, 0]); // length placeholder
+        data.extend_from_slice(&[0x03, 0x03]); // version
+        data.extend_from_slice(&[0u8; 32]); // random
+                                            // Truncate here -- no session_id length byte
+        assert_eq!(parse_sni_from_client_hello(&data), None);
+    }
+
+    #[test]
+    fn test_parse_sni_truncated_at_extensions() {
+        // Build ClientHello with valid headers through to extensions total length,
+        // but truncate before any extension data.
+        let mut data = Vec::new();
+        data.push(0x01); // ClientHello type
+        data.extend_from_slice(&[0, 0, 0]); // length placeholder
+        data.extend_from_slice(&[0x03, 0x03]); // version
+        data.extend_from_slice(&[0u8; 32]); // random
+        data.push(0); // session_id length = 0
+        data.extend_from_slice(&[0, 2]); // cipher suites length
+        data.extend_from_slice(&[0xc0, 0x2f]); // one cipher suite
+        data.push(1); // compression methods length
+        data.push(0); // null compression
+                      // Extensions total length says 100 bytes, but no extension data follows
+        data.extend_from_slice(&[0, 100]);
+        assert_eq!(parse_sni_from_client_hello(&data), None);
+    }
+
+    #[tokio::test]
+    async fn test_peek_client_hello_async() {
+        let client_hello = build_client_hello_with_extensions(Some("example.com"), &[]);
+        let tls_record = wrap_in_tls_record(&client_hello);
+
+        let mut cursor = io::Cursor::new(tls_record.clone());
+        let (buf, sni) = peek_client_hello(&mut cursor)
+            .await
+            .expect("peek should succeed");
+
+        assert_eq!(sni.as_deref(), Some("example.com"));
+        assert_eq!(
+            buf.len(),
+            tls_record.len(),
+            "returned buffer should be 5 + record_len"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_peek_client_hello_non_tls_record() {
+        // First byte 0x15 = TLS alert, not handshake (0x16)
+        let mut data = vec![0x15, 0x03, 0x01, 0x00, 0x02]; // alert record header
+        data.extend_from_slice(&[0x01, 0x00]); // alert body (not consumed by peek)
+
+        let mut cursor = io::Cursor::new(data);
+        let (buf, sni) = peek_client_hello(&mut cursor)
+            .await
+            .expect("peek should succeed");
+
+        assert_eq!(sni, None, "non-TLS-handshake should yield None for SNI");
+        assert_eq!(buf.len(), 5, "only the 5-byte header should be returned");
+    }
 }

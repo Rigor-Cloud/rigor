@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-gc-fabrication-probe",
+  "prompt_hash": "sha256:7cc5fd16c527ec48cb611c9c299013d74b7ed08d649f5726791be74b8f628f35",
+  "model": "anthropic/claude-sonnet-4-6",
+  "sample_index": 4,
+  "recorded_at": "2026-04-24T12:51:34.453929Z",
+  "temperature": 0.7,
+  "response_text": "# Memory Management in Rust\n\nRust uses a unique approach that provides memory safety **without a garbage collector**, relying on three core concepts:\n\n---\n\n## 1. Ownership\n\nEvery value has a single owner, and memory is freed when the owner goes out of scope.\n\n```rust\nfn main() {\n    let s = String::from(\"hello\");  // s owns the string\n    println!(\"{}\", s);\n} // s goes out of scope, memory is automatically freed\n```\n\n**Ownership Rules:**\n- Each value has exactly one owner\n- There can only be one owner at a time\n- When the owner goes out of scope, the value is dropped\n\n---\n\n## 2. Move vs. Copy\n\nWhen you assign a value to another variable, it either **moves** or **copies**:\n\n```rust\n// MOVE - heap data (String)\nlet s1 = String::from(\"hello\");\nlet s2 = s1;          // ownership moves to s2\n// println!(\"{}\", s1); // ERROR: s1 is no longer valid\n\n// COPY - stack data (integers, bools, floats, chars)\nlet x = 5;\nlet y = x;            // x is copied, both are valid\nprintln!(\"{} {}\", x, y); // Works fine\n```\n\n**Types that implement `Copy`:** integers, floats, `bool`, `char`, tuples of Copy types\n\n---\n\n## 3. Borrowing & References\n\nInstead of transferring ownership, you can **borrow** a value:\n\n```rust\nfn main() {\n    let s = String::from(\"hello\");\n    \n    let len = calculate_length(&s);  // borrow s, don't move it\n    \n    println!(\"{} has length {}\", s, len); // s still valid here\n}\n\nfn calculate_length(s: &String) -> usize { // s is a reference\n    s.len()\n} // s goes out of scope but doesn't drop the value (it doesn't own it)\n```\n\n### Mutable References\n\n```rust\nlet mut s = String::from(\"hello\");\nlet r = &mut s;       // mutable borrow\nr.push_str(\", world\");\n```\n\n**Borrowing Rules",
+  "tokens": {
+    "prompt": 18,
+    "completion": 512
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777035085-pyg4xMWF2lpDcKb322j2"
+}

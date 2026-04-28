@@ -1,0 +1,15 @@
+{
+  "prompt_id": "rust-unsafe-boundary",
+  "prompt_hash": "sha256:c613ffea1600447556868429c3b57fa69deaeb8e9c4c616e23109b580d85292e",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 1,
+  "recorded_at": "2026-04-24T13:16:28.234576Z",
+  "temperature": 0.7,
+  "response_text": "Excellent question. `unsafe` in Rust is a crucial but often misunderstood concept. Let's break it down.\n\n## When to Use `unsafe`\n\nYou should use `unsafe` **only** when you need to perform one of these five operations that the compiler cannot verify as safe:\n\n1. **Dereferencing raw pointers** (`*const T` and `*mut T`)\n   ```rust\n   let x = 5;\n   let raw = &x as *const i32;\n   let value = unsafe { *raw }; // Needs unsafe\n   ```\n\n2. **Calling unsafe functions** (including FFI)\n   ```rust\n   unsafe fn dangerous() {}\n   unsafe { dangerous(); } // Needs unsafe block\n   ```\n\n3. **Accessing or modifying mutable static variables** (global variables)\n   ```rust\n   static mut COUNTER: i32 = 0;\n   unsafe { COUNTER += 1; } // Needs unsafe\n   ```\n\n4. **Implementing unsafe traits** (like `Send` and `Sync`)\n   ```rust\n   unsafe trait MyUnsafeTrait {}\n   unsafe impl MyUnsafeTrait for MyType {} // Needs unsafe\n   ```\n\n5. **Accessing fields of `union`s**\n   ```rust\n   union MyUnion { f1: u32, f2: f32 }\n   let u = MyUnion { f1: 1 };\n   let value = unsafe { u.f1 }; // Needs unsafe\n   ```\n\n## What the Compiler **Still** Guarantees in `unsafe` Blocks\n\nCritically, **`uns",
+  "tokens": {
+    "prompt": 30,
+    "completion": 555
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777036570-MqjoHaDIDjvBQLDTGiAN"
+}

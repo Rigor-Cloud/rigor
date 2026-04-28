@@ -1,0 +1,15 @@
+{
+  "prompt_id": "code-python-gc-usage",
+  "prompt_hash": "sha256:3ab63f50b1bd87ff4430b1f25f9e4b73f27ccceeb533fb89a8f5f89cf8ea9f5a",
+  "model": "deepseek/deepseek-r1",
+  "sample_index": 6,
+  "recorded_at": "2026-04-24T10:20:55.402107Z",
+  "temperature": 0.7,
+  "response_text": "Here's a comprehensive Python script demonstrating manual control of garbage collection using the `gc` module:\n\n```python\nimport gc\nimport sys\nimport os\n\nclass GarbageCollectionDemo:\n    def __init__(self):\n        \"\"\"Initialize with garbage collection disabled for demonstration\"\"\"\n        gc.disable()  # Start with GC disabled\n        self.cycle_refs = []\n        \n    def create_garbage(self):\n        \"\"\"Create circular references that won't be collected without GC\"\"\"\n        print(\"Creating circular references...\")\n        \n        # Create circular reference\n        class Node:\n            def __init__(self, value):\n                self.value = value\n                self.next = None\n        \n        # Create circular chain\n        head = Node(\"A\")\n        current = head\n        for i in range(3):\n            new_node = Node(chr(ord('B') + i))\n            current.next = new_node\n            current = new_node\n        current.next = head  # Create cycle\n        \n        self.cycle_refs.append(head)\n        print(f\"Created {len(self.cycle_refs)} circular reference(s)\")\n        \n    def show_gc_stats(self):\n        \"\"\"Display current garbage collection statistics\"\"\"\n        print(\"\\n\" + \"=\"*50)\n        print(\"GARBAGE COLLECTION STATISTICS:\")\n        print(\"=\"*50)\n        \n        # GC status\n        print(f\"GC Enabled: {gc.isenabled()}\")\n        print(f\"GC Thresholds: {gc.get_threshold()}\")\n        print(f\"GC Count (generation 0): {gc.get_count()}\")\n        print(f\"Objects tracked",
+  "tokens": {
+    "prompt": 25,
+    "completion": 518
+  },
+  "cost_usd": null,
+  "openrouter_response_id": "gen-1777026034-ec298ULT5e6SqNZYsc5m"
+}
