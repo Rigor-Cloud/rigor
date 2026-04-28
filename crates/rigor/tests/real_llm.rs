@@ -91,6 +91,9 @@ async fn e1_openrouter_proof_of_life() {
             )
         });
 
-    assert!(!content.trim().is_empty(), "model returned empty content or reasoning");
+    assert!(
+        !content.trim().is_empty(),
+        "model returned empty content or reasoning"
+    );
     eprintln!("e1: model='{}' got content='{}'", model, content.trim());
 }
