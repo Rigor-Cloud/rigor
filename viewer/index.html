@@ -14,8 +14,11 @@
   <script src="/assets/lib/react-dom.min.js"></script>
   <script src="/assets/lib/babel-standalone.min.js"></script>
 
-  <!-- Mock data + helpers (will be replaced with real daemon SSE later) -->
-  <script src="/assets/components/mock-data.js"></script>
+  <!-- Live data bridge (WebSocket + REST → reactive state) -->
+  <script src="/assets/components/live-bridge.js"></script>
+
+  <!-- React hook + context for live data subscription -->
+  <script type="text/babel" src="/assets/components/use-rigor-data.js"></script>
 
   <!-- Tweaks panel (design prototyping tool) -->
   <script type="text/babel" src="/assets/components/app.jsx"></script>

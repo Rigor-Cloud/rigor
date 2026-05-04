@@ -15,6 +15,7 @@ const I = {
 
 // ====== Topbar ======
 function Topbar({ proxy }) {
+  const rigor = useRigorData();
   return (
     <header className="topbar">
       <svg className="tb-logo" viewBox="0 0 32 32" fill="none" aria-label="Rigor">
@@ -28,14 +29,15 @@ function Topbar({ proxy }) {
       <span className="tb-wordmark">Rigor</span>
       <span className="tb-crumb tb-crumb-active">live</span>
       <span className="tb-sep">/</span>
-      <span className="tb-crumb">{RIGOR_DATA.sessionId}</span>
+      <span className="tb-crumb">{rigor.sessionId}</span>
       <div className="tb-spacer"/>
       <span className="proxy-pill">
-        <span className="proxy-dot"/>proxy <span className="mono">localhost:7331</span>
+        <span className={'proxy-dot' + (proxy.connected ? '' : ' off')}/>proxy <span className="mono">{window.location.host}</span>
       </span>
       <div className="kpi-strip">
-        <div className="kpi"><span className="kpi-label">throughput</span><span className="kpi-value">{proxy.tput}/s</span></div>
-        <div className="kpi"><span className="kpi-label">p95</span><span className="kpi-value">{proxy.p95}ms</span></div>
+        <div className="kpi"><span className="kpi-label">requests</span><span className="kpi-value">{proxy.tput}</span></div>
+        <div className="kpi"><span className="kpi-label">claims</span><span className="kpi-value">{rigor.stats.claims}</span></div>
+        <div className="kpi"><span className="kpi-label">violations</span><span className="kpi-value">{rigor.stats.violations}</span></div>
         <div className="kpi"><span className="kpi-label">block</span><span className="kpi-value block">{proxy.blocks}</span></div>
       </div>
     </header>
@@ -67,7 +69,7 @@ function PageTabs({ page, setPage, blocks }) {
 
 // ====== Sidebar ======
 function Sidebar({ activeNode, setActiveNode }) {
-  const { constraints, sources, nodes } = RIGOR_DATA;
+  const { constraints, sources, nodes } = useRigorData();
   const claims = nodes.filter(n => n.type === 'claim');
   return (
     <aside className="sidebar">

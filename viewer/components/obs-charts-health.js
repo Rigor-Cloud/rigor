@@ -29,6 +29,7 @@ function ChartFrame({ title, sub, right, children, height = 160 }) {
       }}>
         <div style={{fontFamily:'var(--font-ui)', fontSize:12, fontWeight:600, color:palette.ink}}>{title}</div>
         {sub && <div style={{fontFamily:'var(--font-mono)', fontSize:9.5, color:palette.ink3}}>{sub}</div>}
+        <span style={{fontFamily:'var(--font-mono)', fontSize:9, fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase', color:palette.ink3, padding:'1px 6px', border:`1px solid ${palette.rule}`, borderRadius:3, background:palette.paper3}}>preview</span>
         <div style={{flex:1}}/>
         {right}
       </div>

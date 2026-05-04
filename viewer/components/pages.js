@@ -1,25 +1,52 @@
 /* global React, RigorBaseComponents, RigorObsCharts1, RigorObsCharts2, RigorObsCharts3, RigorObsCharts4 */
-const { useState } = React;
+const { useState, useEffect } = React;
 const { I } = RigorBaseComponents;
 const { StackedHealthChart, LatencyChart, ThroughputChart, ModelSparkGrid } = RigorObsCharts1;
 const { ClaimsHistogram, StrengthDistribution, TimeToFirstBlock } = RigorObsCharts2;
 const { ConstraintHeatmap, CooccurrenceMatrix, RecallFpScatter } = RigorObsCharts3;
 const { SourceSankey, CoverageMap, RetractFunnel, SessionStrips } = RigorObsCharts4;
 
+// Format an ISO timestamp as HH:MM:SS, or '—' if missing/invalid.
+function fmtTs(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const dd = (n) => String(n).padStart(2, '0');
+  return `${dd(d.getHours())}:${dd(d.getMinutes())}:${dd(d.getSeconds())}`;
+}
+
 // ====== Observability ======
 function ObservabilityPage() {
+  const [evalStats, setEvalStats] = useState(null);
+  const [costStats, setCostStats] = useState(null);
+  const [sessionList, setSessionList] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/eval').then(r => r.ok ? r.json() : null).then(setEvalStats).catch(() => {});
+    fetch('/api/cost').then(r => r.ok ? r.json() : null).then(setCostStats).catch(() => {});
+    fetch('/api/sessions').then(r => r.ok ? r.json() : null).then(setSessionList).catch(() => {});
+  }, []);
+
+  const totalReq = (sessionList || []).reduce((a, s) => a + (s.requests || 0), 0);
+  const totalViol = evalStats?.total_violations ?? 0;
+  const totalSess = evalStats?.total_sessions ?? 0;
+  const fpCount = evalStats?.false_positive_count ?? 0;
+  const precisionPct = (evalStats?.precision ?? 0).toFixed(1);
+  const violPerSess = (evalStats?.violations_per_session ?? 0).toFixed(1);
+  const totalCost = (costStats?.total_cost_usd ?? 0).toFixed(2);
+
   return (
     <div className="page-scroll">
       <h1 className="page-h1">Observability</h1>
-      <p className="page-sub">All sessions running through the local proxy. Aggregated 24h.</p>
+      <p className="page-sub">All sessions running through the local proxy.</p>
 
       <div className="kpi-grid">
-        <div className="kpi-tile"><div className="kt-label">requests</div><div className="kt-value">12,418</div><div className="kt-meta">+8.2% vs 7d</div></div>
-        <div className="kpi-tile"><div className="kt-label">claims judged</div><div className="kt-value">38,902</div><div className="kt-meta">3.1 per response</div></div>
-        <div className="kpi-tile bad"><div className="kt-label">blocks</div><div className="kt-value">214</div><div className="kt-meta">1.7% of responses</div></div>
-        <div className="kpi-tile"><div className="kt-label">retracts</div><div className="kt-value">98</div><div className="kt-meta">46% of blocks recovered</div></div>
-        <div className="kpi-tile good"><div className="kt-label">grounded rate</div><div className="kt-value">81.4%</div><div className="kt-meta">+2.1pp wow</div></div>
-        <div className="kpi-tile"><div className="kt-label">judge p95</div><div className="kt-value">141<span style={{fontSize:13,color:'var(--ink-3)',marginLeft:3}}>ms</span></div><div className="kt-meta">haiku-4-5</div></div>
+        <div className="kpi-tile"><div className="kt-label">requests</div><div className="kt-value">{totalReq.toLocaleString()}</div><div className="kt-meta">across {sessionList?.length ?? 0} sessions</div></div>
+        <div className="kpi-tile"><div className="kt-label">sessions</div><div className="kt-value">{totalSess}</div><div className="kt-meta">{violPerSess} violations / session</div></div>
+        <div className="kpi-tile bad"><div className="kt-label">violations</div><div className="kt-value">{totalViol.toLocaleString()}</div><div className="kt-meta">{evalStats?.constraints?.length ?? 0} constraints fired</div></div>
+        <div className="kpi-tile"><div className="kt-label">false positives</div><div className="kt-value">{fpCount}</div><div className="kt-meta">annotated as FP</div></div>
+        <div className="kpi-tile good"><div className="kt-label">precision</div><div className="kt-value">{precisionPct}%</div><div className="kt-meta">on annotated violations</div></div>
+        <div className="kpi-tile"><div className="kt-label">cost</div><div className="kt-value">${totalCost}</div><div className="kt-meta">{(costStats?.total_input_tokens ?? 0).toLocaleString()} in / {(costStats?.total_output_tokens ?? 0).toLocaleString()} out</div></div>
       </div>
 
       {/* ─── Time-series ─── */}
@@ -81,62 +108,53 @@ function ObservabilityPage() {
         <span className="section-meta">last 24h · click to drill in</span>
       </div>
       <table className="table">
-        <thead><tr><th>session</th><th>started</th><th>model</th><th>claims</th><th>blocks</th><th>grounded</th><th>status</th></tr></thead>
+        <thead><tr><th>session</th><th>started</th><th>agent</th><th>requests</th><th>violations</th><th>constraints</th><th>status</th></tr></thead>
         <tbody>
-          {[
-            ['sess_8b3a91','14:08:03','claude-sonnet-4',  9, 2, 0.71, 'live'],
-            ['sess_8b3a82','13:46:11','claude-sonnet-4', 14, 0, 0.93, 'done'],
-            ['sess_8b3a74','13:31:55','gpt-4o',          22, 3, 0.68, 'done'],
-            ['sess_8b3a61','13:02:18','claude-haiku-4',  6, 1, 0.83, 'done'],
-            ['sess_8b3a4f','12:48:09','claude-sonnet-4', 18, 0, 0.94, 'done'],
-            ['sess_8b3a3a','12:21:44','gpt-4o',         11, 4, 0.55, 'flagged'],
-          ].map(([id, ts, m, c, b, g, st], i) => (
-            <tr key={i}>
-              <td className="mono name">{id}</td>
-              <td className="mono dim">{ts}</td>
-              <td className="mono">{m}</td>
-              <td>{c}</td>
-              <td className="mono" style={{color: b > 0 ? 'var(--signal-violate)' : 'var(--ink-3)'}}>{b}</td>
-              <td>
-                <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <div className={'bar' + (g < 0.7 ? ' bad' : '')}><span style={{width: `${g*100}%`}}/></div>
-                  <span className="mono dim">{Math.round(g*100)}%</span>
-                </div>
-              </td>
-              <td><span className={'badge ' + (st==='live'?'badge-warn':st==='flagged'?'badge-violate':'badge-neutral')}>{st}</span></td>
-            </tr>
-          ))}
+          {(sessionList || []).map((s, i) => {
+            const st = s.alive ? 'live' : s.exit_code != null && s.exit_code !== 0 ? 'flagged' : 'done';
+            return (
+              <tr key={s.id || i}>
+                <td className="mono name">{(s.name || s.id || '').slice(0, 24)}</td>
+                <td className="mono dim">{fmtTs(s.started_at)}</td>
+                <td className="mono">{s.agent || '—'}</td>
+                <td>{s.requests ?? 0}</td>
+                <td className="mono" style={{color: (s.violations || 0) > 0 ? 'var(--signal-violate)' : 'var(--ink-3)'}}>{s.violations ?? 0}</td>
+                <td className="mono dim">{s.constraints ?? 0}</td>
+                <td><span className={'badge ' + (st==='live'?'badge-warn':st==='flagged'?'badge-violate':'badge-neutral')}>{st}</span></td>
+              </tr>
+            );
+          })}
+          {(sessionList || []).length === 0 && (
+            <tr><td colSpan="7" style={{textAlign:'center', color:'var(--ink-3)', padding:'24px'}}>No sessions yet — start one with <code>rigor ground</code>.</td></tr>
+          )}
         </tbody>
       </table>
 
       <div className="section-head">
         <div className="section-h">Top constraints by hit count</div>
-        <span className="section-meta">live + retired</span>
+        <span className="section-meta">from violation log</span>
       </div>
       <table className="table">
-        <thead><tr><th>id</th><th>constraint</th><th>scope</th><th>hits</th><th>blocks</th><th>recall</th></tr></thead>
+        <thead><tr><th>id</th><th>constraint</th><th>hits</th><th>false positives</th><th>fp rate</th><th>last fired</th></tr></thead>
         <tbody>
-          {[
-            ['C-1041','Numeric claim must cite source','finance', 184, 41, 0.92],
-            ['C-2003','No forward-looking projections','finance', 96, 88, 0.87],
-            ['C-1305','Distinguish opinion vs fact','editorial', 71, 4, 0.74],
-            ['C-1102','Quote attribution required','editorial', 58, 12, 0.83],
-            ['C-1133','PII redaction','safety', 22, 22, 0.99],
-          ].map((r,i) => (
-            <tr key={i}>
-              <td className="mono name">{r[0]}</td>
-              <td>{r[1]}</td>
-              <td className="mono dim">{r[2]}</td>
-              <td>{r[3]}</td>
-              <td className="mono" style={{color: r[4]>0?'var(--signal-violate)':''}}>{r[4]}</td>
+          {(evalStats?.constraints || []).slice(0, 10).map((c, i) => (
+            <tr key={c.id || i}>
+              <td className="mono name">{c.id}</td>
+              <td>{c.name}</td>
+              <td>{c.hits}</td>
+              <td className="mono" style={{color: c.false_positives > 0 ? 'var(--signal-violate)' : 'var(--ink-3)'}}>{c.false_positives}</td>
               <td>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <div className="bar"><span style={{width: `${r[5]*100}%`}}/></div>
-                  <span className="mono dim">{Math.round(r[5]*100)}%</span>
+                  <div className={'bar' + (c.fp_rate > 20 ? ' bad' : '')}><span style={{width: `${Math.min(100, c.fp_rate)}%`}}/></div>
+                  <span className="mono dim">{c.fp_rate.toFixed(1)}%</span>
                 </div>
               </td>
+              <td className="mono dim">{fmtTs(c.last_fired)}</td>
             </tr>
           ))}
+          {(evalStats?.constraints || []).length === 0 && (
+            <tr><td colSpan="6" style={{textAlign:'center', color:'var(--ink-3)', padding:'24px'}}>No violations logged yet.</td></tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -146,22 +164,31 @@ function ObservabilityPage() {
 // ====== Violations search ======
 function SearchPage() {
   const [q, setQ] = useState('');
-  const items = [
-    { c: 'C-2003', t: '14:08:42', sess: 'sess_8b3a91', claim: 'Acme will outperform peers.', model: 'claude-sonnet-4', reason: 'Forward-looking projection without disclaimer.' },
-    { c: 'C-2003', t: '14:08:14', sess: 'sess_8b3a91', claim: 'Margins will expand further next year.', model: 'claude-sonnet-4', reason: 'Forward-looking projection.' },
-    { c: 'C-1305', t: '14:08:09', sess: 'sess_8b3a91', claim: 'The strongest quarter on record.', model: 'claude-sonnet-4', reason: 'Opinion presented as fact; source contradicts.' },
-    { c: 'C-1041', t: '13:32:11', sess: 'sess_8b3a74', claim: 'AWS revenue grew roughly 19%.', model: 'gpt-4o', reason: 'Numeric claim without source citation.' },
-    { c: 'C-1133', t: '12:22:07', sess: 'sess_8b3a3a', claim: 'Reach me at jane@acme.com.', model: 'gpt-4o', reason: 'Email PII detected; redacted.' },
-    { c: 'C-1102', t: '12:21:55', sess: 'sess_8b3a3a', claim: '"AI will transform finance," she said.', model: 'gpt-4o', reason: 'Quote attribution missing.' },
-  ].filter(x => !q || (x.c+x.claim+x.reason+x.sess+x.model).toLowerCase().includes(q.toLowerCase()));
+  const [sev, setSev] = useState('');
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (sev) params.set('severity', sev);
+    params.set('limit', '200');
+    fetch('/api/violations?' + params.toString())
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => setItems(rows || []))
+      .catch(() => setItems([]));
+  }, [q, sev]);
+
   return (
     <div className="page-scroll">
       <h1 className="page-h1">Violations</h1>
       <p className="page-sub">Search the full archive of constraint hits.</p>
       <div className="search-bar">
-        <input placeholder="claim text, constraint id, session…" value={q} onChange={e=>setQ(e.target.value)}/>
-        <select><option>all constraints</option><option>finance</option><option>editorial</option><option>safety</option></select>
-        <select><option>all severities</option><option>block</option><option>warn</option></select>
+        <input placeholder="claim text, constraint id, message…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <select value={sev} onChange={e=>setSev(e.target.value)}>
+          <option value="">all severities</option>
+          <option value="block">block</option>
+          <option value="warn">warn</option>
+        </select>
         <button className="btn btn-primary btn-sm">{I.search} Search</button>
       </div>
       <table className="table">
@@ -169,14 +196,17 @@ function SearchPage() {
         <tbody>
           {items.map((it, i) => (
             <tr key={i}>
-              <td className="mono"><span className="badge badge-violate">{it.c}</span></td>
-              <td className="mono dim">{it.t}</td>
-              <td className="mono name">{it.sess}</td>
-              <td className="mono dim">{it.model}</td>
-              <td style={{fontFamily:'var(--font-serif)',fontSize:14,maxWidth:340}}>“{it.claim}”</td>
-              <td className="dim" style={{fontSize:12}}>{it.reason}</td>
+              <td className="mono"><span className={'badge ' + (it.severity === 'block' ? 'badge-violate' : 'badge-warn')}>{it.constraint_id}</span></td>
+              <td className="mono dim">{fmtTs(it.timestamp)}</td>
+              <td className="mono name">{(it.session_id || '').slice(0, 12)}</td>
+              <td className="mono dim">{it.model || '—'}</td>
+              <td style={{fontFamily:'var(--font-serif)',fontSize:14,maxWidth:340}}>{(it.claim_text || []).map(c => `“${c}”`).join(' ')}</td>
+              <td className="dim" style={{fontSize:12}}>{it.message}</td>
             </tr>
           ))}
+          {items.length === 0 && (
+            <tr><td colSpan="6" style={{textAlign:'center', color:'var(--ink-3)', padding:'24px'}}>No matching violations.</td></tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -185,39 +215,46 @@ function SearchPage() {
 
 // ====== Eval ======
 function EvalPage() {
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    fetch('/api/eval').then(r => r.ok ? r.json() : null).then(setStats).catch(() => {});
+  }, []);
+
+  const total = stats?.total_violations ?? 0;
+  const fp = stats?.false_positive_count ?? 0;
+  const sessions = stats?.total_sessions ?? 0;
+  const precision = stats?.precision ?? 0;
+  const violPerSess = stats?.violations_per_session ?? 0;
+  const constraints = stats?.constraints || [];
+
   return (
     <div className="page-scroll">
       <h1 className="page-h1">Eval</h1>
-      <p className="page-sub">Offline scoring of judge against gold-labeled set <code style={{fontFamily:'var(--font-mono)',fontSize:12,padding:'1px 5px',border:'1px solid var(--rule)',borderRadius:3,background:'var(--paper-2)'}}>finance-grounding-v3</code>.</p>
+      <p className="page-sub">Constraint effectiveness against the local violation log. Annotate via <code style={{fontFamily:'var(--font-mono)',fontSize:12,padding:'1px 5px',border:'1px solid var(--rule)',borderRadius:3,background:'var(--paper-2)'}}>rigor log annotate --false-positive</code> to populate precision.</p>
       <div className="kpi-grid">
-        <div className="kpi-tile good"><div className="kt-label">precision</div><div className="kt-value">0.91</div><div className="kt-meta">↑ 0.04 vs prev</div></div>
-        <div className="kpi-tile good"><div className="kt-label">recall</div><div className="kt-value">0.86</div><div className="kt-meta">↑ 0.02</div></div>
-        <div className="kpi-tile"><div className="kt-label">F1</div><div className="kt-value">0.88</div><div className="kt-meta">−</div></div>
-        <div className="kpi-tile bad"><div className="kt-label">false positives</div><div className="kt-value">14</div><div className="kt-meta">of 312</div></div>
-        <div className="kpi-tile"><div className="kt-label">judged</div><div className="kt-value">312</div><div className="kt-meta">3.4s mean</div></div>
-        <div className="kpi-tile"><div className="kt-label">cost</div><div className="kt-value">$1.84</div><div className="kt-meta">$0.0059/item</div></div>
+        <div className="kpi-tile good"><div className="kt-label">precision</div><div className="kt-value">{precision.toFixed(1)}%</div><div className="kt-meta">on annotated entries</div></div>
+        <div className="kpi-tile"><div className="kt-label">total violations</div><div className="kt-value">{total.toLocaleString()}</div><div className="kt-meta">{constraints.length} constraints fired</div></div>
+        <div className="kpi-tile bad"><div className="kt-label">false positives</div><div className="kt-value">{fp}</div><div className="kt-meta">marked via annotate</div></div>
+        <div className="kpi-tile"><div className="kt-label">sessions</div><div className="kt-value">{sessions}</div><div className="kt-meta">{violPerSess.toFixed(1)} violations / session</div></div>
       </div>
 
       <div className="section-head"><div className="section-h">Per-constraint performance</div></div>
       <table className="table">
-        <thead><tr><th>constraint</th><th>P</th><th>R</th><th>F1</th><th>FP</th><th>FN</th></tr></thead>
+        <thead><tr><th>constraint</th><th>name</th><th>hits</th><th>false positives</th><th>fp rate</th><th>last fired</th></tr></thead>
         <tbody>
-          {[
-            ['C-1041',0.94,0.91,0.92, 4, 6],
-            ['C-2003',0.89,0.93,0.91, 7, 4],
-            ['C-1305',0.81,0.74,0.77, 11, 14],
-            ['C-1102',0.92,0.79,0.85, 3, 12],
-            ['C-1133',0.99,0.99,0.99, 1, 1],
-          ].map((r,i) => (
-            <tr key={i}>
-              <td className="mono name">{r[0]}</td>
-              <td className="mono">{r[1].toFixed(2)}</td>
-              <td className="mono">{r[2].toFixed(2)}</td>
-              <td className="mono">{r[3].toFixed(2)}</td>
-              <td className="mono" style={{color:'var(--signal-violate)'}}>{r[4]}</td>
-              <td className="mono" style={{color:'var(--signal-warn-2)'}}>{r[5]}</td>
+          {constraints.map((c, i) => (
+            <tr key={c.id || i}>
+              <td className="mono name">{c.id}</td>
+              <td>{c.name}</td>
+              <td className="mono">{c.hits}</td>
+              <td className="mono" style={{color: c.false_positives > 0 ? 'var(--signal-violate)' : 'var(--ink-3)'}}>{c.false_positives}</td>
+              <td className="mono" style={{color: c.fp_rate > 20 ? 'var(--signal-warn-2)' : 'var(--ink-3)'}}>{c.fp_rate.toFixed(1)}%</td>
+              <td className="mono dim">{fmtTs(c.last_fired)}</td>
             </tr>
           ))}
+          {constraints.length === 0 && (
+            <tr><td colSpan="6" style={{textAlign:'center', color:'var(--ink-3)', padding:'24px'}}>No violations logged yet.</td></tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -226,30 +263,57 @@ function EvalPage() {
 
 // ====== Constraints (catalog/editor) ======
 function ConstraintsPage() {
+  const rigor = useRigorData();
+  const [govList, setGovList] = useState(null);
+  const [filter, setFilter] = useState('');
+
+  const refresh = () => {
+    fetch('/api/governance/constraints').then(r => r.ok ? r.json() : null).then(setGovList).catch(() => {});
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const toggleLive = (id) => {
+    fetch('/api/governance/constraints/' + encodeURIComponent(id) + '/toggle', { method: 'POST' })
+      .then(refresh)
+      .catch(() => {});
+  };
+
+  // Prefer governance API for live state; fall back to /graph.json constraints.
+  const rows = (govList || rigor.constraints || []).map(c => ({
+    id: c.id,
+    label: c.label || c.name || c.id,
+    scope: c.scope || c.domain || 'general',
+    epistemic: c.epistemic || c.epistemic_type || '—',
+    live: c.live !== false,
+  })).filter(c => !filter || (c.id + c.label + c.scope).toLowerCase().includes(filter.toLowerCase()));
+
   return (
     <div className="page-scroll">
       <h1 className="page-h1">Constraints</h1>
-      <p className="page-sub">The compiled constraint set this proxy enforces. Edit, retire, or roll forward.</p>
+      <p className="page-sub">The compiled constraint set this proxy enforces. Click a toggle to enable / disable live.</p>
       <div className="search-bar">
-        <input placeholder="Filter by id, label, scope…" />
-        <select><option>all scopes</option><option>finance</option><option>editorial</option><option>safety</option></select>
-        <button className="btn btn-primary btn-sm">+ New constraint</button>
+        <input placeholder="Filter by id, label, scope…" value={filter} onChange={e=>setFilter(e.target.value)}/>
+        <button className="btn btn-secondary btn-sm" onClick={refresh}>Refresh</button>
       </div>
       <table className="table">
-        <thead><tr><th>id</th><th>label</th><th>scope</th><th>severity</th><th>live</th><th>last edit</th></tr></thead>
+        <thead><tr><th>id</th><th>label</th><th>scope</th><th>epistemic</th><th>live</th></tr></thead>
         <tbody>
-          {RIGOR_DATA.constraints.map(c => (
+          {rows.map(c => (
             <tr key={c.id}>
               <td className="mono name">{c.id}</td>
               <td>{c.label}</td>
               <td className="mono dim">{c.scope}</td>
-              <td><span className={'badge ' + (c.scope==='safety'?'badge-violate':c.scope==='finance'?'badge-warn':'badge-neutral')}>
-                {c.scope==='safety'?'block':c.scope==='finance'?'warn+block':'warn'}
-              </span></td>
-              <td><span className={'toggle' + (c.live ? ' on' : '')} style={{display:'inline-block',verticalAlign:'middle'}}/></td>
-              <td className="mono dim">2 days ago · jdoe</td>
+              <td className="mono dim">{c.epistemic}</td>
+              <td>
+                <span className={'toggle' + (c.live ? ' on' : '')}
+                      style={{display:'inline-block',verticalAlign:'middle',cursor:'pointer'}}
+                      onClick={() => toggleLive(c.id)}/>
+              </td>
             </tr>
           ))}
+          {rows.length === 0 && (
+            <tr><td colSpan="5" style={{textAlign:'center', color:'var(--ink-3)', padding:'24px'}}>No constraints loaded.</td></tr>
+          )}
         </tbody>
       </table>
     </div>

@@ -13,18 +13,13 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "logFilter": "all"
 }/*EDITMODE-END*/;
 
-function App() {
+function AppInner() {
+  const rigor = useRigorData();
   const [page, setPage] = useState('live');
-  const [activeNode, setActiveNode] = useState('D');
-  const [activeEventId, setActiveEventId] = useState('e5');
+  const [activeNode, setActiveNode] = useState(rigor.nodes.length ? rigor.nodes[0].id : null);
+  const [activeEventId, setActiveEventId] = useState(rigor.events.length ? rigor.events[0].id : null);
+  const [activeRequest, setActiveRequest] = useState(null);
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-
-  // Live throughput counters (animated)
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => (t+1) % 1000), 1200);
-    return () => clearInterval(id);
-  }, []);
 
   // Listen for select-node from log strip
   useEffect(() => {
@@ -33,31 +28,39 @@ function App() {
     return () => window.removeEventListener('select-node', fn);
   }, []);
 
-  // Derived counts
+  // Listen for select-request from log strip — flips drawer to Stream tab.
+  useEffect(() => {
+    const fn = (e) => setActiveRequest(e.detail);
+    window.addEventListener('select-request', fn);
+    return () => window.removeEventListener('select-request', fn);
+  }, []);
+
+  // Derived counts — all from real data, no fakes
   const totals = useMemo(() => {
-    const evs = RIGOR_DATA.events;
+    const evs = rigor.events;
     const claims = evs.filter(e => e.kind === 'claim');
     const pass = claims.filter(c => c.status === 'pass').length;
     const warn = claims.filter(c => c.status === 'warn').length;
     const block = claims.filter(c => c.status === 'block').length;
     const retracts = evs.filter(e => e.kind === 'retract').length;
     return {
-      tps: 38 + Math.round(Math.sin(tick/2) * 6 + 4),
+      tps: rigor.stats.tokens,
       pass, warn, block, retracts,
       passRate: Math.round((pass / Math.max(1, claims.length)) * 100),
-      judgeMs: 124 + Math.round(Math.sin(tick/3) * 18),
+      judgeMs: 0,
     };
-  }, [tick]);
+  }, [rigor.events, rigor.stats]);
 
   const proxy = {
-    tput: 38 + Math.round(Math.sin(tick/2) * 6 + 4),
-    p95: 312 + Math.round(Math.cos(tick/3) * 24),
+    tput: rigor.stats.requests,
+    p95: 0,
     blocks: totals.block,
+    connected: rigor.connected,
   };
 
   const history = useMemo(() => ({
-    tps: Array.from({length: 24}, (_, i) => 30 + Math.round(Math.sin((tick+i)/2.5)*8 + Math.cos((tick+i)/4)*5 + 6)),
-  }), [tick]);
+    tps: [],
+  }), []);
 
   const showLevels = useMemo(() => {
     if (tweaks.logFilter === 'all') return null;
@@ -77,11 +80,14 @@ function App() {
             <Sidebar activeNode={activeNode} setActiveNode={setActiveNode}/>
           )}
           <div className="center">
+            <ActionGateBanner/>
+            <TimelineStrip/>
             <StatStrip totals={totals} history={history}/>
             <ConstraintGraph activeNode={activeNode} setActiveNode={setActiveNode} animPulse={tweaks.graphPulse}/>
+            <JudgeLogStrip/>
             <LogStrip activeEventId={activeEventId} setActiveEventId={setActiveEventId} showLevels={showLevels}/>
           </div>
-          <Drawer activeNode={activeNode} setActiveNode={setActiveNode}/>
+          <Drawer activeNode={activeNode} setActiveNode={setActiveNode} activeRequest={activeRequest}/>
         </div>
       )}
 
@@ -108,6 +114,86 @@ function App() {
         </TweakSection>
       </TweaksPanel>
     </div>
+  );
+}
+
+// ====== Action gate banner — surfaces pending gates for approve/reject ======
+function ActionGateBanner() {
+  const rigor = useRigorData();
+  const pending = (rigor.actionGates || []).filter(g => g.status === 'pending');
+  if (pending.length === 0) return null;
+  const decide = (gate_id, approve) => {
+    fetch('/api/gate/' + encodeURIComponent(gate_id) + '/' + (approve ? 'approve' : 'reject'), { method: 'POST' }).catch(() => {});
+  };
+  return (
+    <div className="action-gate-banner">
+      {pending.map(g => (
+        <div key={g.gate_id} className="action-gate-row">
+          <span className="badge badge-warn">action gate</span>
+          <span className="action-gate-text">{g.action_text}</span>
+          {g.reason && <span className="action-gate-reason">{g.reason}</span>}
+          <span style={{flex:1}}/>
+          <button className="btn btn-secondary btn-sm" onClick={() => decide(g.gate_id, false)}>Reject</button>
+          <button className="btn btn-primary btn-sm" onClick={() => decide(g.gate_id, true)}>Approve</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ====== Timeline strip — per-request latency bars + retry/block markers ======
+function TimelineStrip() {
+  const rigor = useRigorData();
+  const items = (rigor.timeline || []).slice(-80);
+  if (items.length === 0) return null;
+  const maxLat = Math.max(120, ...items.filter(i => i.latency != null).map(i => i.latency));
+  return (
+    <div className="timeline-strip">
+      <span className="t-eyebrow" style={{paddingRight:8}}>timeline</span>
+      <div className="timeline-track">
+        {items.map((it, i) => {
+          if (it.type === 'latency') {
+            const h = Math.max(2, Math.round((it.latency / maxLat) * 18));
+            return <span key={i} className="tl-bar" style={{height:h}} title={`${it.latency}ms`}/>;
+          }
+          if (it.type === 'block') return <span key={i} className="tl-mark tl-mark-block" title="block"/>;
+          if (it.type === 'retry') return <span key={i} className="tl-mark tl-mark-retry" title="retry"/>;
+          return null;
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ====== Judge log strip — relevance + judge entries audit lane ======
+function JudgeLogStrip() {
+  const rigor = useRigorData();
+  const entries = (rigor.judgeEntries || []).slice(-40);
+  if (entries.length === 0) return null;
+  return (
+    <div className="judge-strip">
+      <div className="judge-head">
+        <span className="t-eyebrow">judge.log</span>
+        <span style={{flex:1}}/>
+        <span className="t-eyebrow" style={{color:'var(--ink-3)'}}>{entries.length}</span>
+      </div>
+      <div className="judge-body">
+        {entries.slice().reverse().map(e => (
+          <div key={e.id} className="judge-row">
+            <span className="judge-kind">{e.kind}</span>
+            <span className="judge-text">{e.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <RigorDataProvider>
+      <AppInner/>
+    </RigorDataProvider>
   );
 }
 

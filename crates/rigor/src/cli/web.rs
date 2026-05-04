@@ -16,7 +16,7 @@ use crate::logging::ViolationLogger;
 use super::find_rigor_yaml;
 
 #[derive(Embed)]
-#[folder = "../../viewer/"]
+#[folder = "../../viewer-legacy/"]
 struct ViewerAssets;
 
 /// Graph data serialized for 3d-force-graph.
